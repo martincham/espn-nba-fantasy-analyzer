@@ -318,8 +318,8 @@ def remainingRateTeams(league, timeframes, totalOrAvg="avg", ignoreStats=["GP"])
     )
     teams = league.teams
 
-    remaningGames = schedule.calcualteRemainingGames(league=league)
-    remainingExtraGames = schedule.calcualteExtraRemainingGames(league=league)
+    remaningGames = schedule.calculateRemainingGames(league=league)
+    remainingExtraGames = schedule.calculateExtraRemainingGames(league=league)
     for team in teams:
         roster = team.roster
         for player in roster:
@@ -366,8 +366,8 @@ def remainingRateFreeAgents(
         ["total", "t diff", "30", "30diff", "15", "15diff", "7", "7diff"]
     )
 
-    remaningGames = schedule.calcualteRemainingGames(league=league)
-    remainingExtraGames = schedule.calcualteExtraRemainingGames(league=league)
+    remaningGames = schedule.calculateRemainingGames(league=league)
+    remainingExtraGames = schedule.calculateExtraRemainingGames(league=league)
     for player in freeAgents:
         playerRatingList = []
         proTeam = player.proTeam

@@ -57,24 +57,25 @@ remainingFAWorksheet = spreadsheet.get_worksheet(14)
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
 info = [["Last updated", updateTime]]
-infoWorksheet.update(info)
+infoWorksheet.update(range_name=info)
 
 avgWorksheet.update(
-    [avgLeagueRatings.columns.values.tolist()] + avgLeagueRatings.values.tolist()
+    range_name=[avgLeagueRatings.columns.values.tolist()]
+    + avgLeagueRatings.values.tolist()
 )
 totalWorksheet.update(
-    [totalLeagueRatings.columns.values.tolist()] + totalLeagueRatings.values.tolist()
+    range_name=[totalLeagueRatings.columns.values.tolist()]
+    + totalLeagueRatings.values.tolist()
 )
 freeAgentWorksheet.update(
-    [freeAgentRatings.columns.values.tolist()] + freeAgentRatings.values.tolist()
+    range_name=[freeAgentRatings.columns.values.tolist()]
+    + freeAgentRatings.values.tolist()
 )
 freeAgentAvgWorksheet.update(
-    [freeAgentAvgRatings.columns.values.tolist()] + freeAgentAvgRatings.values.tolist()
+    range_name=[freeAgentAvgRatings.columns.values.tolist()]
+    + freeAgentAvgRatings.values.tolist()
 )
 
-freeAgentRatings.to_excel(
-    "freeAgentRatings.xlsx",
-)
 
 categoryList = [
     "PTS",
@@ -96,15 +97,13 @@ remRatingMatrix = rating.remainingRateTeams(
     league=league, timeframes=TIMEFRAMES, totalOrAvg="avg", ignoreStats=IGNORESTATS
 )
 
-remainingValueWorksheet.update(remRatingMatrix)
+remainingValueWorksheet.update(range_name=remRatingMatrix)
 
 remFARatingMatrix = rating.remainingRateFreeAgents(
     league=league, freeAgents=freeAgents, timeframes=TIMEFRAMES, ignoreStats=IGNORESTATS
 )
 
-remainingFAWorksheet.update(
-    remFARatingMatrix,
-)
+remainingFAWorksheet.update(range_name=remFARatingMatrix)
 
 
 teamRatingMatrixTotal = rating.categoryRateTeams(
@@ -121,10 +120,10 @@ teamRatingMatrixThirty = rating.categoryRateTeams(
 )
 
 
-teamMatrixTotalWorksheet.update(teamRatingMatrixTotal)
-teamMatrixSevenWorksheet.update(teamRatingMatrixSeven)
-teamMatrixFifteenWorksheet.update(teamRatingMatrixFifteen)
-teamMatrixThirtyWorksheet.update(teamRatingMatrixThirty)
+teamMatrixTotalWorksheet.update(range_name=teamRatingMatrixTotal)
+teamMatrixSevenWorksheet.update(range_name=teamRatingMatrixSeven)
+teamMatrixFifteenWorksheet.update(range_name=teamRatingMatrixFifteen)
+teamMatrixThirtyWorksheet.update(range_name=teamRatingMatrixThirty)
 
 faRatingMatrixTotal = rating.categoryRateFreeAgents(
     league, freeAgents, "2024_total", "total", categoryList, IGNORESTATS
@@ -140,7 +139,7 @@ faRatingMatrixThirty = rating.categoryRateFreeAgents(
 )
 
 
-faMatrixTotalWorksheet.update(faRatingMatrixTotal)
-faMatrixSevenWorksheet.update(faRatingMatrixSeven)
-faMatrixFifteenWorksheet.update(faRatingMatrixFifteen)
-faMatrixThirtyWorksheet.update(faRatingMatrixThirty)
+faMatrixTotalWorksheet.update(range_name=faRatingMatrixTotal)
+faMatrixSevenWorksheet.update(range_name=faRatingMatrixSeven)
+faMatrixFifteenWorksheet.update(range_name=faRatingMatrixFifteen)
+faMatrixThirtyWorksheet.update(range_name=faRatingMatrixThirty)

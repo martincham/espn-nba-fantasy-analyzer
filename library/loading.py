@@ -6,6 +6,7 @@ import time
 
 LEAGUEFILE = "league.pickle"
 FREEAGENTSFILE = "freeagents.pickle"
+LOGINFILE = "login.txt"
 
 
 def saveFile(filename, data):
@@ -24,18 +25,26 @@ def loadFile(filename):
         print("Error during unpickling object (Possibly unsupported):", ex)
 
 
+# Returns league, or 0 if error
 def reloadLeague():
-    file = open("login.txt", "rb")
-    fileInfo = file.read()
-    leagueInfo = json.loads(fileInfo)
-    league = League(
-        league_id=leagueInfo.get("leagueId"),
-        year=2024,
-        espn_s2=leagueInfo.get("espn_s2"),
-        swid=leagueInfo.get("SWID"),
-        debug=False,
-    )
-    file.close()
+    try:
+        file = open(LOGINFILE, "rb")
+        fileInfo = file.read()
+        leagueInfo = json.loads(fileInfo)
+        league = League(
+            league_id=leagueInfo.get("leagueId"),
+            year=2024,
+            espn_s2=leagueInfo.get("espn_s2"),
+            swid=leagueInfo.get("SWID"),
+            debug=False,
+        )
+        file.close()
+    except FileNotFoundError as ex:
+        print("Could not find login file:", ex)
+        return 0
+    except Exception as ex:
+        print("Error loading league: ", ex)
+        return 0
     saveLeague(league)
     return league
 

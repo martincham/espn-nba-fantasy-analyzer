@@ -1,21 +1,41 @@
 import gspread
+import json
+import os
 from datetime import datetime
+import library.loading as loading
 
 ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
 IGNORESTATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]
 TIMEFRAMES = ["2024_total", "2024_last_30", "2024_last_15", "2024_last_7"]
+LOGINFILE = "login.txt"
 
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
 info = [["Last updated", updateTime]]
 
 
-def clearWorkSheets(spreadsheet):
+def getGoogleSheetName():
+    try:
+        file = open(LOGINFILE, "rb")
+        fileInfo = file.read()
+        loginInfo = json.loads(fileInfo)
+        sheetName = loginInfo.get("googleSheet")
+        file.close()
+    except FileNotFoundError as ex:
+        print("Could not find login file:", ex)
+        return 0
+    except Exception as ex:
+        print("Error: ", ex)
+        return 0
+    return sheetName
+
+
+def clearWorksheets(spreadsheet):
     for worksheet in spreadsheet:
         worksheet.clear()
 
 
-def refreshGoogleSheets():
+def pushGoogleSheets():
     league = loading.loadLeague()
 
     freeAgents = loading.loadFreeAgents()
@@ -32,7 +52,7 @@ def refreshGoogleSheets():
 
     # Publish to Google Sheet
     gc = gspread.service_account()
-    spreadsheet = gc.open("AutoFantasyStats24")
+    spreadsheet = gc.open(getGoogleSheetName())
     avgWorksheet = spreadsheet.get_worksheet(1)
     totalWorksheet = spreadsheet.get_worksheet(0)
     freeAgentWorksheet = spreadsheet.get_worksheet(2)

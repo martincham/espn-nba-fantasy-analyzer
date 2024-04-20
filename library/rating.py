@@ -1,6 +1,6 @@
 import pandas as pd
 
-import schedule
+import library.schedule as schedule
 
 
 # 1. get all players,

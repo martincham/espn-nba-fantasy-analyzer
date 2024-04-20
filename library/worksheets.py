@@ -3,11 +3,13 @@ import json
 import os
 from datetime import datetime
 import library.loading as loading
+import library.rating as rating
+import library.schedule as schedule
 
 ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
 IGNORESTATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]
 TIMEFRAMES = ["2024_total", "2024_last_30", "2024_last_15", "2024_last_7"]
-LOGINFILE = "login.txt"
+LOGINFILE = "settings.txt"
 
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
@@ -30,9 +32,14 @@ def getGoogleSheetName():
     return sheetName
 
 
-def clearWorksheets(spreadsheet):
-    for worksheet in spreadsheet:
-        worksheet.clear()
+def clearWorksheets():
+    try:
+        gc = gspread.service_account()
+        spreadsheet = gc.open(getGoogleSheetName())
+        for worksheet in spreadsheet:
+            worksheet.clear()
+    except Exception as ex:
+        print("Error: ", ex)
 
 
 def pushGoogleSheets():
@@ -73,22 +80,22 @@ def pushGoogleSheets():
     now = datetime.now()
     updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
     info = [["Last updated", updateTime]]
-    infoWorksheet.update(range_name=info)
+    infoWorksheet.update(values=info)
 
     avgWorksheet.update(
-        range_name=[avgLeagueRatings.columns.values.tolist()]
+        values=[avgLeagueRatings.columns.values.tolist()]
         + avgLeagueRatings.values.tolist()
     )
     totalWorksheet.update(
-        range_name=[totalLeagueRatings.columns.values.tolist()]
+        values=[totalLeagueRatings.columns.values.tolist()]
         + totalLeagueRatings.values.tolist()
     )
     freeAgentWorksheet.update(
-        range_name=[freeAgentRatings.columns.values.tolist()]
+        values=[freeAgentRatings.columns.values.tolist()]
         + freeAgentRatings.values.tolist()
     )
     freeAgentAvgWorksheet.update(
-        range_name=[freeAgentAvgRatings.columns.values.tolist()]
+        values=[freeAgentAvgRatings.columns.values.tolist()]
         + freeAgentAvgRatings.values.tolist()
     )
 
@@ -111,7 +118,7 @@ def pushGoogleSheets():
         league=league, timeframes=TIMEFRAMES, totalOrAvg="avg", ignoreStats=IGNORESTATS
     )
 
-    remainingValueWorksheet.update(range_name=remRatingMatrix)
+    remainingValueWorksheet.update(values=remRatingMatrix)
 
     remFARatingMatrix = rating.remainingRateFreeAgents(
         league=league,
@@ -120,7 +127,7 @@ def pushGoogleSheets():
         ignoreStats=IGNORESTATS,
     )
 
-    remainingFAWorksheet.update(range_name=remFARatingMatrix)
+    remainingFAWorksheet.update(values=remFARatingMatrix)
 
     teamRatingMatrixTotal = rating.categoryRateTeams(
         league, "2024_total", "total", categoryList, IGNORESTATS
@@ -135,10 +142,10 @@ def pushGoogleSheets():
         league, "2024_last_30", "total", categoryList, IGNORESTATS
     )
 
-    teamMatrixTotalWorksheet.update(range_name=teamRatingMatrixTotal)
-    teamMatrixSevenWorksheet.update(range_name=teamRatingMatrixSeven)
-    teamMatrixFifteenWorksheet.update(range_name=teamRatingMatrixFifteen)
-    teamMatrixThirtyWorksheet.update(range_name=teamRatingMatrixThirty)
+    teamMatrixTotalWorksheet.update(values=teamRatingMatrixTotal)
+    teamMatrixSevenWorksheet.update(values=teamRatingMatrixSeven)
+    teamMatrixFifteenWorksheet.update(values=teamRatingMatrixFifteen)
+    teamMatrixThirtyWorksheet.update(values=teamRatingMatrixThirty)
 
     faRatingMatrixTotal = rating.categoryRateFreeAgents(
         league, freeAgents, "2024_total", "total", categoryList, IGNORESTATS
@@ -153,7 +160,7 @@ def pushGoogleSheets():
         league, freeAgents, "2024_last_30", "total", categoryList, IGNORESTATS
     )
 
-    faMatrixTotalWorksheet.update(range_name=faRatingMatrixTotal)
-    faMatrixSevenWorksheet.update(range_name=faRatingMatrixSeven)
-    faMatrixFifteenWorksheet.update(range_name=faRatingMatrixFifteen)
-    faMatrixThirtyWorksheet.update(range_name=faRatingMatrixThirty)
+    faMatrixTotalWorksheet.update(values=faRatingMatrixTotal)
+    faMatrixSevenWorksheet.update(values=faRatingMatrixSeven)
+    faMatrixFifteenWorksheet.update(values=faRatingMatrixFifteen)
+    faMatrixThirtyWorksheet.update(values=faRatingMatrixThirty)

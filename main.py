@@ -17,13 +17,14 @@ FREEAGENTSFILE = "freeagents.pickle"
 def main():
     league = loading.loadLeague()
     freeAgents = loading.loadFreeAgents()
-    mainMenuExit = False
+    exitMainMenu = False
     mainMenu = [
-        "[1] Refresh League",
-        "[2] Push Google Worksheets",
-        "[3] Generate Excel Worksheets",
-        "[4] Clear Google Worksheets",
-        "[5] Exit",
+        "[1] Refresh League",  # 0 index
+        "[2] Push Google Worksheets",  # 1 index
+        "[3] Generate Excel Worksheets",  # 2 index
+        "[4] Clear Google Worksheets",  # 3 index
+        "[5] Settings",  # 4 index
+        "[6] Exit",  # 5 index
     ]
     terminalMainMenu = TerminalMenu(
         menu_entries=mainMenu, title="ESPN Fantasy BBALL Analyzer"
@@ -41,8 +42,9 @@ def main():
         print(loading.getLeagueSavedTime())
         print("Selected Google Sheet:", end=" ")
         print(worksheets.getGoogleSheetName())
+
     # MENU
-    while not mainMenuExit:
+    while not exitMainMenu:
         mainMenuEntry = terminalMainMenu.show()
 
         if mainMenuEntry == 0:
@@ -50,12 +52,61 @@ def main():
             if refreshLeague() == 1:
                 print("Successfully refreshed league \n")
 
+        elif mainMenuEntry == 1:
+            print("Pushing Google Worksheet...")
+            worksheets.pushGoogleSheets()
+
         elif mainMenuEntry == 3:
-            print("Clearing Google Worksheet")
+            print("Clearing Google Worksheet\n...")
+            worksheets.clearWorksheets()
+            print("Worksheets Cleared!")
 
         elif mainMenuEntry == 4:
-            mainMenuExit = True
+            settingsMenu()
+
+        elif mainMenuEntry == 5:
+            exitMainMenu = True
             print("Quit Selected")
+
+
+def settingsMenu():
+    exitSettingsMenu = False
+    settingsMenu = [
+        "[1] Set ESPN Info",  # 0 index
+        "[2] Set Season",  # 1 index
+        "[3] Set Ignored Stats",  # 2 index
+        "[4] Set Roster Positions",  # 3 index
+        "  ",  # 4 index
+        "[6] Exit",  # 5 index
+    ]
+    terminalSettingsMenu = TerminalMenu(menu_entries=settingsMenu, title="Settings:")
+
+    while not exitSettingsMenu:
+        settingsMenuEntry = terminalSettingsMenu.show()
+
+        if settingsMenuEntry == 0:
+            espnInfoMenu()
+        elif settingsMenuEntry == 5:
+            exitSettingsMenu = True
+
+
+def espnInfoMenu():
+    exitEspnMenu = False
+    espnMenu = [
+        "[1] Set SWID",  # 0 index
+        "[2] Set espn_s2",  # 1 index
+        "[3] Set league_id",  # 2 index
+        "  ",
+        "  ",
+        "[6] Exit",  # 3 index
+    ]
+    terminalEspnMenu = TerminalMenu(menu_entries=espnMenu, title="Settings:")
+
+    while not exitEspnMenu:
+        espnMenuEntry = terminalEspnMenu.show()
+
+        if espnMenuEntry == 5:
+            exitEspnMenu = True
 
 
 # Returns 1 if refresh work. 0 otherwise

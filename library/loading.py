@@ -6,7 +6,7 @@ import time
 
 LEAGUEFILE = "league.pickle"
 FREEAGENTSFILE = "freeagents.pickle"
-LOGINFILE = "login.txt"
+LOGINFILE = "settings.txt"
 
 
 def saveFile(filename, data):

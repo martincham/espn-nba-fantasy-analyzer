@@ -2,6 +2,7 @@ from espn_api.basketball import League
 import library.rating as rating
 import library.schedule as schedule
 import library.loading as loading
+import library.worksheets as worksheets
 from simple_term_menu import TerminalMenu
 
 
@@ -21,7 +22,8 @@ def main():
         "[1] Refresh League",
         "[2] Push Google Worksheets",
         "[3] Generate Excel Worksheets",
-        "[4] Exit",
+        "[4] Clear Google Worksheets",
+        "[5] Exit",
     ]
     terminalMainMenu = TerminalMenu(
         menu_entries=mainMenu, title="ESPN Fantasy BBALL Analyzer"
@@ -37,20 +39,32 @@ def main():
         print(league.year)
         print("Last refreshed:", end=" ")
         print(loading.getLeagueSavedTime())
+        print("Selected Google Sheet:", end=" ")
+        print(worksheets.getGoogleSheetName())
     # MENU
     while not mainMenuExit:
         mainMenuEntry = terminalMainMenu.show()
+
         if mainMenuEntry == 0:
-            print("Refreshing league from ESPN...")
-            refreshLeague()
+            print("Refreshing league from ESPN\n...")
+            if refreshLeague() == 1:
+                print("Successfully refreshed league \n")
+
         elif mainMenuEntry == 3:
+            print("Clearing Google Worksheet")
+
+        elif mainMenuEntry == 4:
             mainMenuExit = True
             print("Quit Selected")
 
 
+# Returns 1 if refresh work. 0 otherwise
 def refreshLeague():
     league = loading.reloadLeague()
+    if league == 0:
+        return 0
     loading.reloadFreeAgents(league)
+    return 1
 
 
 if __name__ == "__main__":

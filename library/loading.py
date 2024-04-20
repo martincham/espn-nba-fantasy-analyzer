@@ -1,7 +1,8 @@
 from espn_api.basketball import League
 import json
 import pickle
-import gspread
+import os
+import time
 
 LEAGUEFILE = "league.pickle"
 FREEAGENTSFILE = "freeagents.pickle"
@@ -61,6 +62,6 @@ def loadFreeAgents():
     return loadFile(FREEAGENTSFILE)
 
 
-def clearWorkSheets(spreadsheet):
-    for worksheet in spreadsheet:
-        worksheet.clear()
+def getLeagueSavedTime():
+    modifiedTime = os.path.getmtime(LEAGUEFILE)
+    return time.ctime(modifiedTime)

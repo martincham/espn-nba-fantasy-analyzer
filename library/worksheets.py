@@ -10,6 +10,11 @@ updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
 info = [["Last updated", updateTime]]
 
 
+def clearWorkSheets(spreadsheet):
+    for worksheet in spreadsheet:
+        worksheet.clear()
+
+
 def refreshGoogleSheets():
     league = loading.loadLeague()
 

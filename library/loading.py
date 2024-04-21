@@ -6,7 +6,7 @@ import time
 
 LEAGUEFILE = "league.pickle"
 FREEAGENTSFILE = "freeagents.pickle"
-LOGINFILE = "settings.txt"
+SETTINGFILE = "settings.txt"
 
 
 def saveFile(filename, data):
@@ -28,7 +28,7 @@ def loadFile(filename):
 # Returns league, or 0 if error
 def reloadLeague():
     try:
-        file = open(LOGINFILE, "rb")
+        file = open(SETTINGFILE, "rb")
         fileInfo = file.read()
         leagueInfo = json.loads(fileInfo)
         league = League(

@@ -9,7 +9,7 @@ import library.schedule as schedule
 ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
 IGNORESTATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]
 TIMEFRAMES = ["2024_total", "2024_last_30", "2024_last_15", "2024_last_7"]
-LOGINFILE = "settings.txt"
+SETTINGFILE = "settings.txt"
 
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
@@ -18,7 +18,7 @@ info = [["Last updated", updateTime]]
 
 def getGoogleSheetName():
     try:
-        file = open(LOGINFILE, "rb")
+        file = open(SETTINGFILE, "rb")
         fileInfo = file.read()
         loginInfo = json.loads(fileInfo)
         sheetName = loginInfo.get("googleSheet")

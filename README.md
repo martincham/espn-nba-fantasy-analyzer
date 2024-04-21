@@ -1,3 +1,5 @@
-# espn-nba-fantasy-analyzer
+# ESPN NBA Fantasy Basketball Analyzer
 
-Analyzes player value in ESPN NBA fantasy leagues
+### Generates overall, and category player valuations over various timespans
+
+To setup:

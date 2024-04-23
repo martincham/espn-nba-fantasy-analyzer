@@ -1,5 +1,6 @@
 login.txt
 settings.txt
+*.txt
 *.pickle
 *.xlsx
 .vscode

@@ -76,7 +76,7 @@ def settingsMenu():
         "[2] Set Season",  # 1 index
         "[3] Set Ignored Stats",  # 2 index
         "[4] Set Roster Positions",  # 3 index
-        None,
+        "[5] Set Worksheet Name",  # 4 index
         "[6] Exit",  # 5 index
     ]
     terminalSettingsMenu = TerminalMenu(
@@ -91,7 +91,11 @@ def settingsMenu():
         elif settingsMenuEntry == 1:
             changeSetting("seasonId")
         elif settingsMenuEntry == 2:
-            
+            ignoredStatsMenu()
+        elif settingsMenuEntry == 3:
+            rosterPositionMenu()
+        elif settingsMenuEntry == 4:
+            changeSetting("googleSheet")
         elif settingsMenuEntry == 5:
             exitSettingsMenu = True
 
@@ -123,22 +127,36 @@ def espnInfoMenu():
             exitEspnMenu = True
 
 
+def ignoredStatsMenu():
+    return 0
+
+
+def rosterPositionMenu():
+    return 0
+
+
 def changeSetting(settingName):
     try:
-        file = open(SETTINGFILE, "r+b")
+        file = open(SETTINGFILE, "r")
         fileInfo = file.read()
         settings = json.loads(fileInfo)
+        file.close()
 
         settingValue = settings.get(settingName)
         print(settingName, " : ", settingValue)
         print("Enter your new", settingName, end=" ")
         newValue = input(": ")
-        print("Change ", settingName, " to ", newValue, end="  ")
-        confirm = input("Confirm(y/n)")
-        if confirm.lower() == "y":
-            settings.update({settingName: newValue})
-            print("Updated.")
-            json.dump(settings, file)
+        print("Change", settingName, "to", newValue, end="  ")
+        if newValue != "":
+            confirm = input("Confirm(y/n)")
+            if confirm.lower() == "y":
+                file = open(SETTINGFILE, "w")
+                settings.update({settingName: newValue})
+                json.dump(settings, file, indent=4)
+                print("Updated.")
+                file.close()
+            else:
+                print("Not updated.")
         else:
             print("Not updated.")
         file.close()

@@ -88,6 +88,10 @@ def settingsMenu():
 
         if settingsMenuEntry == 0:
             espnInfoMenu()
+        elif settingsMenuEntry == 1:
+            changeSetting("seasonId")
+        elif settingsMenuEntry == 2:
+            
         elif settingsMenuEntry == 5:
             exitSettingsMenu = True
 
@@ -111,6 +115,10 @@ def espnInfoMenu():
 
         if espnMenuEntry == 0:
             changeSetting("SWID")
+        if espnMenuEntry == 1:
+            changeSetting("espn_s2")
+        if espnMenuEntry == 1:
+            changeSetting("league_id")
         elif espnMenuEntry == 5:
             exitEspnMenu = True
 

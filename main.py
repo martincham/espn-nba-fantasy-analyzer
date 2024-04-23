@@ -128,10 +128,12 @@ def espnInfoMenu():
 
 
 def ignoredStatsMenu():
+    print("Not implemented yet. Edit your settings.txt manually.")
     return 0
 
 
 def rosterPositionMenu():
+    print("Not implemented yet. Edit your settings.txt manually.")
     return 0
 
 

@@ -5,12 +5,21 @@
     "seasonId": "2024",
     "teamId": 13,
     "googleSheet": "AutoFantasyStats24",
-    "ignoreStats": [
+    "ignoredStats": [
         "FTM",
         "FTA",
         "TO",
         "FGA",
         "FGM",
         "GP"
+    ],
+    "rosterPositions": [
+        "PG",
+        "F",
+        "SG/SF",
+        "SG/SF",
+        "SG/SF",
+        "PF/C",
+        "U"
     ]
 }

@@ -1,5 +1,16 @@
-{"SWID":"{6ED90164-90CD-462C-AC7F-A97B5C651A92}",
-"espn_s2":"AECBd7VH%2FrjJ0BomFavV7pNRpA7dfTsQ2xaWjkd1iRIlMrFIGVWEbG4%2F6whYspTNlp51GBSnjmufHZx9q8trO%2BG7z8BpIE91YYdm90x9t1cbbX3QicVSeCQ6ZjDYqu0AjDYMVLn0anTIrcR0Rqv%2FaKOig4UdFJ3Wfj2BD%2FMgWODja5rscQudL9xChN%2F7Y1D3%2BWhoK4hJySZJZ8mLjehMqMKtrlV6gcuSxd14zk8ZtreaImJxLx9DSl0gp0Wi3CBOXqdRtdrwxGO4hV%2Fwjx7r7dPhsnKOa6WsAJ4fpMlQQOW4Sw%3D%3D",
-"leagueId":1640258594,
-"seasonId":2024,"teamId":13,
-"googleSheet": "AutoFantasyStats24"}
+{
+    "SWID": "0",
+    "espn_s2": " ",
+    "leagueId": 1640258594,
+    "seasonId": "2024",
+    "teamId": 13,
+    "googleSheet": "AutoFantasyStats24",
+    "ignoreStats": [
+        "FTM",
+        "FTA",
+        "TO",
+        "FGA",
+        "FGM",
+        "GP"
+    ]
+}

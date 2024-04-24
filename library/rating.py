@@ -235,7 +235,9 @@ def categoryRateTeams(league, timeframe, totalOrAvg, categoryList, ignoreStats=[
     averages = calculateLeagueAverages(
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
-    resultMatrix = [categoryList]
+    titles = categoryList.copy()
+    titles.append("Rating")
+    resultMatrix = [titles]
     teams = league.teams
     for team in teams:
         roster = team.roster
@@ -250,6 +252,7 @@ def categoryRateTeams(league, timeframe, totalOrAvg, categoryList, ignoreStats=[
         )
 
         resultMatrix.extend(teamMatrix)
+
     return resultMatrix
 
 

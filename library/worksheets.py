@@ -41,9 +41,54 @@ def clearWorksheets():
         print("Error: ", ex)
 
 
+# columns=number of data columns
+def formatWorksheet(worksheet, columns=4):
+    columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
+    topRowRange = "A1:" + chr(64 + columns) + "1"
+    numberRange = "A2:" + chr(64 + columns) + "1000"
+
+    # Top Row Formatting
+    topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
+    gsf.set_frozen(worksheet=worksheet, rows=1)
+    # Format Numbers
+    gsf.set_column_width(worksheet, columnsRange, 40)
+    numberFormat = gsf.CellFormat(
+        numberFormat=gsf.NumberFormat(type="NUMBER", pattern="#,##0"),
+    )
+    gsf.format_cell_ranges(
+        worksheet=worksheet,
+        ranges=[(topRowRange, topRowFormat), (numberRange, numberFormat)],
+    )
+
+    minPoint = gsf.InterpolationPoint(
+        color=gsf.Color(1, 0.7, 0.7),
+        type="NUMBER",
+        value="0",
+    )
+    midPoint = gsf.InterpolationPoint(
+        color=gsf.Color(1, 1, 1),
+        type="NUMBER",
+        value="100",
+    )
+    maxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(0.6, 1, 0.4),
+        type="NUMBER",
+        value="200",
+    )
+    rule = gsf.ConditionalFormatRule(
+        ranges=[gsf.GridRange.from_a1_range(numberRange, worksheet)],
+        gradientRule=gsf.GradientRule(
+            minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
+        ),
+    )
+    rules = gsf.get_conditional_format_rules(worksheet)
+    rules.clear()
+    rules.append(rule)
+    rules.save()
+
+
 def pushGoogleSheets():
     league = loading.loadLeague()
-
     freeAgents = loading.loadFreeAgents()
 
     avgLeagueRatings = rating.leagueTeamRatings(league, "avg", IGNORESTATS)
@@ -85,49 +130,20 @@ def pushGoogleSheets():
         values=[avgLeagueRatings.columns.values.tolist()]
         + avgLeagueRatings.values.tolist()
     )
-    # Formatting
 
-    # Top Row Formatting
-    topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
-    gsf.format_cell_range(
-        worksheet=avgWorksheet, name="A1:Q1", cell_format=topRowFormat
-    )
-    gsf.set_frozen(worksheet=avgWorksheet, rows=1)
-    # Format Numbers
-    gsf.set_column_width(avgWorksheet, "A:D", 40)
-    numberFormat = gsf.CellFormat(
-        numberFormat=gsf.NumberFormat(type="NUMBER", pattern="#,###"),
-    )
-    gsf.format_cell_range(
-        worksheet=avgWorksheet, name="A2:D1000", cell_format=numberFormat
-    )
-    minPoint = gsf.InterpolationPoint(
-        color=gsf.Color(1, 0.7, 0.7),
-        type="NUMBER",
-        value="0",
-    )
-    midPoint = gsf.InterpolationPoint(
-        color=gsf.Color(1, 1, 1),
-        type="NUMBER",
-        value="100",
-    )
-    maxPoint = gsf.InterpolationPoint(
-        color=gsf.Color(0.6, 1, 0.4),
-        type="NUMBER",
-        value="200",
-    )
-    rule = gsf.ConditionalFormatRule(
-        ranges=[gsf.GridRange.from_a1_range("A1:D1000", avgWorksheet)],
-        gradientRule=gsf.GradientRule(
-            minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
-        ),
-    )
-    rules = gsf.get_conditional_format_rules(avgWorksheet)
-    rules.clear()
-    rules.append(rule)
-    rules.save()
+    formatWorksheet(worksheet=avgWorksheet)
+    formatWorksheet(worksheet=totalWorksheet)
+    formatWorksheet(worksheet=freeAgentWorksheet)
+    formatWorksheet(worksheet=freeAgentAvgWorksheet)
+    formatWorksheet(worksheet=teamMatrixTotalWorksheet, columns=13)
+    formatWorksheet(worksheet=teamMatrixSevenWorksheet, columns=13)
+    formatWorksheet(worksheet=teamMatrixFifteenWorksheet, columns=13)
+    formatWorksheet(worksheet=teamMatrixThirtyWorksheet, columns=13)
+    formatWorksheet(worksheet=faMatrixTotalWorksheet, columns=13)
+    formatWorksheet(worksheet=faMatrixSevenWorksheet, columns=13)
+    formatWorksheet(worksheet=faMatrixFifteenWorksheet, columns=13)
+    formatWorksheet(worksheet=faMatrixThirtyWorksheet, columns=13)
 
-    """"
     totalWorksheet.update(
         values=[totalLeagueRatings.columns.values.tolist()]
         + totalLeagueRatings.values.tolist()
@@ -206,5 +222,3 @@ def pushGoogleSheets():
     faMatrixSevenWorksheet.update(values=faRatingMatrixSeven)
     faMatrixFifteenWorksheet.update(values=faRatingMatrixFifteen)
     faMatrixThirtyWorksheet.update(values=faRatingMatrixThirty)
-
-"""

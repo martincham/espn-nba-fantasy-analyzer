@@ -1,10 +1,9 @@
 import gspread
 import json
-import os
 from datetime import datetime
 import library.loading as loading
 import library.rating as rating
-import library.schedule as schedule
+import gspread_formatting as gsf
 
 ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
 IGNORESTATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]
@@ -86,6 +85,49 @@ def pushGoogleSheets():
         values=[avgLeagueRatings.columns.values.tolist()]
         + avgLeagueRatings.values.tolist()
     )
+    # Formatting
+
+    # Top Row Formatting
+    topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
+    gsf.format_cell_range(
+        worksheet=avgWorksheet, name="A1:Q1", cell_format=topRowFormat
+    )
+    gsf.set_frozen(worksheet=avgWorksheet, rows=1)
+    # Format Numbers
+    gsf.set_column_width(avgWorksheet, "A:D", 40)
+    numberFormat = gsf.CellFormat(
+        numberFormat=gsf.NumberFormat(type="NUMBER", pattern="#,###"),
+    )
+    gsf.format_cell_range(
+        worksheet=avgWorksheet, name="A2:D1000", cell_format=numberFormat
+    )
+    minPoint = gsf.InterpolationPoint(
+        color=gsf.Color(1, 0.7, 0.7),
+        type="NUMBER",
+        value="0",
+    )
+    midPoint = gsf.InterpolationPoint(
+        color=gsf.Color(1, 1, 1),
+        type="NUMBER",
+        value="100",
+    )
+    maxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(0.6, 1, 0.4),
+        type="NUMBER",
+        value="200",
+    )
+    rule = gsf.ConditionalFormatRule(
+        ranges=[gsf.GridRange.from_a1_range("A1:D1000", avgWorksheet)],
+        gradientRule=gsf.GradientRule(
+            minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
+        ),
+    )
+    rules = gsf.get_conditional_format_rules(avgWorksheet)
+    rules.clear()
+    rules.append(rule)
+    rules.save()
+
+    """"
     totalWorksheet.update(
         values=[totalLeagueRatings.columns.values.tolist()]
         + totalLeagueRatings.values.tolist()
@@ -164,3 +206,5 @@ def pushGoogleSheets():
     faMatrixSevenWorksheet.update(values=faRatingMatrixSeven)
     faMatrixFifteenWorksheet.update(values=faRatingMatrixFifteen)
     faMatrixThirtyWorksheet.update(values=faRatingMatrixThirty)
+
+"""

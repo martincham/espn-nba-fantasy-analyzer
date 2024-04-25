@@ -17,6 +17,7 @@ python3 -m pip install pandas gspread gspread-formatting espn-api simple-term-me
 ```
 
 Required [Google gspread setup](https://docs.gspread.org/en/latest/oauth2.html) to allow pushing to Google Sheet.
+Make a spreadsheet with 15 worksheets, and share with your service account.
 
 to run:
 
@@ -38,6 +39,32 @@ ESPN Fantasy BBALL Analyzer
   [5] Settings
   [6] Exit
 ```
+
+Refreshing, pushing to Google, clearing Google, and settings work. Excel not working yet.
+
+```
+Settings:
+> [1] Set ESPN Info
+  [2] Set Season
+  [3] Set Ignored Stats
+  [4] Set Roster Positions
+  [5] Set Worksheet Name
+  [6] Exit
+```
+
+You can either manually edit the json in settings.txt, or you can use this settings menu.
+
+```
+Change ESPN Info:
+> [1] Set SWID
+  [2] Set espn_s2
+  [3] Set league_id
+
+
+  [6] Exit
+```
+
+SWID and espn_s2 required for private leagues. league_id is required for all leagues.
 
 This utility scores players where 100 is the average production of players rostered in your league, over the specified timespan. A score of 200 will have double the production, 50 will have half.
 

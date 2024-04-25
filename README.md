@@ -6,16 +6,39 @@
 
 ### Generates overall, and category player valuations over various timespans
 
-Uses [cwendt94/espn-api](https://github.com/cwendt94/espn-api) for fetching data from ESPN.
+Thanks to [cwendt94/espn-api](https://github.com/cwendt94/espn-api) for fetching data from ESPN.
 
-To setup:
+## Setup:
 
-Requires gspread, gspread-formatting, espn-api, and simple-term-menu packages.
+Requires gspread, gspread-formatting, espn-api, and simple-term-menu packages:
 
 ```
 python3 -m pip install gspread gspread-formatting espn-api simple-term-menu
 ```
 
+Required [Google gspread setup](https://docs.gspread.org/en/latest/oauth2.html) to allow pushing to Google Sheet.
+
+to run:
+
 ```
   python3 main.py
 ```
+
+```
+ESPN Fantasy League: YOUR_LEAGUE_NAME_HERE
+Season: 2024
+Last refreshed: Sat Apr 20 19:34:39 2024
+Selected Google Sheet: testSheet
+
+ESPN Fantasy BBALL Analyzer
+> [1] Refresh League
+  [2] Push Google Worksheets
+  [3] Generate Excel Worksheets
+  [4] Clear Google Worksheets
+  [5] Settings
+  [6] Exit
+```
+
+This utility scores players where 100 is the average production of players rostered in your league, over the specified timespan. A score of 200 will have double the production, 50 will have half.
+
+<img src="assets/exampleESPN.png" alt="worksheet example" width="400"/>

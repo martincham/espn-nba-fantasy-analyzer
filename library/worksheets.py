@@ -71,7 +71,7 @@ def formatWorksheet(worksheet, columns=4):
         value="100",
     )
     maxPoint = gsf.InterpolationPoint(
-        color=gsf.Color(0.6, 1, 0.4),
+        color=gsf.Color(0.3, 0.8, 0.6),
         type="NUMBER",
         value="200",
     )

@@ -309,6 +309,9 @@ def createPlayerMatrix(playerStats, averages, categoryList, ignoreStats):
     return playerMatrix
 
 
+## Rates remaining value of players on teams
+## Value is altered by playing schedule, and compared against league average production.
+## Playes who play on days where your roster is full will have less value then players with games on empty days.
 def remainingRateTeams(league, timeframes, totalOrAvg="avg", ignoreStats=["GP"]):
     averages = calculateLeagueAverages(
         league=league, timeframe="2024_total", totalOrAvg=totalOrAvg

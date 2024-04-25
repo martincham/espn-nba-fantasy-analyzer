@@ -10,10 +10,10 @@ Thanks to [cwendt94/espn-api](https://github.com/cwendt94/espn-api) for fetching
 
 ## Setup:
 
-Requires gspread, gspread-formatting, espn-api, and simple-term-menu packages:
+Requires pandas, gspread, gspread-formatting, espn-api, and simple-term-menu packages:
 
 ```
-python3 -m pip install gspread gspread-formatting espn-api simple-term-menu
+python3 -m pip install pandas gspread gspread-formatting espn-api simple-term-menu
 ```
 
 Required [Google gspread setup](https://docs.gspread.org/en/latest/oauth2.html) to allow pushing to Google Sheet.

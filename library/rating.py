@@ -79,9 +79,10 @@ def mergeStats(resultList, adderList):
 
 
 def rosterRater(timeframe, totalOrAvg, team, averages, ignoreStats):
-    rosterRatings = {}
+    teamMatrix = []
     roster = team.roster
     for player in roster:
+        playerMatrix = []
         stats = player.stats.get(timeframe)
         playerAverages = stats.get(totalOrAvg)
         if playerAverages is None:
@@ -130,12 +131,10 @@ def combineTotalRatingTimeframes(
     thirtyRating = rosterRater(
         "2024_last_30", "total", team, averagesThirty, ignoreStats
     )
+    result = []
+    result.extend(seasonRatings, thirtyRating, fifteenRatings, sevenRatings)
 
-    result = pd.concat(
-        [seasonRatings, thirtyRating, fifteenRatings, sevenRatings], axis=1
-    )
-
-    result["Player"] = result.index
+    # result["Player"] = result.index
 
     teamNameList = [team.team_name] * len(team.roster)
     result["Team"] = teamNameList
@@ -167,16 +166,15 @@ def leagueTeamRatings(league, totalOrAvg="total", ignoreStats=["GP"]):
                 averagesFifteen,
                 averagesThirty,
             )
-            frames.append(teamRating)
+            frames.extend(teamRating)
     else:
         averages = calculateLeagueAverages(league, totalOrAvg=totalOrAvg)
         for team in teams:
             teamRating = combineAverageRatingTimeframes(
                 team, averages, totalOrAvg, ignoreStats
             )
-            frames.append(teamRating)
-    resultFrame = pd.concat(frames)
-    return resultFrame
+            frames.extend(teamRating)
+    return frames
 
 
 def leagueFreeAgentRatings(league, freeAgents, totalOrAvg="total", ignoreStats=["GP"]):

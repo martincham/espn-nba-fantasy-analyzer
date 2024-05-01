@@ -9,6 +9,9 @@ ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
 IGNORESTATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]
 TIMEFRAMES = ["2024_total", "2024_last_30", "2024_last_15", "2024_last_7"]
 SETTINGFILE = "settings.txt"
+RED_RGB = [1, 0.07, 0.7]
+WHITE_RGB = [1, 1, 1]
+GREEN_RGB = [0.3, 0.8, 0.6]
 
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
@@ -61,17 +64,17 @@ def formatWorksheet(worksheet, columns=4):
     )
 
     minPoint = gsf.InterpolationPoint(
-        color=gsf.Color(1, 0.7, 0.7),
+        color=gsf.Color(RED_RGB[0], RED_RGB[1], RED_RGB[2]),
         type="NUMBER",
         value="0",
     )
     midPoint = gsf.InterpolationPoint(
-        color=gsf.Color(1, 1, 1),
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
         type="NUMBER",
         value="100",
     )
     maxPoint = gsf.InterpolationPoint(
-        color=gsf.Color(0.3, 0.8, 0.6),
+        color=gsf.Color(GREEN_RGB[0], GREEN_RGB[1], GREEN_RGB[2]),
         type="NUMBER",
         value="200",
     )
@@ -85,7 +88,55 @@ def formatWorksheet(worksheet, columns=4):
     rules.clear()
     rules.append(rule)
     rules.save()
-
+    
+def formatSpreadsheet()
+    gc = gspread.service_account()
+    spreadsheet = gc.open(getGoogleSheetName())
+    totalWorksheet = spreadsheet.get_worksheet(0)
+    avgWorksheet = spreadsheet.get_worksheet(1)
+    freeAgentWorksheet = spreadsheet.get_worksheet(2)
+    freeAgentAvgWorksheet = spreadsheet.get_worksheet(3)
+    teamMatrixTotalWorksheet = spreadsheet.get_worksheet(4)
+    teamMatrixSevenWorksheet = spreadsheet.get_worksheet(5)
+    teamMatrixFifteenWorksheet = spreadsheet.get_worksheet(6)
+    teamMatrixThirtyWorksheet = spreadsheet.get_worksheet(7)
+    faMatrixTotalWorksheet = spreadsheet.get_worksheet(8)
+    faMatrixSevenWorksheet = spreadsheet.get_worksheet(9)
+    faMatrixFifteenWorksheet = spreadsheet.get_worksheet(10)
+    faMatrixThirtyWorksheet = spreadsheet.get_worksheet(11)
+    remainingValueWorksheet = spreadsheet.get_worksheet(12)
+    remainingFAWorksheet = spreadsheet.get_worksheet(13)
+    infoWorksheet = spreadsheet.get_worksheet(14)
+    
+    # names
+    totalWorksheet.title = "total"
+    avgWorksheet.title = "pG"
+    freeAgentWorksheet.title = "FA"
+    freeAgentAvgWorksheet.title = "FApG"
+    teamMatrixTotalWorksheet.title = "cats"
+    teamMatrixSevenWorksheet.title = "cats7"
+    teamMatrixFifteenWorksheet.title = "cats15"
+    teamMatrixThirtyWorksheet = "cats30"
+    faMatrixTotalWorksheet.title = "FAcats"
+    faMatrixSevenWorksheet.title = "FA7"
+    faMatrixFifteenWorksheet.title = "FA15"
+    faMatrixThirtyWorksheet.title = "FA15"
+    remainingValueWorksheet.title = "remValue"
+    remainingFAWorksheet.title = "remFA"
+    infoWorksheet.title = "info"
+    
+    formatWorksheet(worksheet=avgWorksheet)
+    formatWorksheet(worksheet=totalWorksheet)
+    formatWorksheet(worksheet=freeAgentWorksheet)
+    formatWorksheet(worksheet=freeAgentAvgWorksheet)
+    formatWorksheet(worksheet=teamMatrixTotalWorksheet, columns=13)
+    formatWorksheet(worksheet=teamMatrixSevenWorksheet, columns=13)
+    formatWorksheet(worksheet=teamMatrixFifteenWorksheet, columns=13)
+    formatWorksheet(worksheet=teamMatrixThirtyWorksheet, columns=13)
+    formatWorksheet(worksheet=faMatrixTotalWorksheet, columns=13)
+    formatWorksheet(worksheet=faMatrixSevenWorksheet, columns=13)
+    formatWorksheet(worksheet=faMatrixFifteenWorksheet, columns=13)
+    formatWorksheet(worksheet=faMatrixThirtyWorksheet, columns=13)
 
 def pushGoogleSheets():
     league = loading.loadLeague()
@@ -104,8 +155,8 @@ def pushGoogleSheets():
     # Publish to Google Sheet
     gc = gspread.service_account()
     spreadsheet = gc.open(getGoogleSheetName())
-    avgWorksheet = spreadsheet.get_worksheet(1)
     totalWorksheet = spreadsheet.get_worksheet(0)
+    avgWorksheet = spreadsheet.get_worksheet(1)
     freeAgentWorksheet = spreadsheet.get_worksheet(2)
     freeAgentAvgWorksheet = spreadsheet.get_worksheet(3)
     teamMatrixTotalWorksheet = spreadsheet.get_worksheet(4)
@@ -116,10 +167,11 @@ def pushGoogleSheets():
     faMatrixSevenWorksheet = spreadsheet.get_worksheet(9)
     faMatrixFifteenWorksheet = spreadsheet.get_worksheet(10)
     faMatrixThirtyWorksheet = spreadsheet.get_worksheet(11)
-
-    infoWorksheet = spreadsheet.get_worksheet(12)
-    remainingValueWorksheet = spreadsheet.get_worksheet(13)
-    remainingFAWorksheet = spreadsheet.get_worksheet(14)
+    remainingValueWorksheet = spreadsheet.get_worksheet(12)
+    remainingFAWorksheet = spreadsheet.get_worksheet(13)
+    infoWorksheet = spreadsheet.get_worksheet(14)
+    
+    
 
     now = datetime.now()
     updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
@@ -131,18 +183,6 @@ def pushGoogleSheets():
         + avgLeagueRatings.values.tolist()
     )
 
-    formatWorksheet(worksheet=avgWorksheet)
-    formatWorksheet(worksheet=totalWorksheet)
-    formatWorksheet(worksheet=freeAgentWorksheet)
-    formatWorksheet(worksheet=freeAgentAvgWorksheet)
-    formatWorksheet(worksheet=teamMatrixTotalWorksheet, columns=13)
-    formatWorksheet(worksheet=teamMatrixSevenWorksheet, columns=13)
-    formatWorksheet(worksheet=teamMatrixFifteenWorksheet, columns=13)
-    formatWorksheet(worksheet=teamMatrixThirtyWorksheet, columns=13)
-    formatWorksheet(worksheet=faMatrixTotalWorksheet, columns=13)
-    formatWorksheet(worksheet=faMatrixSevenWorksheet, columns=13)
-    formatWorksheet(worksheet=faMatrixFifteenWorksheet, columns=13)
-    formatWorksheet(worksheet=faMatrixThirtyWorksheet, columns=13)
 
     totalWorksheet.update(
         values=[totalLeagueRatings.columns.values.tolist()]

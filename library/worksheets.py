@@ -89,7 +89,7 @@ def formatWorksheet(worksheet, columns=4):
     rules.append(rule)
     rules.save()
     
-def formatSpreadsheet()
+def initializeSpreadsheet()
     gc = gspread.service_account()
     spreadsheet = gc.open(getGoogleSheetName())
     totalWorksheet = spreadsheet.get_worksheet(0)
@@ -109,7 +109,7 @@ def formatSpreadsheet()
     infoWorksheet = spreadsheet.get_worksheet(14)
     
     # names
-    totalWorksheet.title = "total"
+    totalWorksheet.update_title("total")
     avgWorksheet.title = "pG"
     freeAgentWorksheet.title = "FA"
     freeAgentAvgWorksheet.title = "FApG"

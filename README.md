@@ -17,7 +17,6 @@ python3 -m pip install pandas gspread gspread-formatting espn-api simple-term-me
 ```
 
 Required [Google gspread setup](https://docs.gspread.org/en/latest/oauth2.html) to allow pushing to Google Sheet.
-Make a spreadsheet with 15 worksheets, and share with your service account.
 
 to run:
 

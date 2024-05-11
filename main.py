@@ -119,9 +119,9 @@ def espnInfoMenu():
 
         if espnMenuEntry == 0:
             changeSetting("SWID")
-        if espnMenuEntry == 1:
+        elif espnMenuEntry == 1:
             changeSetting("espn_s2")
-        if espnMenuEntry == 1:
+        elif espnMenuEntry == 2:
             changeSetting("league_id")
         elif espnMenuEntry == 5:
             exitEspnMenu = True

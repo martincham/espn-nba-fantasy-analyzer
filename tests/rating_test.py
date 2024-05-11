@@ -1,70 +1,70 @@
 import library.rating as rating
 from espn_api.basketball import League
+from unittest import TestCase
+from unittest import main
 
 
-def testCalculateLeagueAverages():
-    assert 1 == 1
+class RatingTest(TestCase):
+    def setupTests(self):
+        self.league = League(league_id=1640258594)
+
+    def testCalculateLeagueAverages(self):
+        totalAverages = rating.calculateLeagueAverages(
+            league=self.league, timeframe="2024_total", totalOrAvg="total"
+        )
+        avgAverages = rating.calculateLeagueAverages(
+            league=self.league, timeframe="2024_last_30", totalOrAvg="avg"
+        )
+
+    def testRatePlayer(self):
+        # wemby = league.
+        self.assertEqual(3, 3)
+
+    def testAverageStats(self):
+        self.assertEqual(3, 3)
+
+    def testMergeStats(self):
+        self.assertEqual(3, 3)
+
+    def testRosterRater(self):
+        self.assertEqual(3, 3)
+
+    def testAverageRatingTimeFrame(self):
+        self.assertEqual(3, 3)
+
+    def testTotalRatingTimeframe(self):
+        self.assertEqual(3, 3)
+
+    def testLeagueTeamRatings(self):
+        self.assertEqual(3, 3)
+
+    def testLeagueFreeAgentRatings(self):
+        self.assertEqual(3, 3)
+
+    def testRateFreeAgents(self):
+        self.assertEqual(3, 3)
+
+    def testCompositeRateTeamCats(self):
+        self.assertEqual(3, 3)
+
+    def testCategoryRateTeams(self):
+        self.assertEqual(3, 3)
+
+    def testCategoryRateFreeAgents(self):
+        self.assertEqual(3, 3)
+
+    def testCategoryRatePlayerList(self):
+        self.assertEqual(3, 3)
+
+    def testCreatePlayerMatrix(self):
+        self.assertEqual(3, 3)
+
+    def testRemainingRateTeams(self):
+        self.assertEqual(3, 3)
+
+    def testRemainingRateFreeAgents(self):
+        self.assertEqual(3, 3)
 
 
-def testRatePlayer():
-    assert 2 == 2
-
-
-def testAverageStats():
-    assert 3 == 3
-
-
-def testMergeStats():
-    assert 5 == 5
-
-
-def testRosterRater():
-    assert 6 == 6
-
-
-def testAverageRatingTimeFrame():
-    assert 7 == 7
-
-
-def testTotalRatingTimeframe():
-    assert 8 == 8
-
-
-def testLeagueTeamRatings():
-    assert 9 == 9
-
-
-def testLeagueFreeAgentRatings():
-    assert 10 == 10
-
-
-def testRateFreeAgents():
-    assert 11 == 11
-
-
-def testCompositeRateTeamCats():
-    assert 12 == 12
-
-
-def testCategoryRateTeams():
-    assert 13 == 13
-
-
-def testCategoryRateFreeAgents():
-    assert 14 == 14
-
-
-def testCategoryRatePlayerList():
-    assert 15 == 15
-
-
-def testCreatePlayerMatrix():
-    assert 16 == 16
-
-
-def testRemainingRateTeams():
-    assert 17 == 17
-
-
-def testRemainingRateFreeAgents():
-    assert 18 == 18
+if __name__ == "__main__":
+    main()

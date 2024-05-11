@@ -1,4 +1,4 @@
-import library.rating as rating
+from ..library import rating
 from espn_api.basketball import League
 from unittest import TestCase
 from unittest import main

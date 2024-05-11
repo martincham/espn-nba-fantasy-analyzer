@@ -89,7 +89,7 @@ def formatWorksheet(worksheet, columns=4):
     rules.append(rule)
     rules.save()
     
-def initializeSpreadsheet()
+def initializeSpreadsheet():
     gc = gspread.service_account()
     spreadsheet = gc.open(getGoogleSheetName())
     totalWorksheet = spreadsheet.get_worksheet(0)

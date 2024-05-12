@@ -1,19 +1,24 @@
-from ..library import rating
+from library import rating
 from espn_api.basketball import League
-from unittest import TestCase
-from unittest import main
+import unittest
 
 
-class RatingTest(TestCase):
-    def setupTests(self):
-        self.league = League(league_id=1640258594)
+class TestRating(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+        self.league = League(league_id=1640258594, year=2024)
+
+    @classmethod
+    def tearDownClass(self):
+        temp = 1
 
     def testCalculateLeagueAverages(self):
+        league = self.league
         totalAverages = rating.calculateLeagueAverages(
-            league=self.league, timeframe="2024_total", totalOrAvg="total"
+            league=league, timeframe="2024_total", totalOrAvg="total"
         )
         avgAverages = rating.calculateLeagueAverages(
-            league=self.league, timeframe="2024_last_30", totalOrAvg="avg"
+            league=league, timeframe="2024_last_30", totalOrAvg="avg"
         )
 
     def testRatePlayer(self):
@@ -67,4 +72,4 @@ class RatingTest(TestCase):
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

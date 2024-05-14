@@ -110,6 +110,18 @@ class TestRating(unittest.TestCase):
         tWembyRating = 202.93837488950274
         self.assertEqual(wembyRating, tWembyRating)
 
+        # zero stats test
+        grant = oakland.roster[6]
+        grantStats = grant.stats["2024_last_15"].get("total")
+        totalAverages = rating.calculateLeagueAverages(
+            league=league, timeframe="2024_last_15", totalOrAvg="total"
+        )
+        grantRating = rating.ratePlayer(
+            playerStats=grantStats, averages=totalAverages, ignoreStats=ignoreStats
+        )
+        tGrantRating = 0
+        self.assertEqual(grantRating, tGrantRating)
+
     def testAverageStats(self):
         self.assertEqual(3, 3)
 

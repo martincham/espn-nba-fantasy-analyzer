@@ -55,6 +55,7 @@ def main():
         elif mainMenuEntry == 1:
             print("Pushing Google Worksheet...")
             worksheets.pushGoogleSheets()
+            print("Sheet pushed.")
 
         elif mainMenuEntry == 3:
             print("Clearing Google Worksheet\n...")

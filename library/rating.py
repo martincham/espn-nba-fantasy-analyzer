@@ -45,6 +45,8 @@ def calculateLeagueAverages(league, timeframe="2024_total", totalOrAvg="total"):
 
 def ratePlayer(playerStats, averages, ignoreStats):
     totalRating = 0
+    if playerStats is None:
+        return 0
     for stat in averages:
         if stat in ignoreStats:
             continue

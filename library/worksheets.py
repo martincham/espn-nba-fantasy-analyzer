@@ -9,7 +9,7 @@ ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
 IGNORESTATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]
 TIMEFRAMES = ["2024_total", "2024_last_30", "2024_last_15", "2024_last_7"]
 SETTINGFILE = "settings.txt"
-RED_RGB = [1, 0.07, 0.7]
+RED_RGB = [1, 0.7, 0.7]
 WHITE_RGB = [1, 1, 1]
 GREEN_RGB = [0.3, 0.8, 0.6]
 
@@ -47,7 +47,9 @@ def clearWorksheets():
 # columns=number of data columns
 def formatWorksheet(batch, worksheet, columns=4):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
-    topRowRange = "A1:" + chr(64 + columns) + "1"
+    topRowRange = (
+        "A1:" + chr(64 + columns + 2) + "1"
+    )  # plus 2 for  name and team columns
     numberRange = "A2:" + chr(64 + columns) + "1000"
 
     # Top Row Formatting

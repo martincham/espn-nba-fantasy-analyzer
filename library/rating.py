@@ -327,7 +327,9 @@ def remainingRateTeams(league, timeframes, totalOrAvg="avg", ignoreStats=["GP"])
     teams = league.teams
 
     remaningGames = schedule.calculateRemainingGames(league=league)
-    remainingExtraGames = schedule.calculateExtraRemainingGames(league=league)
+    remainingExtraGames = schedule.calculateExtraRemainingGames(
+        league=league, teamNumber=7
+    )
     for team in teams:
         roster = team.roster
         for player in roster:

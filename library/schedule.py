@@ -5,14 +5,14 @@ from copy import deepcopy
 ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "UT"]
 
 
-def calculateExtraRemainingGames(league):
+def calculateExtraRemainingGames(league, teamNumber, ignorePlayers=0):
     remainingGames = {}
     teamCount = 0
     now = date.today()
 
-    oakland = deepcopy(league.teams[7])
-    del oakland.roster[-3]
-    oaklandSchedule = myTeamSchedule(oakland)
+    myTeam = deepcopy(league.teams[teamNumber])  # CHANGE 7 to teamNumber
+    del myTeam.roster[ignorePlayers]
+    mySchedule = myTeamSchedule(myTeam)
 
     teams = league.teams
     for team in teams:
@@ -27,8 +27,8 @@ def calculateExtraRemainingGames(league):
                 gameTime = game.get("date")
                 gameDay = gameTime.date()
                 if gameDay > now:
-                    if gameDay in oaklandSchedule:
-                        if oaklandSchedule.get(gameDay) < 8:
+                    if gameDay in mySchedule:
+                        if mySchedule.get(gameDay) < 8:
                             gameCount += 1
             remainingGames[proTeam] = gameCount
             teamCount += 1

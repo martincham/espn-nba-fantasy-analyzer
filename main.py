@@ -1,10 +1,10 @@
-from espn_api.basketball import League
 import json
+from simple_term_menu import TerminalMenu
+import config
 import library.rating as rating
 import library.schedule as schedule
 import library.loading as loading
 import library.worksheets as worksheets
-from simple_term_menu import TerminalMenu
 
 
 ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
@@ -16,7 +16,7 @@ SETTINGFILE = "settings.txt"
 
 def main():
     league = loading.loadLeague()
-    freeAgents = loading.loadFreeAgents()
+
     exitMainMenu = False
     mainMenu = [
         "[1] Refresh League",  # 0 index

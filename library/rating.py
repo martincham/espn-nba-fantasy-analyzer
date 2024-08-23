@@ -148,6 +148,8 @@ def leagueTeamRatings(league, totalOrAvg="total", ignoreStats=["GP"]):
     frames = []
     teams = league.teams
     if totalOrAvg == "total":
+        # must calculate averages seperately for totals
+        # e.g. total points scored over 2 weeks is higher than over 1 week
         averagesWhole = calculateLeagueAverages(
             league, "2024_total", totalOrAvg=totalOrAvg
         )
@@ -171,6 +173,7 @@ def leagueTeamRatings(league, totalOrAvg="total", ignoreStats=["GP"]):
             )
             frames.append(teamRating)
     else:
+        # on the other hand, this just uses season averages
         averages = calculateLeagueAverages(league, totalOrAvg=totalOrAvg)
         for team in teams:
             teamRating = combineAverageRatingTimeframes(

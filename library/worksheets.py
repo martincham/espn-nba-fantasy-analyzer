@@ -198,23 +198,13 @@ def pushGoogleSheets():
     info = [["Last updated", updateTime]]
     infoWorksheet.update(values=info)
 
-    avgWorksheet.update(
-        values=[avgLeagueRatings.columns.values.tolist()]
-        + avgLeagueRatings.values.tolist()
-    )
+    ### DELETE
+    titles = ["total", "30", "15", "7", "Player", "Team"]
 
-    totalWorksheet.update(
-        values=[totalLeagueRatings.columns.values.tolist()]
-        + totalLeagueRatings.values.tolist()
-    )
-    freeAgentWorksheet.update(
-        values=[freeAgentRatings.columns.values.tolist()]
-        + freeAgentRatings.values.tolist()
-    )
-    freeAgentAvgWorksheet.update(
-        values=[freeAgentAvgRatings.columns.values.tolist()]
-        + freeAgentAvgRatings.values.tolist()
-    )
+    avgWorksheet.update(values=[titles] + avgLeagueRatings.values.tolist())
+    totalWorksheet.update(values=[titles] + totalLeagueRatings.values.tolist())
+    freeAgentWorksheet.update(values=[titles] + freeAgentRatings.values.tolist())
+    freeAgentAvgWorksheet.update(values=[titles] + freeAgentAvgRatings.values.tolist())
 
     categoryList = [
         "PTS",

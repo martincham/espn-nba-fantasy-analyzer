@@ -198,9 +198,7 @@ def pushGoogleSheets():
     info = [["Last updated", updateTime]]
     infoWorksheet.update(values=info)
 
-    ### DELETE
-    titles = ["total", "30", "15", "7", "Player", "Team"]
-
+    titles = ["Total", "30", "15", "7", "Player", "Team"]
     avgWorksheet.update(values=[titles] + avgLeagueRatings.values.tolist())
     totalWorksheet.update(values=[titles] + totalLeagueRatings.values.tolist())
     freeAgentWorksheet.update(values=[titles] + freeAgentRatings.values.tolist())

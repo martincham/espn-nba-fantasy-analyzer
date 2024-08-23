@@ -60,7 +60,7 @@ def calculateRemainingGames(league):
                     gameCount += 1
             remainingGames[proTeam] = gameCount
             teamCount += 1
-            if teamCount > 29:
+            if teamCount > 29:  # found all 30 teams in league
                 break
         if teamCount > 29:
             break

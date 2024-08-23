@@ -1,0 +1,25 @@
+{
+    "SWID": "{123}",
+    "espn_s2": "abcd",
+    "leagueId": 1640258594,
+    "seasonId": "2024",
+    "teamId": 13,
+    "googleSheet": "testSheet",
+    "ignoredStats": [
+        "FTM",
+        "FTA",
+        "TO",
+        "FGA",
+        "FGM",
+        "GP"
+    ],
+    "rosterPositions": [
+        "PG",
+        "F",
+        "SG/SF",
+        "SG/SF",
+        "SG/SF",
+        "PF/C",
+        "U"
+    ]
+}

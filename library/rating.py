@@ -376,6 +376,11 @@ def remainingRateFreeAgents(
     for player in freeAgents:
         playerRatingList = []
         proTeam = player.proTeam
+        remGames = remaningGames.get(proTeam)
+        if remGames is None:
+            continue  # Player is a free agent (in the real NBA, not fantasy) ond not on a team
+        extraGames = remainingExtraGames.get(proTeam)
+        notExtraGames = remGames - extraGames
         for timeframe in timeframes:
             playerStats = player.stats.get(timeframe)
             playerAvgStats = playerStats.get("avg")
@@ -388,9 +393,7 @@ def remainingRateFreeAgents(
                 averages=averages,
                 ignoreStats=ignoreStats,
             )
-            remGames = remaningGames.get(proTeam)
-            extraGames = remainingExtraGames.get(proTeam)
-            notExtraGames = remGames - extraGames
+
             totalRating = remGames * rating
             extraGamesRating = extraGames * rating
             notExtraGamesRating = notExtraGames * (rating - 80)

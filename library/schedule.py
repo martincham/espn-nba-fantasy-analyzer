@@ -26,7 +26,7 @@ def calculateExtraRemainingGames(league):
             for game in schedule.values():
                 gameTime = game.get("date")
                 gameDay = gameTime.date()
-                if gameDay < now:
+                if gameDay > now:
                     if gameDay in oaklandSchedule:
                         if oaklandSchedule.get(gameDay) < 8:
                             gameCount += 1
@@ -56,7 +56,7 @@ def calculateRemainingGames(league):
             for game in schedule.values():
                 gameTime = game.get("date")
                 gameDay = gameTime.date()
-                if gameDay < now:
+                if gameDay > now:
                     gameCount += 1
             remainingGames[proTeam] = gameCount
             teamCount += 1

@@ -88,12 +88,13 @@ def formatWorksheet(batch, worksheet, columns=4):
     rules.clear()
     rules.append(rule)
     rules.save()
-    
-def formatRemainingValueWorksheet(batch, worksheet, columns = 8)
+
+
+def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
     topRowRange = "A1:" + chr(64 + columns) + "1"
     numberRange = "A2:" + chr(64 + columns) + "1000"
-    
+
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
     batch.set_frozen(worksheet=worksheet, rows=1)
@@ -106,7 +107,6 @@ def formatRemainingValueWorksheet(batch, worksheet, columns = 8)
         worksheet=worksheet,
         ranges=[(topRowRange, topRowFormat), (numberRange, numberFormat)],
     )
-    
 
 
 def initializeSpreadsheet():

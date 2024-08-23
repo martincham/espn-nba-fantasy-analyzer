@@ -123,6 +123,7 @@ class TestRating(unittest.TestCase):
         self.assertEqual(grantRating, tGrantRating)
 
     def testAverageStats(self):
+        league = self.league
         self.assertEqual(3, 3)
 
     def testMergeStats(self):

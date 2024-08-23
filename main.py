@@ -20,10 +20,10 @@ def main():
     exitMainMenu = False
     mainMenu = [
         "[1] Refresh League",  # 0 index
-        "[2] Push Google Worksheets",  # 1 index
-        "[3] Generate Excel Worksheets",  # 2 index
-        "[4] Clear Google Worksheets",  # 3 index
-        "[5] Settings",  # 4 index
+        "[2] Google Sheets Menu",  # 1 index
+        "[3] Excel Spreadsheets Menu",  # 2 index
+        "[4] Settings",  # 3 index
+        None,  # 4 index
         "[6] Exit",  # 5 index
     ]
     terminalMainMenu = TerminalMenu(
@@ -53,21 +53,50 @@ def main():
                 print("Successfully refreshed league \n")
 
         elif mainMenuEntry == 1:
-            print("Pushing Google Worksheet...")
-            worksheets.pushGoogleSheets()
-            print("Sheet pushed.")
+            googleSheetsMenu()
 
         elif mainMenuEntry == 3:
-            print("Clearing Google Worksheet\n...")
-            worksheets.clearWorksheets()
-            print("Worksheets Cleared!")
-
-        elif mainMenuEntry == 4:
             settingsMenu()
 
         elif mainMenuEntry == 5:
             exitMainMenu = True
             print("Quit Selected")
+
+
+def googleSheetsMenu():
+    exitMenu = False
+    menu = [
+        "[1] Push Google Sheet",  # 0 index
+        "[2] Initialize Google Sheet",  # 1 index
+        "[3] Clear Google Sheet",  # 2 index
+        "[4] Set Sheet Name",  # 3 index
+        None,  # 4 index
+        "[6] Exit",  # 5 index,  # 5 index
+    ]
+    terminalMenu = TerminalMenu(
+        menu_entries=menu, title="Google Sheet:", skip_empty_entries=True
+    )
+
+    while not exitMenu:
+        menuEntry = terminalMenu.show()
+
+        if menuEntry == 0:
+            print("Pushing Google Sheet...")
+            worksheets.pushGoogleSheets()
+            print("Sheet pushed.")
+        elif menuEntry == 1:
+            print("Initializing Google Sheet\n...")
+            worksheets.initializeSpreadsheet()
+            print("Worksheets Cleared!")
+        elif menuEntry == 2:
+            print("Clearing Google Sheet\n...")
+            worksheets.clearWorksheets()
+            print("Sheet Cleared!")
+        elif menuEntry == 3:
+            changeSetting("googleSheet")
+
+        elif menuEntry == 5:
+            exitMenu = True
 
 
 def settingsMenu():

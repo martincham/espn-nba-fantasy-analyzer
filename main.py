@@ -1,17 +1,14 @@
 import json
 from simple_term_menu import TerminalMenu
-import config
-import library.rating as rating
-import library.schedule as schedule
+import library.config as config
 import library.loading as loading
 import library.worksheets as worksheets
 
 
-ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
-
-IGNORESTATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]
-TIMEFRAMES = ["2024_total", "2024_last_30", "2024_last_15", "2024_last_7"]
-SETTINGFILE = "settings.txt"
+ROSTER_POSITIONS = config.ROSTER_POSITIONS
+IGNORE_STATS = config.IGNORE_STATS
+TIMEFRAMES = config.TIMEFRAMES
+SETTING_FILE = config.SETTING_FILE
 
 
 def main():
@@ -67,7 +64,7 @@ def googleSheetsMenu():
     exitMenu = False
     menu = [
         "[1] Push Google Sheet",  # 0 index
-        "[2] Initialize Google Sheet",  # 1 index
+        "[2] Format Google Sheet",  # 1 index
         "[3] Clear Google Sheet",  # 2 index
         "[4] Set Sheet Name",  # 3 index
         None,  # 4 index
@@ -85,9 +82,9 @@ def googleSheetsMenu():
             worksheets.pushGoogleSheets()
             print("Sheet pushed.")
         elif menuEntry == 1:
-            print("Initializing Google Sheet\n...")
+            print("Format Google Sheet\n...")
             worksheets.initializeSpreadsheet()
-            print("Worksheets Cleared!")
+            print("Worksheets formatted!")
         elif menuEntry == 2:
             print("Clearing Google Sheet\n...")
             worksheets.clearWorksheets()
@@ -136,7 +133,7 @@ def espnInfoMenu():
         "[1] Set SWID",  # 0 index
         "[2] Set espn_s2",  # 1 index
         "[3] Set league_id",  # 2 index
-        None,
+        "[2] Set team number",  # 3 index
         None,
         "[6] Exit",  # 5 index
     ]
@@ -153,6 +150,8 @@ def espnInfoMenu():
             changeSetting("espn_s2")
         elif espnMenuEntry == 2:
             changeSetting("league_id")
+        elif espnMenuEntry == 3:
+            changeSetting("teamNumber")
         elif espnMenuEntry == 5:
             exitEspnMenu = True
 
@@ -169,7 +168,7 @@ def rosterPositionMenu():
 
 def changeSetting(settingName):
     try:
-        file = open(SETTINGFILE, "r")
+        file = open(SETTING_FILE, "r")
         fileInfo = file.read()
         settings = json.loads(fileInfo)
         file.close()
@@ -182,7 +181,7 @@ def changeSetting(settingName):
         if newValue != "":
             confirm = input("Confirm(y/n)")
             if confirm.lower() == "y":
-                file = open(SETTINGFILE, "w")
+                file = open(SETTING_FILE, "w")
                 settings.update({settingName: newValue})
                 json.dump(settings, file, indent=4)
                 print("Updated.")

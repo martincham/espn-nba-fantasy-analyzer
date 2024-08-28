@@ -1,8 +1,8 @@
-from datetime import datetime
 from datetime import date
 from copy import deepcopy
+import library.config as config
 
-ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "UT"]
+ROSTER_POSITIONS = config.ROSTER_POSITIONS
 
 
 def calculateExtraRemainingGames(league, teamNumber, ignorePlayers=0):
@@ -10,7 +10,9 @@ def calculateExtraRemainingGames(league, teamNumber, ignorePlayers=0):
     teamCount = 0
     now = date.today()
 
-    myTeam = deepcopy(league.teams[teamNumber])  # CHANGE 7 to teamNumber
+    if teamNumber > len(league.teams) - 1:
+        return 0
+    myTeam = deepcopy(league.teams[teamNumber])
     del myTeam.roster[ignorePlayers]
     mySchedule = myTeamSchedule(myTeam)
 

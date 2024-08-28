@@ -1,17 +1,19 @@
-import gspread
 import json
 from datetime import datetime
+import gspread
+import gspread_formatting as gsf
 import library.loading as loading
 import library.rating as rating
-import gspread_formatting as gsf
+import library.config as config
 
-ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
-IGNORESTATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]
-TIMEFRAMES = ["2024_total", "2024_last_30", "2024_last_15", "2024_last_7"]
-SETTINGFILE = "settings.txt"
-RED_RGB = [1, 0.7, 0.7]
-WHITE_RGB = [1, 1, 1]
-GREEN_RGB = [0.3, 0.8, 0.6]
+
+ROSTER_POSITIONS = config.ROSTER_POSITIONS
+IGNORE_STATS = config.IGNORE_STATS
+TIMEFRAMES = config.TIMEFRAMES
+SETTING_FILE = config.SETTING_FILE
+RED_RGB = config.RED_RGB
+WHITE_RGB = config.WHITE_RGB
+GREEN_RGB = config.GREEN_RGB
 
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
@@ -20,7 +22,7 @@ info = [["Last updated", updateTime]]
 
 def getGoogleSheetName():
     try:
-        file = open(SETTINGFILE, "rb")
+        file = open(SETTING_FILE, "rb")
         fileInfo = file.read()
         loginInfo = json.loads(fileInfo)
         sheetName = loginInfo.get("googleSheet")
@@ -166,14 +168,14 @@ def pushGoogleSheets():
     league = loading.loadLeague()
     freeAgents = loading.loadFreeAgents()
 
-    avgLeagueRatings = rating.leagueTeamRatings(league, "avg", IGNORESTATS)
-    totalLeagueRatings = rating.leagueTeamRatings(league, "total", IGNORESTATS)
+    avgLeagueRatings = rating.leagueTeamRatings(league, "avg", IGNORE_STATS)
+    totalLeagueRatings = rating.leagueTeamRatings(league, "total", IGNORE_STATS)
 
     freeAgentRatings = rating.leagueFreeAgentRatings(
-        league, freeAgents, "total", IGNORESTATS
+        league, freeAgents, "total", IGNORE_STATS
     )
     freeAgentAvgRatings = rating.leagueFreeAgentRatings(
-        league, freeAgents, "avg", IGNORESTATS
+        league, freeAgents, "avg", IGNORE_STATS
     )
 
     # Publish to Google Sheet
@@ -222,7 +224,10 @@ def pushGoogleSheets():
     ]
 
     remRatingMatrix = rating.remainingRateTeams(
-        league=league, timeframes=TIMEFRAMES, totalOrAvg="avg", ignoreStats=IGNORESTATS
+        league=league,
+        timeframes=TIMEFRAMES,
+        totalOrAvg="avg",
+        IGNORE_STATS=IGNORE_STATS,
     )
 
     remainingValueWorksheet.update(values=remRatingMatrix)
@@ -231,22 +236,22 @@ def pushGoogleSheets():
         league=league,
         freeAgents=freeAgents,
         timeframes=TIMEFRAMES,
-        ignoreStats=IGNORESTATS,
+        IGNORE_STATS=IGNORE_STATS,
     )
 
     remainingFAWorksheet.update(values=remFARatingMatrix)
 
     teamRatingMatrixTotal = rating.categoryRateTeams(
-        league, "2024_total", "total", categoryList, IGNORESTATS
+        league, "2024_total", "total", categoryList, IGNORE_STATS
     )
     teamRatingMatrixSeven = rating.categoryRateTeams(
-        league, "2024_last_7", "total", categoryList, IGNORESTATS
+        league, "2024_last_7", "total", categoryList, IGNORE_STATS
     )
     teamRatingMatrixFifteen = rating.categoryRateTeams(
-        league, "2024_last_15", "total", categoryList, IGNORESTATS
+        league, "2024_last_15", "total", categoryList, IGNORE_STATS
     )
     teamRatingMatrixThirty = rating.categoryRateTeams(
-        league, "2024_last_30", "total", categoryList, IGNORESTATS
+        league, "2024_last_30", "total", categoryList, IGNORE_STATS
     )
 
     teamMatrixTotalWorksheet.update(values=teamRatingMatrixTotal)
@@ -255,16 +260,16 @@ def pushGoogleSheets():
     teamMatrixThirtyWorksheet.update(values=teamRatingMatrixThirty)
 
     faRatingMatrixTotal = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_total", "total", categoryList, IGNORESTATS
+        league, freeAgents, "2024_total", "total", categoryList, IGNORE_STATS
     )
     faRatingMatrixSeven = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_last_7", "total", categoryList, IGNORESTATS
+        league, freeAgents, "2024_last_7", "total", categoryList, IGNORE_STATS
     )
     faRatingMatrixFifteen = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_last_15", "total", categoryList, IGNORESTATS
+        league, freeAgents, "2024_last_15", "total", categoryList, IGNORE_STATS
     )
     faRatingMatrixThirty = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_last_30", "total", categoryList, IGNORESTATS
+        league, freeAgents, "2024_last_30", "total", categoryList, IGNORE_STATS
     )
 
     faMatrixTotalWorksheet.update(values=faRatingMatrixTotal)

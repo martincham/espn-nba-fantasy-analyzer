@@ -3,10 +3,11 @@ import json
 import pickle
 import os
 import time
+import library.config as config
 
-LEAGUEFILE = "league.pickle"
-FREEAGENTSFILE = "freeagents.pickle"
-SETTINGFILE = "settings.txt"
+LEAGUE_FILE = config.LEAGUE_FILE
+FREE_AGENTS_FILE = config.FREE_AGENTS_FILE
+SETTING_FILE = config.SETTING_FILE
 
 
 def saveFile(filename, data):
@@ -28,7 +29,7 @@ def loadFile(filename):
 # Returns league, or 0 if error
 def reloadLeague():
     try:
-        file = open(SETTINGFILE, "rb")
+        file = open(SETTING_FILE, "rb")
         fileInfo = file.read()
         leagueInfo = json.loads(fileInfo)
         league = League(
@@ -50,11 +51,11 @@ def reloadLeague():
 
 
 def loadLeague():
-    return loadFile(LEAGUEFILE)
+    return loadFile(LEAGUE_FILE)
 
 
 def saveLeague(league):
-    saveFile(LEAGUEFILE, league)
+    saveFile(LEAGUE_FILE, league)
 
 
 def reloadFreeAgents(league=League):
@@ -64,13 +65,13 @@ def reloadFreeAgents(league=League):
 
 
 def saveFreeAgents(freeAgents):
-    saveFile(FREEAGENTSFILE, freeAgents)
+    saveFile(FREE_AGENTS_FILE, freeAgents)
 
 
 def loadFreeAgents():
-    return loadFile(FREEAGENTSFILE)
+    return loadFile(FREE_AGENTS_FILE)
 
 
 def getLeagueSavedTime():
-    modifiedTime = os.path.getmtime(LEAGUEFILE)
+    modifiedTime = os.path.getmtime(LEAGUE_FILE)
     return time.ctime(modifiedTime)

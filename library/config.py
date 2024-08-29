@@ -19,5 +19,6 @@ file.close()
 
 ROSTER_POSITIONS = settings.get("rosterPositions")
 IGNORE_STATS = settings.get("ignoredStats")
-TEAM_NUMBER = settings.get("teamNumber")
+TEAM_NUMBER = int(settings.get("teamNumber")) - 1
 IGNORE_PLAYERS = settings.get("ignorePlayers")
+MAX_PLAYERS = int(settings.get("maxPlayers"))

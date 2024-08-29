@@ -273,7 +273,9 @@ def categoryRateFreeAgents(
     averages = calculateLeagueAverages(
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
-    resultMatrix = [categoryList]
+    titles = categoryList.copy()
+    titles.append("Rating")
+    resultMatrix = [titles]
     freeAgentMatrix = categoryRatePlayerList(
         freeAgents, timeframe, totalOrAvg, averages, categoryList, IGNORE_STATS
     )

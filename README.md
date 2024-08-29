@@ -58,7 +58,7 @@ Change ESPN Info:
 > [1] Set SWID
   [2] Set espn_s2
   [3] Set league_id
-
+  [2] Set team number
 
   [6] Exit
 ```

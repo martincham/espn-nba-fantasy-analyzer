@@ -82,7 +82,7 @@ def googleSheetsMenu():
             worksheets.pushGoogleSheets()
             print("Sheet pushed.")
         elif menuEntry == 1:
-            print("Format Google Sheet\n...")
+            print("Formating Google Sheet\n...")
             worksheets.initializeSpreadsheet()
             print("Worksheets formatted!")
         elif menuEntry == 2:

@@ -3,6 +3,7 @@ from copy import deepcopy
 import library.config as config
 
 ROSTER_POSITIONS = config.ROSTER_POSITIONS
+MAX_PLAYERS = config.MAX_PLAYERS
 
 
 def calculateExtraRemainingGames(league, teamNumber, ignorePlayers=0):
@@ -13,7 +14,7 @@ def calculateExtraRemainingGames(league, teamNumber, ignorePlayers=0):
     if teamNumber > len(league.teams) - 1:
         return 0
     myTeam = deepcopy(league.teams[teamNumber])
-    del myTeam.roster[ignorePlayers]
+    del myTeam.roster[-ignorePlayers:]  # removes last X players from list
     mySchedule = myTeamSchedule(myTeam)
 
     teams = league.teams
@@ -30,7 +31,7 @@ def calculateExtraRemainingGames(league, teamNumber, ignorePlayers=0):
                 gameDay = gameTime.date()
                 if gameDay > now:
                     if gameDay in mySchedule:
-                        if mySchedule.get(gameDay) < 8:
+                        if mySchedule.get(gameDay) < MAX_PLAYERS:
                             gameCount += 1
             remainingGames[proTeam] = gameCount
             teamCount += 1

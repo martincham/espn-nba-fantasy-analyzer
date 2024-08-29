@@ -1,17 +1,19 @@
-import gspread
 import json
 from datetime import datetime
+import gspread
+import gspread_formatting as gsf
 import library.loading as loading
 import library.rating as rating
-import gspread_formatting as gsf
+import library.config as config
 
-ROSTER_POSITIONS = ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"]
-IGNORESTATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]
-TIMEFRAMES = ["2024_total", "2024_last_30", "2024_last_15", "2024_last_7"]
-SETTINGFILE = "settings.txt"
-RED_RGB = [1, 0.07, 0.7]
-WHITE_RGB = [1, 1, 1]
-GREEN_RGB = [0.3, 0.8, 0.6]
+
+ROSTER_POSITIONS = config.ROSTER_POSITIONS
+IGNORE_STATS = config.IGNORE_STATS
+TIMEFRAMES = config.TIMEFRAMES
+SETTING_FILE = config.SETTING_FILE
+RED_RGB = config.RED_RGB
+WHITE_RGB = config.WHITE_RGB
+GREEN_RGB = config.GREEN_RGB
 
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
@@ -20,7 +22,7 @@ info = [["Last updated", updateTime]]
 
 def getGoogleSheetName():
     try:
-        file = open(SETTINGFILE, "rb")
+        file = open(SETTING_FILE, "rb")
         fileInfo = file.read()
         loginInfo = json.loads(fileInfo)
         sheetName = loginInfo.get("googleSheet")
@@ -45,9 +47,13 @@ def clearWorksheets():
 
 
 # columns=number of data columns
-def formatWorksheet(batch, worksheet, columns=4):
+def formatWorksheet(
+    batch, worksheet, columns=4, minValue="0", midValue="100", maxValue="200"
+):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
-    topRowRange = "A1:" + chr(64 + columns) + "1"
+    topRowRange = (
+        "A1:" + chr(64 + columns + 3) + "1"
+    )  # plus 2 for  name and team columns
     numberRange = "A2:" + chr(64 + columns) + "1000"
 
     # Top Row Formatting
@@ -66,17 +72,17 @@ def formatWorksheet(batch, worksheet, columns=4):
     minPoint = gsf.InterpolationPoint(
         color=gsf.Color(RED_RGB[0], RED_RGB[1], RED_RGB[2]),
         type="NUMBER",
-        value="0",
+        value=minValue,
     )
     midPoint = gsf.InterpolationPoint(
         color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
         type="NUMBER",
-        value="100",
+        value=midValue,
     )
     maxPoint = gsf.InterpolationPoint(
         color=gsf.Color(GREEN_RGB[0], GREEN_RGB[1], GREEN_RGB[2]),
         type="NUMBER",
-        value="200",
+        value=maxValue,
     )
     rule = gsf.ConditionalFormatRule(
         ranges=[gsf.GridRange.from_a1_range(numberRange, worksheet)],
@@ -158,20 +164,22 @@ def initializeSpreadsheet():
         formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=13)
         formatWorksheet(batch=batch, worksheet=faMatrixFifteenWorksheet, columns=13)
         formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=13)
+        formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
+        formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
 
 
 def pushGoogleSheets():
     league = loading.loadLeague()
     freeAgents = loading.loadFreeAgents()
 
-    avgLeagueRatings = rating.leagueTeamRatings(league, "avg", IGNORESTATS)
-    totalLeagueRatings = rating.leagueTeamRatings(league, "total", IGNORESTATS)
+    avgLeagueRatings = rating.leagueTeamRatings(league, "avg", IGNORE_STATS)
+    totalLeagueRatings = rating.leagueTeamRatings(league, "total", IGNORE_STATS)
 
     freeAgentRatings = rating.leagueFreeAgentRatings(
-        league, freeAgents, "total", IGNORESTATS
+        league, freeAgents, "total", IGNORE_STATS
     )
     freeAgentAvgRatings = rating.leagueFreeAgentRatings(
-        league, freeAgents, "avg", IGNORESTATS
+        league, freeAgents, "avg", IGNORE_STATS
     )
 
     # Publish to Google Sheet
@@ -198,23 +206,11 @@ def pushGoogleSheets():
     info = [["Last updated", updateTime]]
     infoWorksheet.update(values=info)
 
-    avgWorksheet.update(
-        values=[avgLeagueRatings.columns.values.tolist()]
-        + avgLeagueRatings.values.tolist()
-    )
-
-    totalWorksheet.update(
-        values=[totalLeagueRatings.columns.values.tolist()]
-        + totalLeagueRatings.values.tolist()
-    )
-    freeAgentWorksheet.update(
-        values=[freeAgentRatings.columns.values.tolist()]
-        + freeAgentRatings.values.tolist()
-    )
-    freeAgentAvgWorksheet.update(
-        values=[freeAgentAvgRatings.columns.values.tolist()]
-        + freeAgentAvgRatings.values.tolist()
-    )
+    titles = ["Total", "30", "15", "7", "Player", "Team"]
+    avgWorksheet.update(values=[titles] + avgLeagueRatings.values.tolist())
+    totalWorksheet.update(values=[titles] + totalLeagueRatings.values.tolist())
+    freeAgentWorksheet.update(values=[titles] + freeAgentRatings.values.tolist())
+    freeAgentAvgWorksheet.update(values=[titles] + freeAgentAvgRatings.values.tolist())
 
     categoryList = [
         "PTS",
@@ -232,7 +228,10 @@ def pushGoogleSheets():
     ]
 
     remRatingMatrix = rating.remainingRateTeams(
-        league=league, timeframes=TIMEFRAMES, totalOrAvg="avg", ignoreStats=IGNORESTATS
+        league=league,
+        timeframes=TIMEFRAMES,
+        totalOrAvg="avg",
+        IGNORE_STATS=IGNORE_STATS,
     )
 
     remainingValueWorksheet.update(values=remRatingMatrix)
@@ -241,22 +240,22 @@ def pushGoogleSheets():
         league=league,
         freeAgents=freeAgents,
         timeframes=TIMEFRAMES,
-        ignoreStats=IGNORESTATS,
+        IGNORE_STATS=IGNORE_STATS,
     )
 
     remainingFAWorksheet.update(values=remFARatingMatrix)
 
     teamRatingMatrixTotal = rating.categoryRateTeams(
-        league, "2024_total", "total", categoryList, IGNORESTATS
+        league, "2024_total", "total", categoryList, IGNORE_STATS
     )
     teamRatingMatrixSeven = rating.categoryRateTeams(
-        league, "2024_last_7", "total", categoryList, IGNORESTATS
+        league, "2024_last_7", "total", categoryList, IGNORE_STATS
     )
     teamRatingMatrixFifteen = rating.categoryRateTeams(
-        league, "2024_last_15", "total", categoryList, IGNORESTATS
+        league, "2024_last_15", "total", categoryList, IGNORE_STATS
     )
     teamRatingMatrixThirty = rating.categoryRateTeams(
-        league, "2024_last_30", "total", categoryList, IGNORESTATS
+        league, "2024_last_30", "total", categoryList, IGNORE_STATS
     )
 
     teamMatrixTotalWorksheet.update(values=teamRatingMatrixTotal)
@@ -265,16 +264,16 @@ def pushGoogleSheets():
     teamMatrixThirtyWorksheet.update(values=teamRatingMatrixThirty)
 
     faRatingMatrixTotal = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_total", "total", categoryList, IGNORESTATS
+        league, freeAgents, "2024_total", "total", categoryList, IGNORE_STATS
     )
     faRatingMatrixSeven = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_last_7", "total", categoryList, IGNORESTATS
+        league, freeAgents, "2024_last_7", "total", categoryList, IGNORE_STATS
     )
     faRatingMatrixFifteen = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_last_15", "total", categoryList, IGNORESTATS
+        league, freeAgents, "2024_last_15", "total", categoryList, IGNORE_STATS
     )
     faRatingMatrixThirty = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_last_30", "total", categoryList, IGNORESTATS
+        league, freeAgents, "2024_last_30", "total", categoryList, IGNORE_STATS
     )
 
     faMatrixTotalWorksheet.update(values=faRatingMatrixTotal)

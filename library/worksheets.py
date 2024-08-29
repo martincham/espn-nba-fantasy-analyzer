@@ -47,10 +47,12 @@ def clearWorksheets():
 
 
 # columns=number of data columns
-def formatWorksheet(batch, worksheet, columns=4):
+def formatWorksheet(
+    batch, worksheet, columns=4, minValue="0", midValue="100", maxValue="200"
+):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
     topRowRange = (
-        "A1:" + chr(64 + columns + 2) + "1"
+        "A1:" + chr(64 + columns + 3) + "1"
     )  # plus 2 for  name and team columns
     numberRange = "A2:" + chr(64 + columns) + "1000"
 
@@ -70,17 +72,17 @@ def formatWorksheet(batch, worksheet, columns=4):
     minPoint = gsf.InterpolationPoint(
         color=gsf.Color(RED_RGB[0], RED_RGB[1], RED_RGB[2]),
         type="NUMBER",
-        value="0",
+        value=minValue,
     )
     midPoint = gsf.InterpolationPoint(
         color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
         type="NUMBER",
-        value="100",
+        value=midValue,
     )
     maxPoint = gsf.InterpolationPoint(
         color=gsf.Color(GREEN_RGB[0], GREEN_RGB[1], GREEN_RGB[2]),
         type="NUMBER",
-        value="200",
+        value=maxValue,
     )
     rule = gsf.ConditionalFormatRule(
         ranges=[gsf.GridRange.from_a1_range(numberRange, worksheet)],
@@ -162,6 +164,8 @@ def initializeSpreadsheet():
         formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=13)
         formatWorksheet(batch=batch, worksheet=faMatrixFifteenWorksheet, columns=13)
         formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=13)
+        formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
+        formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
 
 
 def pushGoogleSheets():

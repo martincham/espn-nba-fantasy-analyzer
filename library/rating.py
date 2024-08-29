@@ -247,7 +247,7 @@ def categoryRateTeams(league, timeframe, totalOrAvg, categoryList, IGNORE_STATS=
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
     titles = categoryList.copy()
-    titles.append("Rating")
+    titles.extend(["Rating", "Player Name", "Team", "Pro Team"])
     resultMatrix = [titles]
     teams = league.teams
     for team in teams:
@@ -274,7 +274,7 @@ def categoryRateFreeAgents(
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
     titles = categoryList.copy()
-    titles.append("Rating")
+    titles.extend(["Rating", "Player Name", "Team", "Pro Team"])
     resultMatrix = [titles]
     freeAgentMatrix = categoryRatePlayerList(
         freeAgents, timeframe, totalOrAvg, averages, categoryList, IGNORE_STATS
@@ -298,6 +298,7 @@ def categoryRatePlayerList(
     for player in playerList:
         stats = player.stats.get(timeframe)
         playerStats = stats.get(totalOrAvg)
+        proTeam = player.proTeam
         if playerStats is None:
             playerMatrix = [0] * (categoryNum + 1)
 
@@ -310,9 +311,11 @@ def categoryRatePlayerList(
         injuryStatus = player.injuryStatus
         if not isinstance(injuryStatus, str):
             injuryStatus = "?"
-        if teamName is not None:
-            playerMatrix.append(teamName)
+
+        playerMatrix.append(teamName if teamName is not None else "")
+        playerMatrix.append(proTeam if proTeam is not None else "")
         resultMatrix.append(playerMatrix)
+
     return resultMatrix
 
 
@@ -336,7 +339,19 @@ def remainingRateTeams(league, timeframes, totalOrAvg="avg", IGNORE_STATS=["GP"]
     )
     resultMatrix = []
     resultMatrix.append(
-        ["total", "t diff", "30", "30diff", "15", "15diff", "7", "7diff"]
+        [
+            "total",
+            "t diff",
+            "30",
+            "30diff",
+            "15",
+            "15diff",
+            "7",
+            "7diff",
+            "Player Name",
+            "Team",
+            "Pro Team",
+        ]
     )
     teams = league.teams
 
@@ -387,7 +402,18 @@ def remainingRateFreeAgents(
     )
     resultMatrix = []
     resultMatrix.append(
-        ["total", "t diff", "30", "30diff", "15", "15diff", "7", "7diff"]
+        [
+            "total",
+            "t diff",
+            "30",
+            "30diff",
+            "15",
+            "15diff",
+            "7",
+            "7diff",
+            "Player Name",
+            "Pro Team",
+        ]
     )
 
     remaningGames = schedule.calculateRemainingGames(league=league)

@@ -1,10 +1,21 @@
 {
     "SWID": "{123}",
-    "espn_s2": "abcd",
+    "espn_s2": "456",
     "leagueId": 1640258594,
-    "seasonId": "2024",
-    "teamId": 13,
+    "seasonId": 2024,
+    "teamNumber": 8,
     "googleSheet": "testSheet",
+    "categories": [
+        "FG%",
+	    "FT%",
+	    "3PM",
+	    "REB",
+	    "AST",
+	    "STL",
+	    "BLK",
+	    "TO",
+	    "PTS"
+    ],
     "ignoredStats": [
         "FTM",
         "FTA",
@@ -21,5 +32,7 @@
         "SG/SF",
         "PF/C",
         "U"
-    ]
+    ],
+    "ignorePlayers": 3,
+    "maxPlayers": 8
 }

@@ -1,8 +1,21 @@
 import json
 
 ROSTER_POSITIONS = []
-IGNORE_STATS = []
-CATEGORIES = ["FG%", "FT%", "3PM", "REB", "AST", "STL", "BLK", "TO", "PTS"]  # default
+IGNORE_STATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]  # default
+CATEGORIES = [
+    "PTS",
+    "BLK",
+    "STL",
+    "AST",
+    "REB",
+    "3PTM",
+    "TO",
+    "FTM",
+    "FTA",
+    "FGM",
+    "FGA",
+    "GP",
+]  # default
 TIMEFRAMES = ["_total", "_last_30", "_last_15", "_last_7"]  # suffixes
 # files
 SETTING_FILE = "settings.txt"
@@ -25,4 +38,4 @@ TEAM_NUMBER = int(settings.get("teamNumber")) - 1  # switch to 0 indexing
 IGNORE_PLAYERS = settings.get("ignorePlayers")
 MAX_PLAYERS = int(settings.get("maxPlayers"))
 SEASON_ID = int(settings.get("seasonId"))
-TIMEFRAMES = [SEASON_ID + word for word in TIMEFRAMES]
+TIMEFRAMES = [str(SEASON_ID) + word for word in TIMEFRAMES]

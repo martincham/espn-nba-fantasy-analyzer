@@ -8,20 +8,7 @@ import library.config as config
 #     - calculate averages
 # 2. loop over players again
 #     - calculate value rating
-CATEGORIES = {
-    "PTS": 0,
-    "BLK": 0,
-    "STL": 0,
-    "AST": 0,
-    "REB": 0,
-    "3PTM": 0,
-    "TO": 0,
-    "FTM": 0,
-    "FTA": 0,
-    "FGM": 0,
-    "FGA": 0,
-    "GP": 0,
-}
+CATEGORIES = {cat: 0 for cat in config.CATEGORIES}
 TEAM_NUMBER = config.TEAM_NUMBER
 IGNORE_PLAYERS = config.IGNORE_PLAYERS
 

@@ -16,7 +16,7 @@ IGNORE_PLAYERS = config.IGNORE_PLAYERS
 def calculateLeagueAverages(league, timeframe="2024_total", totalOrAvg="total"):
     averages = CATEGORIES.copy()
     totals = averages.copy()
-    count = 0
+    playerCount = 0
 
     teams = league.teams
     for team in teams:
@@ -25,9 +25,9 @@ def calculateLeagueAverages(league, timeframe="2024_total", totalOrAvg="total"):
             stats = player.stats
             total = stats.get(timeframe)
             mergeStats(totals, total)
-            count += 1
+            playerCount += 1
     averages = averageStats(
-        totals=totals, averages=averages, count=count, totalOrAvg=totalOrAvg
+        totals=totals, averages=averages, playerCount=playerCount, totalOrAvg=totalOrAvg
     )
     return averages
 
@@ -48,11 +48,11 @@ def ratePlayer(playerStats, averages, IGNORE_STATS):
     return totalRating
 
 
-def averageStats(totals, averages, count, totalOrAvg):
+def averageStats(totals, averages, playerCount, totalOrAvg):
     if totalOrAvg == "avg":
         divisor = totals.get("GP")
     else:
-        divisor = count
+        divisor = playerCount
     for stat in totals:
         statAverage = totals.get(stat) / divisor
         averages.update({stat: statAverage})
@@ -65,6 +65,7 @@ def mergeStats(resultList, adderList):
         return
     for item in resultList:
         value = totalValues.get(item)
+
         update = resultList.get(item) + value
         resultList.update({item: update})
 

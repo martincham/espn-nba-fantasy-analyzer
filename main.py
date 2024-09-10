@@ -4,10 +4,6 @@ import library.config as config
 import library.loading as loading
 import library.worksheets as worksheets
 
-
-ROSTER_POSITIONS = config.ROSTER_POSITIONS
-IGNORE_STATS = config.IGNORE_STATS
-TIMEFRAMES = config.TIMEFRAMES
 SETTING_FILE = config.SETTING_FILE
 
 

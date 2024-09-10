@@ -14,6 +14,7 @@ SETTING_FILE = config.SETTING_FILE
 RED_RGB = config.RED_RGB
 WHITE_RGB = config.WHITE_RGB
 GREEN_RGB = config.GREEN_RGB
+CATEGORIES = config.CATEGORIES
 
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
@@ -115,26 +116,38 @@ def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     )
 
 
+def createWorksheet(spreadsheet: gspread.Spreadsheet, title, rows=500, cols=20):
+    try:
+        sheet = spreadsheet.worksheet(title=title)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet(title=title, rows=rows, cols=cols)
+    except Exception as ex:
+        print("Error:", ex)
+    return sheet
+
+
 def initializeSpreadsheet():
     gc = gspread.service_account()
     spreadsheet = gc.open(getGoogleSheetName())
     totalWorksheet = spreadsheet.get_worksheet(0)
-    avgWorksheet = spreadsheet.get_worksheet(1)
-    freeAgentWorksheet = spreadsheet.get_worksheet(2)
-    freeAgentAvgWorksheet = spreadsheet.get_worksheet(3)
-    teamMatrixTotalWorksheet = spreadsheet.get_worksheet(4)
-    teamMatrixSevenWorksheet = spreadsheet.get_worksheet(5)
-    teamMatrixFifteenWorksheet = spreadsheet.get_worksheet(6)
-    teamMatrixThirtyWorksheet = spreadsheet.get_worksheet(7)
-    faMatrixTotalWorksheet = spreadsheet.get_worksheet(8)
-    faMatrixSevenWorksheet = spreadsheet.get_worksheet(9)
-    faMatrixFifteenWorksheet = spreadsheet.get_worksheet(10)
-    faMatrixThirtyWorksheet = spreadsheet.get_worksheet(11)
-    remainingValueWorksheet = spreadsheet.get_worksheet(12)
-    remainingFAWorksheet = spreadsheet.get_worksheet(13)
-    infoWorksheet = spreadsheet.get_worksheet(14)
+    totalWorksheet.update_title("total")
+    avgWorksheet = createWorksheet(spreadsheet=spreadsheet, title="pG")
+    freeAgentWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA")
+    freeAgentAvgWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FApG")
+    teamMatrixTotalWorksheet = createWorksheet(spreadsheet=spreadsheet, title="cats")
+    teamMatrixSevenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="7")
+    teamMatrixFifteenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="15")
+    teamMatrixThirtyWorksheet = createWorksheet(spreadsheet=spreadsheet, title="30")
+    faMatrixTotalWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FAcats")
+    faMatrixSevenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA7")
+    faMatrixFifteenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA15")
+    faMatrixThirtyWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA30")
+    remainingValueWorksheet = createWorksheet(spreadsheet=spreadsheet, title="rem")
+    remainingFAWorksheet = createWorksheet(spreadsheet=spreadsheet, title="remFA")
+    infoWorksheet = createWorksheet(spreadsheet=spreadsheet, title="info")
 
     # names
+    """"
     totalWorksheet.update_title("total")
     avgWorksheet.update_title("pG")
     freeAgentWorksheet.update_title("FA")
@@ -150,6 +163,7 @@ def initializeSpreadsheet():
     remainingValueWorksheet.update_title("remValue")
     remainingFAWorksheet.update_title("remFA")
     infoWorksheet.update_title("info")
+    """
 
     with gsf.batch_updater(spreadsheet) as batch:
         formatWorksheet(batch=batch, worksheet=avgWorksheet)
@@ -165,7 +179,7 @@ def initializeSpreadsheet():
         formatWorksheet(batch=batch, worksheet=faMatrixFifteenWorksheet, columns=13)
         formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=13)
         formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
-        formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
+        formatWorksheet(batch=batch, worksheet=remainingFAWorksheet, columns=8)
 
 
 def pushGoogleSheets():
@@ -212,20 +226,7 @@ def pushGoogleSheets():
     freeAgentWorksheet.update(values=[titles] + freeAgentRatings.values.tolist())
     freeAgentAvgWorksheet.update(values=[titles] + freeAgentAvgRatings.values.tolist())
 
-    categoryList = [
-        "PTS",
-        "BLK",
-        "STL",
-        "AST",
-        "REB",
-        "3PTM",
-        "TO",
-        "FTM",
-        "FTA",
-        "FGM",
-        "FGA",
-        "GP",
-    ]
+    categoryList = CATEGORIES
 
     remRatingMatrix = rating.remainingRateTeams(
         league=league,

@@ -8,7 +8,7 @@ CATEGORIES = [
     "STL",
     "AST",
     "REB",
-    "3PTM",
+    "3PM",
     "TO",
     "FTM",
     "FTA",
@@ -33,6 +33,8 @@ file.close()
 
 ROSTER_POSITIONS = settings.get("rosterPositions")
 CATEGORIES = settings.get("categories")
+if "GP" not in CATEGORIES:
+    CATEGORIES += ["GP"]  # must contain Games Played
 IGNORE_STATS = settings.get("ignoredStats")
 TEAM_NUMBER = int(settings.get("teamNumber")) - 1  # switch to 0 indexing
 IGNORE_PLAYERS = settings.get("ignorePlayers")

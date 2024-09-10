@@ -11,6 +11,7 @@ import library.config as config
 CATEGORIES = {cat: 0 for cat in config.CATEGORIES}
 TEAM_NUMBER = config.TEAM_NUMBER
 IGNORE_PLAYERS = config.IGNORE_PLAYERS
+PERCENT_STATS = config.PERCENT_STATS
 
 
 def calculateLeagueAverages(league, timeframe="2024_total", totalOrAvg="total"):
@@ -54,7 +55,10 @@ def averageStats(totals, averages, playerCount, totalOrAvg):
     else:
         divisor = playerCount
     for stat in totals:
-        statAverage = totals.get(stat) / divisor
+        if stat in PERCENT_STATS:
+            statAverage = totals.get(stat)
+        else:
+            statAverage = totals.get(stat) / divisor
         averages.update({stat: statAverage})
     return averages
 

@@ -47,15 +47,28 @@ def clearWorksheets():
         print("Error: ", ex)
 
 
+def numberToColumnLetter(num):
+    letters = ""
+    while num:
+        mod = (num - 1) % 26
+        letters += chr(mod + 65)
+        num = (num - 1) // 26
+    return "".join(reversed(letters))
+
+
 # columns=number of data columns
 def formatWorksheet(
     batch, worksheet, columns=4, minValue="0", midValue="100", maxValue="200"
 ):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
+    textColumns = (
+        numberToColumnLetter(columns + 1) + ":" + numberToColumnLetter(columns + 4)
+    )
+
     topRowRange = (
         "A1:" + chr(64 + columns + 3) + "1"
     )  # plus 2 for  name and team columns
-    numberRange = "A2:" + chr(64 + columns) + "1000"
+    numberRange = "A2:" + chr(64 + columns + 2) + "1000"
 
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
@@ -65,6 +78,9 @@ def formatWorksheet(
     numberFormat = gsf.CellFormat(
         numberFormat=gsf.NumberFormat(type="NUMBER", pattern="#,##0"),
     )
+    # Format Text Columns
+    batch.set_column_width(worksheet, textColumns, 120)
+    # Format Cells
     batch.format_cell_ranges(
         worksheet=worksheet,
         ranges=[(topRowRange, topRowFormat), (numberRange, numberFormat)],
@@ -164,20 +180,30 @@ def initializeSpreadsheet():
     remainingFAWorksheet.update_title("remFA")
     infoWorksheet.update_title("info")
     """
-
+    columns = len(CATEGORIES) + 1
     with gsf.batch_updater(spreadsheet) as batch:
         formatWorksheet(batch=batch, worksheet=avgWorksheet)
         formatWorksheet(batch=batch, worksheet=totalWorksheet)
         formatWorksheet(batch=batch, worksheet=freeAgentWorksheet)
         formatWorksheet(batch=batch, worksheet=freeAgentAvgWorksheet)
-        formatWorksheet(batch=batch, worksheet=teamMatrixTotalWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=teamMatrixSevenWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=teamMatrixFifteenWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=teamMatrixThirtyWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=faMatrixTotalWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=faMatrixFifteenWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=13)
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixTotalWorksheet, columns=columns
+        )
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixSevenWorksheet, columns=columns
+        )
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixFifteenWorksheet, columns=columns
+        )
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixThirtyWorksheet, columns=columns
+        )
+        formatWorksheet(batch=batch, worksheet=faMatrixTotalWorksheet, columns=columns)
+        formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=columns)
+        formatWorksheet(
+            batch=batch, worksheet=faMatrixFifteenWorksheet, columns=columns
+        )
+        formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=columns)
         formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
         formatWorksheet(batch=batch, worksheet=remainingFAWorksheet, columns=8)
 

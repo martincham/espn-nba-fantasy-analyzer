@@ -17,6 +17,7 @@ CATEGORIES = [
     "GP",
 ]  # default
 TIMEFRAMES = ["_total", "_last_30", "_last_15", "_last_7"]  # suffixes
+PERCENT_STATS = ["FG%", "AFG%", "FT%", "3P%", "A/TO", "STR", "FTR"]
 # files
 SETTING_FILE = "settings.txt"
 LEAGUE_FILE = "league.pickle"

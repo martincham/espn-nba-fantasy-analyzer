@@ -118,7 +118,7 @@ This utility scores players where 100 is the **average production of players ros
 
 <img src="assets/exampleESPN.png" alt="worksheet example" width="400"/>
 
-If the average number of Points per Game (PPG) is , a player with 15 PPG will have a rating of 100. A player with 30 PPG will be rated 200.
+If the average number of Points per Game (PPG) is 15, a player with 15 PPG will have a rating of 100. A player with 30 PPG will be rated 200.
 If the average number of Steals per Game (SPG) is .8, a player with .8 SPG will have a rating of 100. A player with 1.6 SPG will be rated 200. The 1.6 SPG player is as valuable as the 30 PPG player (in fantasy).
 
 <img width="577" alt="Screenshot 2024-09-10 at 2 50 01 PM" src="https://github.com/user-attachments/assets/d5c4984f-77ef-469c-adda-d102f11a07f5">

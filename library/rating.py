@@ -8,28 +8,16 @@ import library.config as config
 #     - calculate averages
 # 2. loop over players again
 #     - calculate value rating
-CATEGORIES = {
-    "PTS": 0,
-    "BLK": 0,
-    "STL": 0,
-    "AST": 0,
-    "REB": 0,
-    "3PTM": 0,
-    "TO": 0,
-    "FTM": 0,
-    "FTA": 0,
-    "FGM": 0,
-    "FGA": 0,
-    "GP": 0,
-}
+CATEGORIES = {cat: 0 for cat in config.CATEGORIES}
 TEAM_NUMBER = config.TEAM_NUMBER
 IGNORE_PLAYERS = config.IGNORE_PLAYERS
+PERCENT_STATS = config.PERCENT_STATS
 
 
 def calculateLeagueAverages(league, timeframe="2024_total", totalOrAvg="total"):
     averages = CATEGORIES.copy()
     totals = averages.copy()
-    count = 0
+    playerCount = 0
 
     teams = league.teams
     for team in teams:
@@ -38,9 +26,9 @@ def calculateLeagueAverages(league, timeframe="2024_total", totalOrAvg="total"):
             stats = player.stats
             total = stats.get(timeframe)
             mergeStats(totals, total)
-            count += 1
+            playerCount += 1
     averages = averageStats(
-        totals=totals, averages=averages, count=count, totalOrAvg=totalOrAvg
+        totals=totals, averages=averages, playerCount=playerCount, totalOrAvg=totalOrAvg
     )
     return averages
 
@@ -61,13 +49,16 @@ def ratePlayer(playerStats, averages, IGNORE_STATS):
     return totalRating
 
 
-def averageStats(totals, averages, count, totalOrAvg):
+def averageStats(totals, averages, playerCount, totalOrAvg):
     if totalOrAvg == "avg":
         divisor = totals.get("GP")
     else:
-        divisor = count
+        divisor = playerCount
     for stat in totals:
-        statAverage = totals.get(stat) / divisor
+        if stat in PERCENT_STATS:
+            statAverage = totals.get(stat)
+        else:
+            statAverage = totals.get(stat) / divisor
         averages.update({stat: statAverage})
     return averages
 
@@ -78,6 +69,7 @@ def mergeStats(resultList, adderList):
         return
     for item in resultList:
         value = totalValues.get(item)
+
         update = resultList.get(item) + value
         resultList.update({item: update})
 

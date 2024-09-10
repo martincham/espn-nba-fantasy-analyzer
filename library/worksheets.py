@@ -14,6 +14,7 @@ SETTING_FILE = config.SETTING_FILE
 RED_RGB = config.RED_RGB
 WHITE_RGB = config.WHITE_RGB
 GREEN_RGB = config.GREEN_RGB
+CATEGORIES = config.CATEGORIES
 
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
@@ -46,15 +47,28 @@ def clearWorksheets():
         print("Error: ", ex)
 
 
+def numberToColumnLetter(num):
+    letters = ""
+    while num:
+        mod = (num - 1) % 26
+        letters += chr(mod + 65)
+        num = (num - 1) // 26
+    return "".join(reversed(letters))
+
+
 # columns=number of data columns
 def formatWorksheet(
     batch, worksheet, columns=4, minValue="0", midValue="100", maxValue="200"
 ):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
+    textColumns = (
+        numberToColumnLetter(columns + 1) + ":" + numberToColumnLetter(columns + 4)
+    )
+
     topRowRange = (
         "A1:" + chr(64 + columns + 3) + "1"
     )  # plus 2 for  name and team columns
-    numberRange = "A2:" + chr(64 + columns) + "1000"
+    numberRange = "A2:" + chr(64 + columns + 2) + "1000"
 
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
@@ -64,6 +78,9 @@ def formatWorksheet(
     numberFormat = gsf.CellFormat(
         numberFormat=gsf.NumberFormat(type="NUMBER", pattern="#,##0"),
     )
+    # Format Text Columns
+    batch.set_column_width(worksheet, textColumns, 120)
+    # Format Cells
     batch.format_cell_ranges(
         worksheet=worksheet,
         ranges=[(topRowRange, topRowFormat), (numberRange, numberFormat)],
@@ -115,26 +132,38 @@ def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     )
 
 
+def createWorksheet(spreadsheet: gspread.Spreadsheet, title, rows=500, cols=20):
+    try:
+        sheet = spreadsheet.worksheet(title=title)
+    except gspread.WorksheetNotFound:
+        sheet = spreadsheet.add_worksheet(title=title, rows=rows, cols=cols)
+    except Exception as ex:
+        print("Error:", ex)
+    return sheet
+
+
 def initializeSpreadsheet():
     gc = gspread.service_account()
     spreadsheet = gc.open(getGoogleSheetName())
     totalWorksheet = spreadsheet.get_worksheet(0)
-    avgWorksheet = spreadsheet.get_worksheet(1)
-    freeAgentWorksheet = spreadsheet.get_worksheet(2)
-    freeAgentAvgWorksheet = spreadsheet.get_worksheet(3)
-    teamMatrixTotalWorksheet = spreadsheet.get_worksheet(4)
-    teamMatrixSevenWorksheet = spreadsheet.get_worksheet(5)
-    teamMatrixFifteenWorksheet = spreadsheet.get_worksheet(6)
-    teamMatrixThirtyWorksheet = spreadsheet.get_worksheet(7)
-    faMatrixTotalWorksheet = spreadsheet.get_worksheet(8)
-    faMatrixSevenWorksheet = spreadsheet.get_worksheet(9)
-    faMatrixFifteenWorksheet = spreadsheet.get_worksheet(10)
-    faMatrixThirtyWorksheet = spreadsheet.get_worksheet(11)
-    remainingValueWorksheet = spreadsheet.get_worksheet(12)
-    remainingFAWorksheet = spreadsheet.get_worksheet(13)
-    infoWorksheet = spreadsheet.get_worksheet(14)
+    totalWorksheet.update_title("total")
+    avgWorksheet = createWorksheet(spreadsheet=spreadsheet, title="pG")
+    freeAgentWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA")
+    freeAgentAvgWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FApG")
+    teamMatrixTotalWorksheet = createWorksheet(spreadsheet=spreadsheet, title="cats")
+    teamMatrixSevenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="7")
+    teamMatrixFifteenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="15")
+    teamMatrixThirtyWorksheet = createWorksheet(spreadsheet=spreadsheet, title="30")
+    faMatrixTotalWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FAcats")
+    faMatrixSevenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA7")
+    faMatrixFifteenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA15")
+    faMatrixThirtyWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA30")
+    remainingValueWorksheet = createWorksheet(spreadsheet=spreadsheet, title="rem")
+    remainingFAWorksheet = createWorksheet(spreadsheet=spreadsheet, title="remFA")
+    infoWorksheet = createWorksheet(spreadsheet=spreadsheet, title="info")
 
     # names
+    """"
     totalWorksheet.update_title("total")
     avgWorksheet.update_title("pG")
     freeAgentWorksheet.update_title("FA")
@@ -150,22 +179,33 @@ def initializeSpreadsheet():
     remainingValueWorksheet.update_title("remValue")
     remainingFAWorksheet.update_title("remFA")
     infoWorksheet.update_title("info")
-
+    """
+    columns = len(CATEGORIES) + 1
     with gsf.batch_updater(spreadsheet) as batch:
         formatWorksheet(batch=batch, worksheet=avgWorksheet)
         formatWorksheet(batch=batch, worksheet=totalWorksheet)
         formatWorksheet(batch=batch, worksheet=freeAgentWorksheet)
         formatWorksheet(batch=batch, worksheet=freeAgentAvgWorksheet)
-        formatWorksheet(batch=batch, worksheet=teamMatrixTotalWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=teamMatrixSevenWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=teamMatrixFifteenWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=teamMatrixThirtyWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=faMatrixTotalWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=faMatrixFifteenWorksheet, columns=13)
-        formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=13)
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixTotalWorksheet, columns=columns
+        )
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixSevenWorksheet, columns=columns
+        )
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixFifteenWorksheet, columns=columns
+        )
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixThirtyWorksheet, columns=columns
+        )
+        formatWorksheet(batch=batch, worksheet=faMatrixTotalWorksheet, columns=columns)
+        formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=columns)
+        formatWorksheet(
+            batch=batch, worksheet=faMatrixFifteenWorksheet, columns=columns
+        )
+        formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=columns)
         formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
-        formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
+        formatWorksheet(batch=batch, worksheet=remainingFAWorksheet, columns=8)
 
 
 def pushGoogleSheets():
@@ -212,20 +252,7 @@ def pushGoogleSheets():
     freeAgentWorksheet.update(values=[titles] + freeAgentRatings.values.tolist())
     freeAgentAvgWorksheet.update(values=[titles] + freeAgentAvgRatings.values.tolist())
 
-    categoryList = [
-        "PTS",
-        "BLK",
-        "STL",
-        "AST",
-        "REB",
-        "3PTM",
-        "TO",
-        "FTM",
-        "FTA",
-        "FGM",
-        "FGA",
-        "GP",
-    ]
+    categoryList = CATEGORIES
 
     remRatingMatrix = rating.remainingRateTeams(
         league=league,

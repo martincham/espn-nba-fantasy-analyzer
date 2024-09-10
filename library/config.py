@@ -1,8 +1,23 @@
 import json
 
 ROSTER_POSITIONS = []
-IGNORE_STATS = []
-TIMEFRAMES = ["2024_total", "2024_last_30", "2024_last_15", "2024_last_7"]
+IGNORE_STATS = ["FTM", "FTA", "TO", "FGA", "FGM", "GP"]  # default
+CATEGORIES = [
+    "PTS",
+    "BLK",
+    "STL",
+    "AST",
+    "REB",
+    "3PM",
+    "TO",
+    "FTM",
+    "FTA",
+    "FGM",
+    "FGA",
+    "GP",
+]  # default
+TIMEFRAMES = ["_total", "_last_30", "_last_15", "_last_7"]  # suffixes
+PERCENT_STATS = ["FG%", "AFG%", "FT%", "3P%", "A/TO", "STR", "FTR"]
 # files
 SETTING_FILE = "settings.txt"
 LEAGUE_FILE = "league.pickle"
@@ -18,7 +33,12 @@ settings = json.loads(fileInfo)
 file.close()
 
 ROSTER_POSITIONS = settings.get("rosterPositions")
+CATEGORIES = settings.get("categories")
+if "GP" not in CATEGORIES:
+    CATEGORIES += ["GP"]  # must contain Games Played
 IGNORE_STATS = settings.get("ignoredStats")
-TEAM_NUMBER = int(settings.get("teamNumber")) - 1
+TEAM_NUMBER = int(settings.get("teamNumber")) - 1  # switch to 0 indexing
 IGNORE_PLAYERS = settings.get("ignorePlayers")
 MAX_PLAYERS = int(settings.get("maxPlayers"))
+SEASON_ID = int(settings.get("seasonId"))
+TIMEFRAMES = [str(SEASON_ID) + word for word in TIMEFRAMES]

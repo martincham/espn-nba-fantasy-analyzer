@@ -14,7 +14,7 @@ Requires pandas, gspread, gspread-formatting, espn-api, and simple-term-menu pac
 python3 -m pip install pandas gspread gspread-formatting espn-api simple-term-menu
 ```
 
-Required [Google gspread setup](https://docs.gspread.org/en/latest/oauth2.html) to allow pushing to Google Sheet.
+Required [Google gspread setup](https://docs.gspread.org/en/latest/oauth2.html) to allow pushing to Google Sheet. Local Excel spreadhsheets not yet implemented.
 
 To install, either download and unpack the .zip, or run:
 

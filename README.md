@@ -16,7 +16,7 @@ Requires pandas, gspread, gspread-formatting, espn-api, and simple-term-menu pac
 python3 -m pip install pandas gspread gspread-formatting espn-api simple-term-menu
 ```
 
-Required [Google gspread setup](https://docs.gspread.org/en/latest/oauth2.html) to allow pushing to Google Sheet.
+Required [Google gspread setup](https://docs.gspread.org/en/latest/oauth2.html) to allow pushing to Google Sheet. Local Excel spreadhsheets not yet implemented.
 
 to run:
 
@@ -63,7 +63,7 @@ Change ESPN Info:
   [6] Exit
 ```
 
-SWID and espn_s2 required for private leagues. league_id is required for all leagues.
+SWID and espn_s2 required for private leagues, but it doesn't hurt to put yours, league_id is required for all leagues.
 
 This utility scores players where 100 is the average production of players rostered in your league, over the specified timespan. A score of 200 will have double the production, 50 will have half.
 

@@ -110,7 +110,7 @@ Change ESPN Info:
 
 SWID and espn_s2 required for private leagues, ([finding SWID and espn_s2](https://github.com/cwendt94/espn-api/discussions/150)), league_id is required for all leagues. Your team number is required to calculate remaining value.
 
-"categories" does not yet support percentage based stats like FG%. Stats like TO and GP can behave weirdly too.
+"categories" does not yet support percentage based stats like FG%. Stats like TO and GP can behave weirdly too, so they should be in "ignoredStats".
 
 ## Reading the Data:
 

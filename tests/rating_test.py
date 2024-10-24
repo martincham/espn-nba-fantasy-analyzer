@@ -3,6 +3,7 @@ from espn_api.basketball import League
 import unittest
 
 
+
 class TestRating(unittest.TestCase):
     @classmethod
     def setUpClass(self):

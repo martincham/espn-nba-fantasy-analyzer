@@ -99,7 +99,7 @@ def settingsMenu():
         "[2] Set Season",  # 1 index
         "[3] Set Ignored Stats",  # 2 index
         "[4] Set Roster Positions",  # 3 index
-        "[5] Set Worksheet Name",  # 4 index
+        None,  # 4 index
         "[6] Exit",  # 5 index
     ]
     terminalSettingsMenu = TerminalMenu(
@@ -117,8 +117,6 @@ def settingsMenu():
             ignoredStatsMenu()
         elif settingsMenuEntry == 3:
             rosterPositionMenu()
-        elif settingsMenuEntry == 4:
-            changeSetting("googleSheet")
         elif settingsMenuEntry == 5:
             exitSettingsMenu = True
 

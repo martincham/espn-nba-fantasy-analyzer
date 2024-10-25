@@ -1,4 +1,5 @@
 import json
+import os
 from simple_term_menu import TerminalMenu
 import library.config as config
 import library.loading as loading
@@ -7,9 +8,16 @@ import library.worksheets as worksheets
 SETTING_FILE = config.SETTING_FILE
 
 
+def clear_screen():
+    # Check if the system is Windows
+    if os.name == 'nt':
+        os.system('cls')  # Windows
+    else:
+        os.system('clear')  # macOS and Linux
+
 def main():
     league = loading.loadLeague()
-
+    clear_screen()
     exitMainMenu = False
     mainMenu = [
         "[1] Refresh League",  # 0 index
@@ -20,7 +28,7 @@ def main():
         "[6] Exit",  # 5 index
     ]
     terminalMainMenu = TerminalMenu(
-        menu_entries=mainMenu, title="ESPN Fantasy BBALL Analyzer"
+        menu_entries=mainMenu, title="ESPN Fantasy BBALL Analyzer",
     )
 
     # Intro Messages
@@ -64,7 +72,7 @@ def googleSheetsMenu():
         "[3] Clear Google Sheet",  # 2 index
         "[4] Set Sheet Name",  # 3 index
         None,  # 4 index
-        "[6] Exit",  # 5 index,  # 5 index
+        "[6] Back",  # 5 index,  # 5 index
     ]
     terminalMenu = TerminalMenu(
         menu_entries=menu, title="Google Sheet:", skip_empty_entries=True
@@ -100,11 +108,10 @@ def settingsMenu():
         "[3] Set Ignored Stats",  # 2 index
         "[4] Set Roster Positions",  # 3 index
         None,  # 4 index
-        "[6] Exit",  # 5 index
+        "[6] Back",  # 5 index
     ]
     terminalSettingsMenu = TerminalMenu(
-        menu_entries=settingsMenu, title="Settings:", skip_empty_entries=True
-    )
+        menu_entries=settingsMenu, title="Settings:", skip_empty_entries=True)
 
     while not exitSettingsMenu:
         settingsMenuEntry = terminalSettingsMenu.show()
@@ -129,7 +136,7 @@ def espnInfoMenu():
         "[3] Set league_id",  # 2 index
         "[2] Set team number",  # 3 index
         None,
-        "[6] Exit",  # 5 index
+        "[6] Back",  # 5 index
     ]
     terminalEspnMenu = TerminalMenu(
         menu_entries=espnMenu, title="Change ESPN Info:", skip_empty_entries=True

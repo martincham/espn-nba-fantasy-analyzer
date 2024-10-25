@@ -21,7 +21,7 @@ PERCENT_STATS = ["FG%", "AFG%", "FT%", "3P%", "A/TO", "STR", "FTR"]
 # files
 SETTING_FILE = "settings.txt"
 LEAGUE_FILE = "league.pickle"
-FREE_AGENTS_FILE = "freeagents.pickle"
+FREE_AGENTS_FILE = "freeAgents.pickle"
 # spreadsheet settings
 RED_RGB = [0.91, 0.49, 0.45]
 WHITE_RGB = [1, 1, 1]
@@ -32,6 +32,12 @@ fileInfo = file.read()
 settings = json.loads(fileInfo)
 file.close()
 
+SEASON_ID = int(settings.get("seasonId"))
+SWID = settings.get("SWID")
+ESPN_S2 = settings.get("espn_s2")
+LEAGUE_ID = settings.get("leagueId")
+TIMEFRAMES = [str(SEASON_ID) + suffix for suffix in TIMEFRAMES]
+
 ROSTER_POSITIONS = settings.get("rosterPositions")
 CATEGORIES = settings.get("categories")
 if "GP" not in CATEGORIES:
@@ -40,5 +46,4 @@ IGNORE_STATS = settings.get("ignoredStats")
 TEAM_NUMBER = int(settings.get("teamNumber")) - 1  # switch to 0 indexing
 IGNORE_PLAYERS = settings.get("ignorePlayers")
 MAX_PLAYERS = int(settings.get("maxPlayers"))
-SEASON_ID = int(settings.get("seasonId"))
-TIMEFRAMES = [str(SEASON_ID) + word for word in TIMEFRAMES]
+

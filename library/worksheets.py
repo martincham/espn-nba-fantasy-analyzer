@@ -273,16 +273,16 @@ def pushGoogleSheets():
     remainingFAWorksheet.update(values=remFARatingMatrix)
 
     teamRatingMatrixTotal = rating.categoryRateTeams(
-        league, "2024_total", "total", categoryList, IGNORE_STATS
+        league, TIMEFRAMES[0], "total", categoryList, IGNORE_STATS
     )
     teamRatingMatrixSeven = rating.categoryRateTeams(
-        league, "2024_last_7", "total", categoryList, IGNORE_STATS
+        league, TIMEFRAMES[1], "total", categoryList, IGNORE_STATS
     )
     teamRatingMatrixFifteen = rating.categoryRateTeams(
-        league, "2024_last_15", "total", categoryList, IGNORE_STATS
+        league, TIMEFRAMES[2], "total", categoryList, IGNORE_STATS
     )
     teamRatingMatrixThirty = rating.categoryRateTeams(
-        league, "2024_last_30", "total", categoryList, IGNORE_STATS
+        league, TIMEFRAMES[3], "total", categoryList, IGNORE_STATS
     )
 
     teamMatrixTotalWorksheet.update(values=teamRatingMatrixTotal)
@@ -291,16 +291,16 @@ def pushGoogleSheets():
     teamMatrixThirtyWorksheet.update(values=teamRatingMatrixThirty)
 
     faRatingMatrixTotal = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_total", "total", categoryList, IGNORE_STATS
+        league, freeAgents, TIMEFRAMES[0], "total", categoryList, IGNORE_STATS
     )
     faRatingMatrixSeven = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_last_7", "total", categoryList, IGNORE_STATS
+        league, freeAgents, TIMEFRAMES[1], "total", categoryList, IGNORE_STATS
     )
     faRatingMatrixFifteen = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_last_15", "total", categoryList, IGNORE_STATS
+        league, freeAgents, TIMEFRAMES[2], "total", categoryList, IGNORE_STATS
     )
     faRatingMatrixThirty = rating.categoryRateFreeAgents(
-        league, freeAgents, "2024_last_30", "total", categoryList, IGNORE_STATS
+        league, freeAgents, TIMEFRAMES[3], "total", categoryList, IGNORE_STATS
     )
 
     faMatrixTotalWorksheet.update(values=faRatingMatrixTotal)

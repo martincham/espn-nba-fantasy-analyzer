@@ -8,6 +8,11 @@ import library.config as config
 LEAGUE_FILE = config.LEAGUE_FILE
 FREE_AGENTS_FILE = config.FREE_AGENTS_FILE
 SETTING_FILE = config.SETTING_FILE
+SWID = config.SWID
+ESPN_S2 = config.ESPN_S2
+SEASON_ID = config.SEASON_ID
+LEAGUE_ID = config.LEAGUE_ID
+
 
 
 def saveFile(filename, data):
@@ -33,10 +38,10 @@ def reloadLeague():
         fileInfo = file.read()
         leagueInfo = json.loads(fileInfo)
         league = League(
-            league_id=leagueInfo.get("leagueId"),
-            year=2024,
-            espn_s2=leagueInfo.get("espn_s2"),
-            swid=leagueInfo.get("SWID"),
+            league_id=LEAGUE_ID,
+            year=SEASON_ID,
+            espn_s2=ESPN_S2,
+            swid=SWID,
             debug=False,
         )
         file.close()

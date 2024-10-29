@@ -67,7 +67,7 @@ def averageStats(totals, averages, playerCount, totalOrAvg):
 def mergeStats(resultList, adderList):
     totalValues = adderList.get("total", None)
     if totalValues is None:
-        return 0 
+        return 0
     for item in resultList:
         value = totalValues.get(item)
 
@@ -105,9 +105,13 @@ def combineAverageRatingTimeframes(team, averages, totalOrAvg, IGNORE_STATS):
         [seasonRatings, thirtyRating, fifteenRatings, sevenRatings], axis=1
     )
 
+
+
     result["Player"] = result.index
 
     teamNameList = [team.team_name] * len(team.roster)
+    # 6teamPositionList = [team.roster[i].position for i in range(len(team.roster))]
+    # result["Position"] = teamPositionList
     result["Team"] = teamNameList
     return result
 
@@ -444,3 +448,10 @@ def remainingRateFreeAgents(
         playerRatingList.append(proTeam)
         resultMatrix.append(playerRatingList)
     return resultMatrix
+
+
+def minuteTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
+    pass
+
+def minuteFreeAgentRatings(league, freeAgents, totalOrAvg="total", IGNORE_STATS=["GP"]):
+    pass

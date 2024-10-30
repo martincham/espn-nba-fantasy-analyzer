@@ -95,11 +95,12 @@ def rosterRater(timeframe, totalOrAvg, team, averages, IGNORE_STATS):
 
 def combineAverageRatingTimeframes(team, averages, totalOrAvg, IGNORE_STATS):
     seasonRatings = rosterRater(TIMEFRAMES[0], totalOrAvg, team, averages, IGNORE_STATS)
-    sevenRatings = rosterRater(TIMEFRAMES[1], totalOrAvg, team, averages, IGNORE_STATS)
+    thirtyRating = rosterRater(TIMEFRAMES[1], totalOrAvg, team, averages, IGNORE_STATS)
     fifteenRatings = rosterRater(
         TIMEFRAMES[2], totalOrAvg, team, averages, IGNORE_STATS
     )
-    thirtyRating = rosterRater(TIMEFRAMES[3], totalOrAvg, team, averages, IGNORE_STATS)
+    sevenRatings = rosterRater(TIMEFRAMES[3], totalOrAvg, team, averages, IGNORE_STATS)
+    
 
     result = pd.concat(
         [seasonRatings, thirtyRating, fifteenRatings, sevenRatings], axis=1
@@ -127,15 +128,16 @@ def combineTotalRatingTimeframes(
     seasonRatings = rosterRater(
         TIMEFRAMES[0], "total", team, averagesWhole, IGNORE_STATS
     )
-    sevenRatings = rosterRater(
-        TIMEFRAMES[1], "total", team, averagesSeven, IGNORE_STATS
+    thirtyRating = rosterRater(
+        TIMEFRAMES[1], "total", team, averagesThirty, IGNORE_STATS
     )
     fifteenRatings = rosterRater(
         TIMEFRAMES[2], "total", team, averagesFifteen, IGNORE_STATS
     )
-    thirtyRating = rosterRater(
-        TIMEFRAMES[3], "total", team, averagesThirty, IGNORE_STATS
+    sevenRatings = rosterRater(
+        TIMEFRAMES[3], "total", team, averagesSeven, IGNORE_STATS
     )
+    
 
     result = pd.concat(
         [seasonRatings, thirtyRating, fifteenRatings, sevenRatings], axis=1
@@ -157,15 +159,16 @@ def leagueTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
         averagesWhole = calculateLeagueAverages(
             league, TIMEFRAMES[0], totalOrAvg=totalOrAvg
         )
-        averagesSeven = calculateLeagueAverages(
+        averagesThirty = calculateLeagueAverages(
             league, TIMEFRAMES[1], totalOrAvg=totalOrAvg
         )
         averagesFifteen = calculateLeagueAverages(
             league, TIMEFRAMES[2], totalOrAvg=totalOrAvg
         )
-        averagesThirty = calculateLeagueAverages(
+        averagesSeven = calculateLeagueAverages(
             league, TIMEFRAMES[3], totalOrAvg=totalOrAvg
         )
+        
         for team in teams:
             teamRating = combineTotalRatingTimeframes(
                 team,

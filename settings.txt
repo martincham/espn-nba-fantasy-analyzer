@@ -2,7 +2,7 @@
     "SWID": "{123}",
     "espn_s2": "456",
     "leagueId": 1640258594,
-    "seasonId": 2024,
+    "seasonId": 2025,
     "teamNumber": 8,
     "googleSheet": "SheetNameHere",
     "categories": [

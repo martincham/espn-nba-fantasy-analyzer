@@ -46,4 +46,3 @@ IGNORE_STATS = settings.get("ignoredStats")
 TEAM_NUMBER = int(settings.get("teamNumber")) - 1  # switch to 0 indexing
 IGNORE_PLAYERS = settings.get("ignorePlayers")
 MAX_PLAYERS = int(settings.get("maxPlayers"))
-

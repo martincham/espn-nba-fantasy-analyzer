@@ -26,11 +26,61 @@ FREE_AGENTS_FILE = "freeAgents.pickle"
 RED_RGB = [0.91, 0.49, 0.45]
 WHITE_RGB = [1, 1, 1]
 GREEN_RGB = [0.3, 0.8, 0.6]
+
+
 # load from setting file
-file = open(SETTING_FILE, "r")
-fileInfo = file.read()
-settings = json.loads(fileInfo)
-file.close()
+try:
+    with open(SETTING_FILE, "r") as file:
+        fileInfo = file.read()
+        settings = json.loads(fileInfo)
+        file.close()
+except Exception as ex: # file not found, initialize
+    print("Could not find login file:", ex)
+    settings = {
+    "SWID": "{123}",
+    "espn_s2": "456",
+    "leagueId": 1640258594,
+    "seasonId": 2025,
+    "teamNumber": 8,
+    "googleSheet": "SheetNameHere",
+    "categories": [
+        "PTS",
+        "BLK",
+        "STL",
+        "AST",
+        "REB",
+        "3PM",
+        "TO",
+        "FTM",
+        "FTA",
+        "FGM",
+        "FGA",
+        "GP"
+    ],
+    "ignoredStats": [
+        "FTM",
+        "FTA",
+        "TO",
+        "FGA",
+        "FGM",
+        "GP"
+    ],
+    "rosterPositions": [
+        "PG",
+        "F",
+        "SG/SF",
+        "SG/SF",
+        "SG/SF",
+        "PF/C",
+        "U"
+    ],
+    "ignorePlayers": 3,
+    "maxPlayers": 8
+    }
+    with open(SETTING_FILE, "w") as file:
+        json.dump(settings, file, indent=4)  # `indent=4` formats JSON for readability
+        
+
 
 SEASON_ID = int(settings.get("seasonId"))
 SWID = settings.get("SWID")

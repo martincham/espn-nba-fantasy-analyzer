@@ -113,7 +113,7 @@ def combineAverageRatingTimeframes(team, averages, totalOrAvg, IGNORE_STATS):
     result["Player"] = result.index
 
     teamNameList = [team.team_name] * len(team.roster)
-    # 6teamPositionList = [team.roster[i].position for i in range(len(team.roster))]
+    # teamPositionList = [team.roster[i].position for i in range(len(team.roster))]
     # result["Position"] = teamPositionList
     result["Team"] = teamNameList
     return result

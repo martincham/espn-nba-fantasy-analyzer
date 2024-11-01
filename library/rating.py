@@ -25,6 +25,8 @@ def calculateLeagueAverages(league, timeframe=str(SEASON_ID)+"_total", totalOrAv
     for team in teams:
         roster = team.roster
         for player in roster:
+            if player.lineupSlot == 'IR': # Ignore Injury Reserve players
+                continue
             stats = player.stats
             total = stats.get(timeframe)
             playerCount += mergeStats(totals, total)
@@ -111,7 +113,7 @@ def combineAverageRatingTimeframes(team, averages, totalOrAvg, IGNORE_STATS):
     result["Player"] = result.index
 
     teamNameList = [team.team_name] * len(team.roster)
-    # 6teamPositionList = [team.roster[i].position for i in range(len(team.roster))]
+    # teamPositionList = [team.roster[i].position for i in range(len(team.roster))]
     # result["Position"] = teamPositionList
     result["Team"] = teamNameList
     return result

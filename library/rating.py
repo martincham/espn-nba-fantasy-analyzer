@@ -25,6 +25,8 @@ def calculateLeagueAverages(league, timeframe=str(SEASON_ID)+"_total", totalOrAv
     for team in teams:
         roster = team.roster
         for player in roster:
+            if player.lineupSlot == 'IR': # Ignore Injury Reserve players
+                continue
             stats = player.stats
             total = stats.get(timeframe)
             playerCount += mergeStats(totals, total)

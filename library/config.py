@@ -59,7 +59,7 @@ except Exception as ex:  # file not found, initialize
             "GP",
         ],
         "ignoredStats": ["FTM", "FTA", "TO", "FGA", "FGM", "GP"],
-        "rosterPositions": ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"],
+        "rosterPositions": ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "UT"],
         "teamSize": 12,
         "ignorePlayers": 3,
         "maxPlayers": 7,

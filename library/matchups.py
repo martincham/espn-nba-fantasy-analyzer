@@ -51,7 +51,6 @@ def createMatchupSchedule(league):
         print("Could not find schedule file:", ex)
 
     team = league.teams[TEAM_NUMBER]
-    roster = team.roster
     teamRatings = teamRating(team=team, averages=averages)
     schedule = team.schedule
     # Setup Labels in first Column
@@ -75,43 +74,59 @@ def createMatchupSchedule(league):
         ]
     )
     matchupSheet[0].extend(ROSTER_POSITIONS)
-    matchupSheet[0].extend([""])
-    matchupSheet[0].extend(["Bench"] * (TEAM_SIZE - len(ROSTER_POSITIONS)))
-    matchupSheet[0].extend([""])
+    matchupSheet[0].extend(["Opponent"])
     matchupSheet[0].extend(ROSTER_POSITIONS)
-    matchupSheet[0].extend([""])
-    matchupSheet[0].extend(["Bench"] * (TEAM_SIZE - len(ROSTER_POSITIONS)))
 
     for index, matchup in enumerate(schedule):
         opponent = matchup.away_team
-        opponentRoster = opponent.roster
         opponentRatings = teamRating(team=opponent, averages=averages)
         # Loop over days in the matchup
         dateRange = scheduleDates[str(index + 1)]  # whoops i made schedule 1 starting
         startDate = date.fromisoformat(dateRange[0])
         endDate = date.fromisoformat(dateRange[1])
+        runningSeasonDiff = 0
+        running15Diff = 0
         for singleDate in range((endDate - startDate).days + 1):
+            # Today Information
             currentDate = startDate + timedelta(days=singleDate)
             columnData = [currentDate.strftime("%m/%d/%Y")]
             columnData.append(currentDate.strftime("%A"))
+            # Team Rating
             columnData.append(team.team_name if index == 0 else "")
-            teamSeason = teamDayRating(
-                teamRatings=teamRatings, team=team, date=currentDate
+            teamSeason = teamDayRating(teamRatings=teamRatings, date=currentDate)
+            team15 = teamDayRating(
+                teamRatings=teamRatings, date=currentDate, timeframe=TIMEFRAMES[2]
             )
-            team15 = teamDayRating(team=team, date=currentDate, timeframe="15")
-            columnData.append(teamSeason.rating)
-            columnData.append(team15.rating)
+            columnData.extend([teamSeason.get("rating"), team15.get("rating")])
+            # Opponent Rating
             columnData.append(opponent.team_name if index == 0 else "")
-            opponentSeason = teamDayRating(team=opponent, date=currentDate)
-            opponent15 = teamDayRating(team=opponent, date=currentDate, timeframe="15")
-            columnData.append(opponentSeason)
-            columnData.append(opponent15)
+            opponentSeason = teamDayRating(
+                teamRatings=opponentRatings, date=currentDate
+            )
+            opponent15 = teamDayRating(
+                teamRatings=opponentRatings, date=currentDate, timeframe=TIMEFRAMES[2]
+            )
+            columnData.extend([opponentSeason.get("rating"), opponent15.get("rating")])
+            # Diff Rating
             columnData.append("Diff" if index == 0 else "")
-            diff = team15 - opponent15
-            columnData.append(diff)
+            seasonDiff = teamSeason.get("rating") - opponentSeason.get("rating")
+            diff15 = team15.get("rating") - opponent15.get("rating")
+            columnData.extend([seasonDiff, diff15])
+            runningSeasonDiff += seasonDiff
+            running15Diff += diff15
+            # Matchup Total
+            columnData.append("Total Diff" if currentDate == endDate else "")
+            columnData.append(runningSeasonDiff if currentDate == endDate else "")
+            columnData.append(running15Diff if currentDate == endDate else "")
             # Roster Positions
-            # For each day, calculate each teams on-court value
-            # User PerGame values, skip injury, check roster positions
+            for slot in team15.get("roster"):
+                columnData.append(slot)
+            columnData.append(opponent.team_name if index == 0 else "")
+            for slot in opponent15.get("roster"):
+                columnData.append(slot)
+            matchupSheet.append(columnData)
+
+    return matchupSheet
 
 
 def teamRating(team, averages):
@@ -124,16 +139,44 @@ def teamRating(team, averages):
         player15Rating = rating.ratePlayer(
             stats.get(TIMEFRAMES[2]).get("avg"), averages.get("15"), IGNORE_STATS
         )
+        # making a set of datetime.dates for easier lookup
+        gameDays = {game["date"].date() for game in player.schedule.values()}
         playerRating = {
             "name": player.name,
-            "slot": player.eligibleSlots,
-            "total": playerSeasonRating,
-            "15": player15Rating,
+            "eligibleSlots": player.eligibleSlots,
+            "injuryStatus": player.injuryStatus,
+            "lineupSlot": player.lineupSlot,
+            "gameDays": gameDays,
+            TIMEFRAMES[0]: playerSeasonRating,
+            TIMEFRAMES[2]: player15Rating,
         }
         teamRatings.append(playerRating)
+    teamRatings.sort(key=lambda x: x[TIMEFRAMES[0]], reverse=True)
     return teamRatings
 
 
-def teamDayRating(teamRatings, team, date, timeframe="total"):
-    pass
-    # TODO sort by rating, place by position
+def teamDayRating(teamRatings, date, timeframe=TIMEFRAMES[0]):
+    # team ratings must be sorted descending
+    # we will greedily place best players first
+    dayRating = 0
+    playingToday = ROSTER_POSITIONS.copy()
+    placed = 0
+    for player in teamRatings:
+        if placed >= len(ROSTER_POSITIONS):
+            break
+        if player.get("lineupSlot") == "IR" or player.get("injuryStatus") == "OUT":
+            continue
+        if date not in player.get("gameDays"):
+            continue
+        # eligibleSlots are sorted by most restricive to least restrictive
+        # we want to place in most restrictive first in order to approximate optimal lineups
+        slots = player.get("eligibleSlots")
+        for slot in slots:
+            if slot in playingToday:
+                playingToday[playingToday.index(slot)] = player.get("name")
+                placed += 1
+                dayRating += player.get(timeframe)
+                break
+
+    result = {"rating": dayRating, "roster": playingToday}
+    return result

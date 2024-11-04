@@ -5,6 +5,7 @@ import gspread_formatting as gsf
 import library.loading as loading
 import library.rating as rating
 import library.config as config
+import library.matchups as matchups
 
 
 ROSTER_POSITIONS = config.ROSTER_POSITIONS
@@ -120,8 +121,8 @@ def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     topRowRange = "A1:" + chr(64 + columns) + "1"
     # For some reason, gspread-formatting does not like compound ranges
     numberRange = "A2:" + chr(64 + columns + 2) + "1000"
-    remRange = ["A2:A400","C2:C400","E2:E400","G2:G400"]
-    differentialRange = ["B2:B400","D2:D400","F2:F400","H2:H400"]
+    remRange = ["A2:A400", "C2:C400", "E2:E400", "G2:G400"]
+    differentialRange = ["B2:B400", "D2:D400", "F2:F400", "H2:H400"]
 
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
@@ -143,13 +144,13 @@ def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     midPoint = gsf.InterpolationPoint(
         color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
         type="PERCENT",
-        value="50"
+        value="50",
     )
     maxPoint = gsf.InterpolationPoint(
         color=gsf.Color(GREEN_RGB[0], GREEN_RGB[1], GREEN_RGB[2]),
         type="MAX",
     )
-    
+
     # Yellow-to-Gray gradient for differential
     dminPoint = gsf.InterpolationPoint(
         color=gsf.Color(YELLOW_RGB[0], YELLOW_RGB[1], YELLOW_RGB[2]),
@@ -158,31 +159,31 @@ def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     dmidPoint = gsf.InterpolationPoint(
         color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
         type="PERCENT",
-        value="50"
+        value="50",
     )
     dmaxPoint = gsf.InterpolationPoint(
         color=gsf.Color(GRAY_RGB[0], GRAY_RGB[1], GRAY_RGB[2]),
         type="MAX",
     )
-    
+
     # Apply conditional formatting gradients
     rules = gsf.get_conditional_format_rules(worksheet)
     rules.clear()
     for numRange in remRange:
         rule = gsf.ConditionalFormatRule(
             ranges=[gsf.GridRange.from_a1_range(numRange, worksheet)],
-                gradientRule=gsf.GradientRule(
+            gradientRule=gsf.GradientRule(
                 minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
-                ),
+            ),
         )
         rules.append(rule)
     for diffRange in differentialRange:
         rule = gsf.ConditionalFormatRule(
             ranges=[gsf.GridRange.from_a1_range(diffRange, worksheet)],
-                gradientRule=gsf.GradientRule(
+            gradientRule=gsf.GradientRule(
                 minpoint=dminPoint, midpoint=dmidPoint, maxpoint=dmaxPoint
-                ),
-            )
+            ),
+        )
         rules.append(rule)
     rules.save()
 
@@ -259,13 +260,19 @@ def initializeSpreadsheet():
             batch=batch, worksheet=faMatrixFifteenWorksheet, columns=columns
         )
         formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=columns)
-        formatRemainingValueWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
-        formatRemainingValueWorksheet(batch=batch, worksheet=remainingFAWorksheet, columns=8)
+        formatRemainingValueWorksheet(
+            batch=batch, worksheet=remainingValueWorksheet, columns=8
+        )
+        formatRemainingValueWorksheet(
+            batch=batch, worksheet=remainingFAWorksheet, columns=8
+        )
 
 
 def pushGoogleSheets():
     league = loading.loadLeague()
     freeAgents = loading.loadFreeAgents()
+
+    matchupData = matchups.createMatchupSchedule(league=league)
 
     avgLeagueRatings = rating.leagueTeamRatings(league, "avg", IGNORE_STATS)
     totalLeagueRatings = rating.leagueTeamRatings(league, "total", IGNORE_STATS)
@@ -295,6 +302,7 @@ def pushGoogleSheets():
     remainingValueWorksheet = spreadsheet.get_worksheet(12)
     remainingFAWorksheet = spreadsheet.get_worksheet(13)
     infoWorksheet = spreadsheet.get_worksheet(14)
+    matchupWorksheet = spreadsheet.get_worksheet(15)
 
     now = datetime.now()
     updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")

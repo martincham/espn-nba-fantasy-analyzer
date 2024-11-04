@@ -26,7 +26,7 @@ FREE_AGENTS_FILE = "freeAgents.pickle"
 RED_RGB = [0.91, 0.49, 0.45]
 WHITE_RGB = [1, 1, 1]
 GREEN_RGB = [0.3, 0.8, 0.6]
-YELLOW_RGB = [1, 1, .8]
+YELLOW_RGB = [1, 1, 0.8]
 GRAY_RGB = [0.8, 0.8, 0.8]
 
 # load from setting file
@@ -35,52 +35,37 @@ try:
         fileInfo = file.read()
         settings = json.loads(fileInfo)
         file.close()
-except Exception as ex: # file not found, initialize
-    print("Could not find login file:", ex)
+except Exception as ex:  # file not found, initialize
+    print("Creating settings.txt file:")
     settings = {
-    "SWID": "{123}",
-    "espn_s2": "456",
-    "leagueId": 1640258594,
-    "seasonId": 2025,
-    "teamNumber": 8,
-    "googleSheet": "SheetNameHere",
-    "categories": [
-        "PTS",
-        "BLK",
-        "STL",
-        "AST",
-        "REB",
-        "3PM",
-        "TO",
-        "FTM",
-        "FTA",
-        "FGM",
-        "FGA",
-        "GP"
-    ],
-    "ignoredStats": [
-        "FTM",
-        "FTA",
-        "TO",
-        "FGA",
-        "FGM",
-        "GP"
-    ],
-    "rosterPositions": [
-        "PG",
-        "F",
-        "SG/SF",
-        "SG/SF",
-        "SG/SF",
-        "PF/C",
-        "U"
-    ],
-    "ignorePlayers": 3,
-    "maxPlayers": 8
+        "SWID": "{123}",
+        "espn_s2": "456",
+        "leagueId": 1640258594,
+        "seasonId": 2025,
+        "teamNumber": 8,
+        "googleSheet": "SheetNameHere",
+        "categories": [
+            "PTS",
+            "BLK",
+            "STL",
+            "AST",
+            "REB",
+            "3PM",
+            "TO",
+            "FTM",
+            "FTA",
+            "FGM",
+            "FGA",
+            "GP",
+        ],
+        "ignoredStats": ["FTM", "FTA", "TO", "FGA", "FGM", "GP"],
+        "rosterPositions": ["PG", "F", "SG/SF", "SG/SF", "SG/SF", "PF/C", "U"],
+        "teamSize": 12,
+        "ignorePlayers": 3,
+        "maxPlayers": 7,
     }
     with open(SETTING_FILE, "w") as file:
         json.dump(settings, file, indent=4)  # `indent=4` formats JSON for readability
-        
 
 
 SEASON_ID = int(settings.get("seasonId"))
@@ -90,6 +75,7 @@ LEAGUE_ID = settings.get("leagueId")
 TIMEFRAMES = [str(SEASON_ID) + suffix for suffix in TIMEFRAMES]
 
 ROSTER_POSITIONS = settings.get("rosterPositions")
+TEAM_SIZE = settings.get("teamSize")
 CATEGORIES = settings.get("categories")
 if "GP" not in CATEGORIES:
     CATEGORIES += ["GP"]  # must contain Games Played

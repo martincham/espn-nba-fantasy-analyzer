@@ -14,6 +14,8 @@ SETTING_FILE = config.SETTING_FILE
 RED_RGB = config.RED_RGB
 WHITE_RGB = config.WHITE_RGB
 GREEN_RGB = config.GREEN_RGB
+YELLOW_RGB = config.YELLOW_RGB
+GRAY_RGB = config.GRAY_RGB
 CATEGORIES = config.CATEGORIES
 
 now = datetime.now()
@@ -116,7 +118,10 @@ def formatWorksheet(
 def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
     topRowRange = "A1:" + chr(64 + columns) + "1"
-    numberRange = "A2:" + chr(64 + columns) + "1000"
+    # For some reason, gspread-formatting does not like compound ranges
+    numberRange = "A2:" + chr(64 + columns + 2) + "1000"
+    remRange = ["A2:A400","C2:C400","E2:E400","G2:G400"]
+    differentialRange = ["B2:B400","D2:D400","F2:F400","H2:H400"]
 
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
@@ -130,6 +135,56 @@ def formatRemainingValueWorksheet(batch, worksheet, columns=8):
         worksheet=worksheet,
         ranges=[(topRowRange, topRowFormat), (numberRange, numberFormat)],
     )
+    # Normal Green-to-Red gradient
+    minPoint = gsf.InterpolationPoint(
+        color=gsf.Color(RED_RGB[0], RED_RGB[1], RED_RGB[2]),
+        type="MIN",
+    )
+    midPoint = gsf.InterpolationPoint(
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
+        type="PERCENT",
+        value="50"
+    )
+    maxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(GREEN_RGB[0], GREEN_RGB[1], GREEN_RGB[2]),
+        type="MAX",
+    )
+    
+    # Yellow-to-Gray gradient for differential
+    dminPoint = gsf.InterpolationPoint(
+        color=gsf.Color(YELLOW_RGB[0], YELLOW_RGB[1], YELLOW_RGB[2]),
+        type="MIN",
+    )
+    dmidPoint = gsf.InterpolationPoint(
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
+        type="PERCENT",
+        value="50"
+    )
+    dmaxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(GRAY_RGB[0], GRAY_RGB[1], GRAY_RGB[2]),
+        type="MAX",
+    )
+    
+    # Apply conditional formatting gradients
+    rules = gsf.get_conditional_format_rules(worksheet)
+    rules.clear()
+    for numRange in remRange:
+        rule = gsf.ConditionalFormatRule(
+            ranges=[gsf.GridRange.from_a1_range(numRange, worksheet)],
+                gradientRule=gsf.GradientRule(
+                minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
+                ),
+        )
+        rules.append(rule)
+    for diffRange in differentialRange:
+        rule = gsf.ConditionalFormatRule(
+            ranges=[gsf.GridRange.from_a1_range(diffRange, worksheet)],
+                gradientRule=gsf.GradientRule(
+                minpoint=dminPoint, midpoint=dmidPoint, maxpoint=dmaxPoint
+                ),
+            )
+        rules.append(rule)
+    rules.save()
 
 
 def createWorksheet(spreadsheet: gspread.Spreadsheet, title, rows=500, cols=20):
@@ -204,8 +259,8 @@ def initializeSpreadsheet():
             batch=batch, worksheet=faMatrixFifteenWorksheet, columns=columns
         )
         formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=columns)
-        formatWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
-        formatWorksheet(batch=batch, worksheet=remainingFAWorksheet, columns=8)
+        formatRemainingValueWorksheet(batch=batch, worksheet=remainingValueWorksheet, columns=8)
+        formatRemainingValueWorksheet(batch=batch, worksheet=remainingFAWorksheet, columns=8)
 
 
 def pushGoogleSheets():

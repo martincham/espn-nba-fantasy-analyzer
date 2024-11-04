@@ -26,7 +26,8 @@ FREE_AGENTS_FILE = "freeAgents.pickle"
 RED_RGB = [0.91, 0.49, 0.45]
 WHITE_RGB = [1, 1, 1]
 GREEN_RGB = [0.3, 0.8, 0.6]
-
+YELLOW_RGB = [1, 1, .8]
+GRAY_RGB = [0.8, 0.8, 0.8]
 
 # load from setting file
 try:

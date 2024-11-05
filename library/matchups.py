@@ -78,7 +78,11 @@ def createMatchupSchedule(league):
     matchupSheet[0].extend(ROSTER_POSITIONS)
 
     for index, matchup in enumerate(schedule):
-        opponent = matchup.away_team
+        opponent = (
+            matchup.away_team
+            if matchup.home_team.team_name == team.team_name
+            else matchup.home_team
+        )
         opponentRatings = teamRating(team=opponent, averages=averages)
         # Loop over days in the matchup
         dateRange = scheduleDates[str(index + 1)]  # whoops i made schedule 1 starting
@@ -92,14 +96,14 @@ def createMatchupSchedule(league):
             columnData = [currentDate.strftime("%m/%d/%Y")]
             columnData.append(currentDate.strftime("%A"))
             # Team Rating
-            columnData.append(team.team_name if index == 0 else "")
+            columnData.append(team.team_name if singleDate == 0 else "")
             teamSeason = teamDayRating(teamRatings=teamRatings, date=currentDate)
             team15 = teamDayRating(
                 teamRatings=teamRatings, date=currentDate, timeframe=TIMEFRAMES[2]
             )
             columnData.extend([teamSeason.get("rating"), team15.get("rating")])
             # Opponent Rating
-            columnData.append(opponent.team_name if index == 0 else "")
+            columnData.append(opponent.team_name if singleDate == 0 else "")
             opponentSeason = teamDayRating(
                 teamRatings=opponentRatings, date=currentDate
             )
@@ -108,7 +112,7 @@ def createMatchupSchedule(league):
             )
             columnData.extend([opponentSeason.get("rating"), opponent15.get("rating")])
             # Diff Rating
-            columnData.append("Diff" if index == 0 else "")
+            columnData.append("Diff" if singleDate == 0 else "")
             seasonDiff = teamSeason.get("rating") - opponentSeason.get("rating")
             diff15 = team15.get("rating") - opponent15.get("rating")
             columnData.extend([seasonDiff, diff15])
@@ -118,10 +122,11 @@ def createMatchupSchedule(league):
             columnData.append("Total Diff" if currentDate == endDate else "")
             columnData.append(runningSeasonDiff if currentDate == endDate else "")
             columnData.append(running15Diff if currentDate == endDate else "")
+            columnData.append("")
             # Roster Positions
             for slot in team15.get("roster"):
                 columnData.append(slot)
-            columnData.append(opponent.team_name if index == 0 else "")
+            columnData.append(opponent.team_name if singleDate == 0 else "")
             for slot in opponent15.get("roster"):
                 columnData.append(slot)
             matchupSheet.append(columnData)
@@ -151,7 +156,8 @@ def teamRating(team, averages):
             TIMEFRAMES[2]: player15Rating,
         }
         teamRatings.append(playerRating)
-    teamRatings.sort(key=lambda x: x[TIMEFRAMES[0]], reverse=True)
+    # Sort descending by Last 15 days per-game rating, trying to esitmate who to play first
+    teamRatings.sort(key=lambda x: x[TIMEFRAMES[2]], reverse=True)
     return teamRatings
 
 

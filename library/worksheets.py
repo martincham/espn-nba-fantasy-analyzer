@@ -188,6 +188,72 @@ def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     rules.save()
 
 
+def formatMatchupWorksheet(batch, worksheet):
+
+    numberRange = "B4:ZZ14"
+
+    # Top Row Formatting, Left Column Formatting
+    batch.set_frozen(worksheet=worksheet, rows=2, cols=1)
+    batch.set_column_width(worksheet, "A", 70)
+    rowLabelRange = "1:3"
+    leftColumnRange = "A"
+    labelFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
+
+    # Format Numbers
+    batch.set_column_width(worksheet, "B:ZZ", 50)
+    numberFormat = gsf.CellFormat(
+        numberFormat=gsf.NumberFormat(type="NUMBER", pattern="#,##0"),
+    )
+
+    # Roster Foramtting
+    rosterRange = "16:30"
+    rosterFormat = gsf.CellFormat(textFormat=gsf.TextFormat(fontSize=7))
+    # Format Cells
+    batch.format_cell_ranges(
+        worksheet=worksheet,
+        ranges=[
+            (numberRange, numberFormat),
+            (rowLabelRange, labelFormat),
+            ("6", labelFormat),
+            ("9", labelFormat),
+            ("23", labelFormat),
+            (leftColumnRange, labelFormat),
+            (rosterRange, rosterFormat),
+        ],
+    )
+
+    minPoint = gsf.InterpolationPoint(
+        color=gsf.Color(RED_RGB[0], RED_RGB[1], RED_RGB[2]),
+        type="MIN",
+    )
+    midPoint = gsf.InterpolationPoint(
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
+        type="PERCENT",
+        value="50",
+    )
+    maxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(GREEN_RGB[0], GREEN_RGB[1], GREEN_RGB[2]),
+        type="MAX",
+    )
+    rule = gsf.ConditionalFormatRule(
+        ranges=[gsf.GridRange.from_a1_range("B4:ZZ8", worksheet)],
+        gradientRule=gsf.GradientRule(
+            minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
+        ),
+    )
+    rule2 = gsf.ConditionalFormatRule(
+        ranges=[gsf.GridRange.from_a1_range("B10:ZZ14", worksheet)],
+        gradientRule=gsf.GradientRule(
+            minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
+        ),
+    )
+    rules = gsf.get_conditional_format_rules(worksheet)
+    rules.clear()
+    rules.append(rule)
+    rules.append(rule2)
+    rules.save()
+
+
 def createWorksheet(spreadsheet: gspread.Spreadsheet, title, rows=500, cols=20):
     try:
         sheet = spreadsheet.worksheet(title=title)
@@ -217,6 +283,7 @@ def initializeSpreadsheet():
     remainingValueWorksheet = createWorksheet(spreadsheet=spreadsheet, title="rem")
     remainingFAWorksheet = createWorksheet(spreadsheet=spreadsheet, title="remFA")
     infoWorksheet = createWorksheet(spreadsheet=spreadsheet, title="info")
+    matchupWorksheet = createWorksheet(spreadsheet=spreadsheet, title="matchups")
 
     # names
     """"
@@ -266,6 +333,7 @@ def initializeSpreadsheet():
         formatRemainingValueWorksheet(
             batch=batch, worksheet=remainingFAWorksheet, columns=8
         )
+        formatMatchupWorksheet(batch=batch, worksheet=matchupWorksheet)
 
 
 def pushGoogleSheets():
@@ -303,6 +371,9 @@ def pushGoogleSheets():
     remainingFAWorksheet = spreadsheet.get_worksheet(13)
     infoWorksheet = spreadsheet.get_worksheet(14)
     matchupWorksheet = spreadsheet.get_worksheet(15)
+
+    transposed_data = [list(row) for row in zip(*matchupData)]
+    matchupWorksheet.update(values=transposed_data)
 
     now = datetime.now()
     updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")

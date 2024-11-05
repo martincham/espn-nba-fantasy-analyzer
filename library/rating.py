@@ -16,7 +16,9 @@ SEASON_ID = config.SEASON_ID
 TIMEFRAMES = config.TIMEFRAMES
 
 
-def calculateLeagueAverages(league, timeframe=str(SEASON_ID)+"_total", totalOrAvg="total"):
+def calculateLeagueAverages(
+    league, timeframe=str(SEASON_ID) + "_total", totalOrAvg="total"
+):
     averages = CATEGORIES.copy()
     totals = averages.copy()
     playerCount = 0
@@ -25,7 +27,7 @@ def calculateLeagueAverages(league, timeframe=str(SEASON_ID)+"_total", totalOrAv
     for team in teams:
         roster = team.roster
         for player in roster:
-            if player.lineupSlot == 'IR': # Ignore Injury Reserve players
+            if player.lineupSlot == "IR":  # Ignore Injury Reserve players
                 continue
             stats = player.stats
             total = stats.get(timeframe)
@@ -65,6 +67,7 @@ def averageStats(totals, averages, playerCount, totalOrAvg):
         averages.update({stat: statAverage})
     return averages
 
+
 # returns 1 if player has stats, 0 otherwise
 def mergeStats(resultList, adderList):
     totalValues = adderList.get("total", None)
@@ -102,13 +105,10 @@ def combineAverageRatingTimeframes(team, averages, totalOrAvg, IGNORE_STATS):
         TIMEFRAMES[2], totalOrAvg, team, averages, IGNORE_STATS
     )
     sevenRatings = rosterRater(TIMEFRAMES[3], totalOrAvg, team, averages, IGNORE_STATS)
-    
 
     result = pd.concat(
         [seasonRatings, thirtyRating, fifteenRatings, sevenRatings], axis=1
     )
-
-
 
     result["Player"] = result.index
 
@@ -139,7 +139,6 @@ def combineTotalRatingTimeframes(
     sevenRatings = rosterRater(
         TIMEFRAMES[3], "total", team, averagesSeven, IGNORE_STATS
     )
-    
 
     result = pd.concat(
         [seasonRatings, thirtyRating, fifteenRatings, sevenRatings], axis=1
@@ -170,7 +169,7 @@ def leagueTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
         averagesSeven = calculateLeagueAverages(
             league, TIMEFRAMES[3], totalOrAvg=totalOrAvg
         )
-        
+
         for team in teams:
             teamRating = combineTotalRatingTimeframes(
                 team,
@@ -457,6 +456,7 @@ def remainingRateFreeAgents(
 
 def minuteTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
     pass
+
 
 def minuteFreeAgentRatings(league, freeAgents, totalOrAvg="total", IGNORE_STATS=["GP"]):
     pass

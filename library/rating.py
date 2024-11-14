@@ -12,14 +12,19 @@ CATEGORIES = {cat: 0 for cat in config.CATEGORIES}
 TEAM_NUMBER = config.TEAM_NUMBER
 IGNORE_PLAYERS = config.IGNORE_PLAYERS
 PERCENT_STATS = config.PERCENT_STATS
+PERCENT_MAP = config.PERCENT_MAP
 SEASON_ID = config.SEASON_ID
 TIMEFRAMES = config.TIMEFRAMES
+IGNORE_STATS = config.IGNORE_STATS
 
 
 def calculateLeagueAverages(
     league, timeframe=str(SEASON_ID) + "_total", totalOrAvg="total"
 ):
     averages = CATEGORIES.copy()
+    for percentStat in PERCENT_MAP.keys():
+        if percentStat in averages:
+            averages.update({cat: 0 for cat in PERCENT_MAP.get(percentStat)})
     totals = averages.copy()
     playerCount = 0
 
@@ -40,18 +45,40 @@ def calculateLeagueAverages(
 
 def ratePlayer(playerStats, averages, IGNORE_STATS):
     totalRating = 0
+    statCount = 0
     if playerStats is None:
         return 0
     for stat in averages:
         if stat in IGNORE_STATS:
             continue
-        playerStat = playerStats.get(stat)
-        averageStat = averages.get(stat)
-        statRating = playerStat / averageStat
-        totalRating += statRating
-    remainingNumStats = len(averages) - len(IGNORE_STATS)
-    totalRating = (totalRating / remainingNumStats) * 100
+        if stat in PERCENT_STATS:
+            totalRating += ratePercentStat(playerStats, averages, stat)
+            statCount += 1
+        else:
+            playerStat = playerStats.get(stat)
+            averageStat = averages.get(stat)
+            statRating = playerStat / averageStat
+            totalRating += statRating
+            statCount += 1
+    totalRating = (totalRating / statCount) * 100
     return totalRating
+
+
+def ratePercentStat(playerStats, averages, stat):
+    rawStats = PERCENT_MAP.get(stat)
+    attempts = playerStats.get(rawStats[1])
+    avgAttempts = averages.get(rawStats[1])
+    percent = playerStats.get(stat)
+    # Percent diff will be > 1 if better than average, < 1 if worse
+    percentDiff = percent / averages.get(stat)
+    # Differential gets taken to the power of attempts over/under average
+    # E.G. League average % on any attempts will still be rated 100.
+    # And +5% percent on 10 attempts is better than +20% on 1 attempt.
+    attemptDiff = attempts / avgAttempts
+    # Adjust weighting ratio to get normal ranges from 0 to 200
+    weightingRatio = 2
+    statRating = pow(percentDiff, attemptDiff * weightingRatio)
+    return statRating
 
 
 def averageStats(totals, averages, playerCount, totalOrAvg):
@@ -61,7 +88,7 @@ def averageStats(totals, averages, playerCount, totalOrAvg):
         divisor = playerCount
     for stat in totals:
         if stat in PERCENT_STATS:
-            statAverage = totals.get(stat)
+            statAverage = totals.get(stat) / playerCount
         else:
             statAverage = totals.get(stat) / divisor
         averages.update({stat: statAverage})
@@ -246,6 +273,8 @@ def categoryRateTeams(league, timeframe, totalOrAvg, categoryList, IGNORE_STATS=
     averages = calculateLeagueAverages(
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
+    averages.update({"FG%": averages.get("FGM") / averages.get("FGA")})
+    averages.update({"FT%": averages.get("FTM") / averages.get("FTA")})
     titles = categoryList.copy()
     titles.extend(["Rating", "Player Name", "Team", "Pro Team"])
     resultMatrix = [titles]
@@ -325,6 +354,9 @@ def createPlayerMatrix(playerStats, averages, categoryList, IGNORE_STATS):
         stat = playerStats.get(cat)
         if stat is None:
             playerMatrix.append(0)
+        elif cat in PERCENT_STATS:
+            statRating = ratePercentStat(playerStats, averages, cat) * 100
+            playerMatrix.append(statRating)
         else:
             statAverage = averages.get(cat)
             statRating = (stat / statAverage) * 100

@@ -9,6 +9,7 @@ import library.rating as rating
 SCHEDULE_FILE = "2025.txt"
 TEAM_NUMBER = config.TEAM_NUMBER
 ROSTER_POSITIONS = config.ROSTER_POSITIONS
+POSITION_HEIRARCHY = config.POSITION_HEIRARCHY
 TEAM_SIZE = config.TEAM_SIZE
 TIMEFRAMES = config.TIMEFRAMES
 IGNORE_STATS = config.IGNORE_STATS
@@ -177,6 +178,11 @@ def teamDayRating(teamRatings, date, timeframe=TIMEFRAMES[0]):
         # eligibleSlots are sorted by most restricive to least restrictive
         # we want to place in most restrictive first in order to approximate optimal lineups
         slots = player.get("eligibleSlots")
+        slots.sort(
+            key=lambda x: (
+                POSITION_HEIRARCHY.index(x) if x in POSITION_HEIRARCHY else 999
+            )
+        )
         for slot in slots:
             if slot in playingToday:
                 playingToday[playingToday.index(slot)] = player.get("name")

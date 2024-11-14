@@ -10,14 +10,21 @@ CATEGORIES = [
     "REB",
     "3PM",
     "TO",
-    "FTM",
-    "FTA",
-    "FGM",
-    "FGA",
+    "FG%",
+    "FT%",
     "GP",
 ]  # default
 TIMEFRAMES = ["_total", "_last_30", "_last_15", "_last_7"]  # suffixes
 PERCENT_STATS = ["FG%", "AFG%", "FT%", "3P%", "A/TO", "STR", "FTR"]
+PERCENT_MAP = {
+    "FG%": ["FGM", "FGA"],
+    "AFG%": ["FGM", "FGA"],
+    "FT%": ["FTM", "FTA"],
+    "3P%": ["3PM", "3PA"],
+    "A/TO": ["AST", "TO"],
+    "STR": ["STL", "TO"],
+    "FTR": ["FTA", "FGA"],
+}
 # files
 SETTING_FILE = "settings.txt"
 LEAGUE_FILE = "league.pickle"
@@ -67,7 +74,7 @@ except Exception as ex:  # file not found, initialize
     with open(SETTING_FILE, "w") as file:
         json.dump(settings, file, indent=4)  # `indent=4` formats JSON for readability
 
-
+POSITION_HEIRARCHY = ["SG/SF", "SG/SF", "SG/SF", "PG", "F", "PF/C", "UT"]
 SEASON_ID = int(settings.get("seasonId"))
 SWID = settings.get("SWID")
 ESPN_S2 = settings.get("espn_s2")

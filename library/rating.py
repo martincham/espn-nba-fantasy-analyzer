@@ -1,6 +1,8 @@
+from typing import Dict, List
 import library.schedule as schedule
 import library.config as config
 import pandas as pd
+from espn_api.basketball import League
 
 
 # 1. get all players,
@@ -19,8 +21,10 @@ IGNORE_STATS = config.IGNORE_STATS
 
 
 def calculateLeagueAverages(
-    league, timeframe=str(SEASON_ID) + "_total", totalOrAvg="total"
-):
+    league: League,
+    timeframe: str = str(SEASON_ID) + "_total",
+    totalOrAvg: str = "total",
+) -> Dict[str, int]:
     averages = CATEGORIES.copy()
     for percentStat in PERCENT_MAP.keys():
         if percentStat in averages:
@@ -43,7 +47,9 @@ def calculateLeagueAverages(
     return averages
 
 
-def ratePlayer(playerStats, averages, IGNORE_STATS):
+def ratePlayer(
+    playerStats: Dict[str, float], averages: Dict[str, float], IGNORE_STATS: List[str]
+) -> float:
     totalRating = 0
     statCount = 0
     if playerStats is None:
@@ -64,8 +70,12 @@ def ratePlayer(playerStats, averages, IGNORE_STATS):
     return totalRating
 
 
-def ratePercentStat(playerStats, averages, stat):
-    rawStats = PERCENT_MAP.get(stat)
+def ratePercentStat(
+    playerStats: Dict[str, float], averages: Dict[str, float], stat: str
+) -> float:
+    rawStats = PERCENT_MAP.get(stat, None)
+    if rawStats is None:
+        return 0
     attempts = playerStats.get(rawStats[1])
     avgAttempts = averages.get(rawStats[1])
     percent = playerStats.get(stat)
@@ -81,7 +91,12 @@ def ratePercentStat(playerStats, averages, stat):
     return statRating
 
 
-def averageStats(totals, averages, playerCount, totalOrAvg):
+def averageStats(
+    totals: Dict[str, int],
+    averages: Dict[str, float],
+    playerCount: int,
+    totalOrAvg: str,
+) -> Dict[str, float]:
     if totalOrAvg == "avg":
         divisor = totals.get("GP")
     else:
@@ -96,7 +111,7 @@ def averageStats(totals, averages, playerCount, totalOrAvg):
 
 
 # returns 1 if player has stats, 0 otherwise
-def mergeStats(resultList, adderList):
+def mergeStats(resultList: Dict[str, int], adderList) -> int:
     totalValues = adderList.get("total", None)
     if totalValues is None:
         return 0

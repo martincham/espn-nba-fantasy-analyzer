@@ -69,7 +69,7 @@ def clearWorksheets():
         print("Error: ", ex)
 
 
-def numberToColumnLetter(num):
+def numberToColumnLetter(num: int):
     letters = ""
     while num:
         mod = (num - 1) % 26
@@ -80,7 +80,12 @@ def numberToColumnLetter(num):
 
 # columns=number of data columns
 def formatWorksheet(
-    batch, worksheet, columns=4, minValue="0", midValue="100", maxValue="200"
+    batch: gsf.SpreadsheetBatchUpdater,
+    worksheet: gspread.worksheet,
+    columns: int = 4,
+    minValue: str = "0",
+    midValue: str = "100",
+    maxValue: str = "200",
 ):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
     textColumns = (
@@ -135,7 +140,9 @@ def formatWorksheet(
     rules.save()
 
 
-def formatRemainingValueWorksheet(batch, worksheet, columns=8):
+def formatRemainingValueWorksheet(
+    batch: gsf.SpreadsheetBatchUpdater, worksheet: gspread.Worksheet, columns: int = 8
+):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
     topRowRange = "A1:" + chr(64 + columns) + "1"
     # For some reason, gspread-formatting does not like compound ranges
@@ -207,7 +214,9 @@ def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     rules.save()
 
 
-def formatMatchupWorksheet(batch, worksheet):
+def formatMatchupWorksheet(
+    batch: gsf.SpreadsheetBatchUpdater, worksheet: gspread.Worksheet
+):
 
     numberRange = "B4:ZZ14"
 
@@ -273,7 +282,9 @@ def formatMatchupWorksheet(batch, worksheet):
     rules.save()
 
 
-def createWorksheet(spreadsheet: gspread.Spreadsheet, title, rows=500, cols=20):
+def createWorksheet(
+    spreadsheet: gspread.Spreadsheet, title: str, rows: int = 500, cols: int = 20
+):
     try:
         sheet = spreadsheet.worksheet(title=title)
     except gspread.WorksheetNotFound:

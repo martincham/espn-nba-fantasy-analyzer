@@ -1,8 +1,9 @@
-from espn_api.basketball import League
+from typing import List
 import json
 import pickle
 import os
 import time
+from espn_api.basketball import League, Player
 import library.config as config
 
 LEAGUE_FILE = config.LEAGUE_FILE
@@ -68,7 +69,7 @@ def reloadFreeAgents(league: League):
     return freeAgents
 
 
-def saveFreeAgents(freeAgents):
+def saveFreeAgents(freeAgents: List[Player]):
     saveFile(FREE_AGENTS_FILE, freeAgents)
 
 

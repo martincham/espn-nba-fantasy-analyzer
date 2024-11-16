@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Any
 import library.schedule as schedule
 import library.config as config
 import pandas as pd
@@ -298,7 +298,7 @@ def compositeRateTeamCats(
     totalOrAvg: str,
     categoryList: List[str],
     IGNORE_STATS: List[str],
-):
+) -> List[List[Any]]:
     resultMatrix = [categoryList]
     if totalOrAvg == "total":
         for timeframe in timeFrames:
@@ -313,7 +313,13 @@ def compositeRateTeamCats(
     return resultMatrix
 
 
-def categoryRateTeams(league, timeframe, totalOrAvg, categoryList, IGNORE_STATS=["GP"]):
+def categoryRateTeams(
+    league: League,
+    timeframe: str,
+    totalOrAvg: str,
+    categoryList: List[str],
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     averages = calculateLeagueAverages(
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
@@ -341,8 +347,13 @@ def categoryRateTeams(league, timeframe, totalOrAvg, categoryList, IGNORE_STATS=
 
 
 def categoryRateFreeAgents(
-    league, freeAgents, timeframe, totalOrAvg, categoryList, IGNORE_STATS=["GP"]
-):
+    league: League,
+    freeAgents: List[Player],
+    timeframe: str,
+    totalOrAvg: str,
+    categoryList: List[str],
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     averages = calculateLeagueAverages(
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
@@ -357,14 +368,14 @@ def categoryRateFreeAgents(
 
 
 def categoryRatePlayerList(
-    playerList,
-    timeframe,
-    totalOrAvg,
-    averages,
-    categoryList,
-    IGNORE_STATS,
-    teamName="?",
-):
+    playerList: List[Player],
+    timeframe: str,
+    totalOrAvg: str,
+    averages: Dict[str, float],
+    categoryList: List[str],
+    IGNORE_STATS: List[str],
+    teamName: str = "?",
+) -> List[List[Any]]:
     resultMatrix = []
     categoryNum = len(categoryList)
 
@@ -392,7 +403,12 @@ def categoryRatePlayerList(
     return resultMatrix
 
 
-def createPlayerMatrix(playerStats, averages, categoryList, IGNORE_STATS):
+def createPlayerMatrix(
+    playerStats: Dict[str, float],
+    averages: Dict[str.float],
+    categoryList: List[str],
+    IGNORE_STATS: List[str],
+) -> List[float]:
     playerMatrix = []
     for cat in categoryList:
         stat = playerStats.get(cat)
@@ -409,7 +425,12 @@ def createPlayerMatrix(playerStats, averages, categoryList, IGNORE_STATS):
     return playerMatrix
 
 
-def remainingRateTeams(league, timeframes, totalOrAvg="avg", IGNORE_STATS=["GP"]):
+def remainingRateTeams(
+    league: League,
+    timeframes: List[str],
+    totalOrAvg: str = "avg",
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     averages = calculateLeagueAverages(
         league=league, timeframe=TIMEFRAMES[0], totalOrAvg=totalOrAvg
     )
@@ -471,8 +492,12 @@ def remainingRateTeams(league, timeframes, totalOrAvg="avg", IGNORE_STATS=["GP"]
 
 
 def remainingRateFreeAgents(
-    league, freeAgents, timeframes, totalOrAvg="avg", IGNORE_STATS=["GP"]
-):
+    league: League,
+    freeAgents: List[Player],
+    timeframes: List[str],
+    totalOrAvg: str = "avg",
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     averages = calculateLeagueAverages(
         league=league, timeframe=TIMEFRAMES[0], totalOrAvg=totalOrAvg
     )
@@ -530,9 +555,16 @@ def remainingRateFreeAgents(
     return resultMatrix
 
 
-def minuteTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
+def minuteTeamRatings(
+    league: League, totalOrAvg: str = "total", IGNORE_STATS: List[str] = ["GP"]
+) -> List[List[Any]]:
     pass
 
 
-def minuteFreeAgentRatings(league, freeAgents, totalOrAvg="total", IGNORE_STATS=["GP"]):
+def minuteFreeAgentRatings(
+    league: League,
+    freeAgents: List[Player],
+    totalOrAvg: str = "total",
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     pass

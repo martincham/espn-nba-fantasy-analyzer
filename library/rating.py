@@ -78,9 +78,11 @@ def ratePercentStat(
         return 0
     attempts = playerStats.get(rawStats[1])
     avgAttempts = averages.get(rawStats[1])
+    avgMakes = averages.get(rawStats[0])
     percent = playerStats.get(stat)
     # Percent diff will be > 1 if better than average, < 1 if worse
-    percentDiff = percent / averages.get(stat)
+    avgPercent = avgMakes / avgAttempts
+    percentDiff = percent / avgPercent
     # Differential gets taken to the power of attempts over/under average
     # E.G. League average % on any attempts will still be rated 100.
     # And +5% percent on 10 attempts is better than +20% on 1 attempt.

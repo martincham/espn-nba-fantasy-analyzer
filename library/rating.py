@@ -1,6 +1,8 @@
+from typing import Dict, List, Any
 import library.schedule as schedule
 import library.config as config
 import pandas as pd
+from espn_api.basketball import League, Team, Player
 
 
 # 1. get all players,
@@ -12,14 +14,21 @@ CATEGORIES = {cat: 0 for cat in config.CATEGORIES}
 TEAM_NUMBER = config.TEAM_NUMBER
 IGNORE_PLAYERS = config.IGNORE_PLAYERS
 PERCENT_STATS = config.PERCENT_STATS
+PERCENT_MAP = config.PERCENT_MAP
 SEASON_ID = config.SEASON_ID
 TIMEFRAMES = config.TIMEFRAMES
+IGNORE_STATS = config.IGNORE_STATS
 
 
 def calculateLeagueAverages(
-    league, timeframe=str(SEASON_ID) + "_total", totalOrAvg="total"
-):
+    league: League,
+    timeframe: str = str(SEASON_ID) + "_total",
+    totalOrAvg: str = "total",
+) -> Dict[str, int]:
     averages = CATEGORIES.copy()
+    for percentStat in PERCENT_MAP.keys():
+        if percentStat in averages:
+            averages.update({cat: 0 for cat in PERCENT_MAP.get(percentStat)})
     totals = averages.copy()
     playerCount = 0
 
@@ -38,30 +47,65 @@ def calculateLeagueAverages(
     return averages
 
 
-def ratePlayer(playerStats, averages, IGNORE_STATS):
+def ratePlayer(
+    playerStats: Dict[str, float], averages: Dict[str, float], IGNORE_STATS: List[str]
+) -> float:
     totalRating = 0
+    statCount = 0
     if playerStats is None:
         return 0
     for stat in averages:
         if stat in IGNORE_STATS:
             continue
-        playerStat = playerStats.get(stat)
-        averageStat = averages.get(stat)
-        statRating = playerStat / averageStat
-        totalRating += statRating
-    remainingNumStats = len(averages) - len(IGNORE_STATS)
-    totalRating = (totalRating / remainingNumStats) * 100
+        if stat in PERCENT_STATS:
+            totalRating += ratePercentStat(playerStats, averages, stat)
+            statCount += 1
+        else:
+            playerStat = playerStats.get(stat)
+            averageStat = averages.get(stat)
+            statRating = playerStat / averageStat
+            totalRating += statRating
+            statCount += 1
+    totalRating = (totalRating / statCount) * 100
     return totalRating
 
 
-def averageStats(totals, averages, playerCount, totalOrAvg):
+def ratePercentStat(
+    playerStats: Dict[str, float], averages: Dict[str, float], stat: str
+) -> float:
+    rawStats = PERCENT_MAP.get(stat, None)
+    if rawStats is None:
+        return 0
+    attempts = playerStats.get(rawStats[1])
+    avgAttempts = averages.get(rawStats[1])
+    avgMakes = averages.get(rawStats[0])
+    percent = playerStats.get(stat)
+    # Percent diff will be > 1 if better than average, < 1 if worse
+    avgPercent = avgMakes / avgAttempts
+    percentDiff = percent / avgPercent
+    # Differential gets taken to the power of attempts over/under average
+    # E.G. League average % on any attempts will still be rated 100.
+    # And +5% percent on 10 attempts is better than +20% on 1 attempt.
+    attemptDiff = attempts / avgAttempts
+    # Adjust weighting ratio to get normal ranges from 0 to 200
+    weightingRatio = 2
+    statRating = pow(percentDiff, attemptDiff * weightingRatio)
+    return statRating
+
+
+def averageStats(
+    totals: Dict[str, int],
+    averages: Dict[str, float],
+    playerCount: int,
+    totalOrAvg: str,
+) -> Dict[str, float]:
     if totalOrAvg == "avg":
         divisor = totals.get("GP")
     else:
         divisor = playerCount
     for stat in totals:
         if stat in PERCENT_STATS:
-            statAverage = totals.get(stat)
+            statAverage = totals.get(stat) / playerCount
         else:
             statAverage = totals.get(stat) / divisor
         averages.update({stat: statAverage})
@@ -69,7 +113,7 @@ def averageStats(totals, averages, playerCount, totalOrAvg):
 
 
 # returns 1 if player has stats, 0 otherwise
-def mergeStats(resultList, adderList):
+def mergeStats(resultList: Dict[str, int], adderList) -> int:
     totalValues = adderList.get("total", None)
     if totalValues is None:
         return 0
@@ -81,7 +125,13 @@ def mergeStats(resultList, adderList):
     return 1
 
 
-def rosterRater(timeframe, totalOrAvg, team, averages, IGNORE_STATS):
+def rosterRater(
+    timeframe: str,
+    totalOrAvg: str,
+    team: Team,
+    averages: Dict[str, float],
+    IGNORE_STATS: List[str],
+) -> pd.DataFrame:
     rosterRatings = {}
     roster = team.roster
     for player in roster:
@@ -98,7 +148,9 @@ def rosterRater(timeframe, totalOrAvg, team, averages, IGNORE_STATS):
     return ratingFrame
 
 
-def combineAverageRatingTimeframes(team, averages, totalOrAvg, IGNORE_STATS):
+def combineAverageRatingTimeframes(
+    team: Team, averages: Dict[str, float], totalOrAvg: str, IGNORE_STATS: List[str]
+) -> pd.DataFrame:
     seasonRatings = rosterRater(TIMEFRAMES[0], totalOrAvg, team, averages, IGNORE_STATS)
     thirtyRating = rosterRater(TIMEFRAMES[1], totalOrAvg, team, averages, IGNORE_STATS)
     fifteenRatings = rosterRater(
@@ -120,13 +172,13 @@ def combineAverageRatingTimeframes(team, averages, totalOrAvg, IGNORE_STATS):
 
 
 def combineTotalRatingTimeframes(
-    team,
-    IGNORE_STATS,
-    averagesWhole=None,
-    averagesSeven=None,
-    averagesFifteen=None,
-    averagesThirty=None,
-):
+    team: Team,
+    IGNORE_STATS: List[str],
+    averagesWhole: Dict[str, float] = None,
+    averagesSeven: Dict[str, float] = None,
+    averagesFifteen: Dict[str, float] = None,
+    averagesThirty: Dict[str, float] = None,
+) -> pd.DataFrame:
     seasonRatings = rosterRater(
         TIMEFRAMES[0], "total", team, averagesWhole, IGNORE_STATS
     )
@@ -151,7 +203,9 @@ def combineTotalRatingTimeframes(
     return result
 
 
-def leagueTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
+def leagueTeamRatings(
+    league: League, totalOrAvg: str = "total", IGNORE_STATS: List[str] = ["GP"]
+) -> pd.DataFrame:
     frames = []
     teams = league.teams
     if totalOrAvg == "total":
@@ -192,7 +246,12 @@ def leagueTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
     return resultFrame
 
 
-def leagueFreeAgentRatings(league, freeAgents, totalOrAvg="total", IGNORE_STATS=["GP"]):
+def leagueFreeAgentRatings(
+    league: League,
+    freeAgents: List[Player],
+    totalOrAvg: str = "total",
+    IGNORE_STATS: List[str] = ["GP"],
+) -> pd.DataFrame:
     frames = []
     if totalOrAvg == "total":
         for timeframe in TIMEFRAMES:
@@ -211,7 +270,13 @@ def leagueFreeAgentRatings(league, freeAgents, totalOrAvg="total", IGNORE_STATS=
     return ratingFrame
 
 
-def rateFreeAgents(timeframe, totalOrAvg, freeAgents, averages, IGNORE_STATS):
+def rateFreeAgents(
+    timeframe: str,
+    totalOrAvg: str,
+    freeAgents: List[Player],
+    averages: Dict[str, float],
+    IGNORE_STATS: List[str],
+) -> pd.DataFrame:
     freeAgentRating = {}
     for player in freeAgents:
         stats = player.stats.get(timeframe)
@@ -227,7 +292,13 @@ def rateFreeAgents(timeframe, totalOrAvg, freeAgents, averages, IGNORE_STATS):
     return ratingFrame
 
 
-def compositeRateTeamCats(league, timeFrames, totalOrAvg, categoryList, IGNORE_STATS):
+def compositeRateTeamCats(
+    league: League,
+    timeFrames,
+    totalOrAvg: str,
+    categoryList: List[str],
+    IGNORE_STATS: List[str],
+) -> List[List[Any]]:
     resultMatrix = [categoryList]
     if totalOrAvg == "total":
         for timeframe in timeFrames:
@@ -236,16 +307,24 @@ def compositeRateTeamCats(league, timeFrames, totalOrAvg, categoryList, IGNORE_S
             )
     else:
         averages = calculateLeagueAverages(
-            league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
+            league=league, timeframe=timeFrames, totalOrAvg=totalOrAvg
         )
 
     return resultMatrix
 
 
-def categoryRateTeams(league, timeframe, totalOrAvg, categoryList, IGNORE_STATS=["GP"]):
+def categoryRateTeams(
+    league: League,
+    timeframe: str,
+    totalOrAvg: str,
+    categoryList: List[str],
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     averages = calculateLeagueAverages(
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
+    averages.update({"FG%": averages.get("FGM") / averages.get("FGA")})
+    averages.update({"FT%": averages.get("FTM") / averages.get("FTA")})
     titles = categoryList.copy()
     titles.extend(["Rating", "Player Name", "Team", "Pro Team"])
     resultMatrix = [titles]
@@ -268,8 +347,13 @@ def categoryRateTeams(league, timeframe, totalOrAvg, categoryList, IGNORE_STATS=
 
 
 def categoryRateFreeAgents(
-    league, freeAgents, timeframe, totalOrAvg, categoryList, IGNORE_STATS=["GP"]
-):
+    league: League,
+    freeAgents: List[Player],
+    timeframe: str,
+    totalOrAvg: str,
+    categoryList: List[str],
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     averages = calculateLeagueAverages(
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
@@ -284,14 +368,14 @@ def categoryRateFreeAgents(
 
 
 def categoryRatePlayerList(
-    playerList,
-    timeframe,
-    totalOrAvg,
-    averages,
-    categoryList,
-    IGNORE_STATS,
-    teamName="?",
-):
+    playerList: List[Player],
+    timeframe: str,
+    totalOrAvg: str,
+    averages: Dict[str, float],
+    categoryList: List[str],
+    IGNORE_STATS: List[str],
+    teamName: str = "?",
+) -> List[List[Any]]:
     resultMatrix = []
     categoryNum = len(categoryList)
 
@@ -319,12 +403,20 @@ def categoryRatePlayerList(
     return resultMatrix
 
 
-def createPlayerMatrix(playerStats, averages, categoryList, IGNORE_STATS):
+def createPlayerMatrix(
+    playerStats: Dict[str, float],
+    averages: Dict[str.float],
+    categoryList: List[str],
+    IGNORE_STATS: List[str],
+) -> List[float]:
     playerMatrix = []
     for cat in categoryList:
         stat = playerStats.get(cat)
         if stat is None:
             playerMatrix.append(0)
+        elif cat in PERCENT_STATS:
+            statRating = ratePercentStat(playerStats, averages, cat) * 100
+            playerMatrix.append(statRating)
         else:
             statAverage = averages.get(cat)
             statRating = (stat / statAverage) * 100
@@ -333,7 +425,12 @@ def createPlayerMatrix(playerStats, averages, categoryList, IGNORE_STATS):
     return playerMatrix
 
 
-def remainingRateTeams(league, timeframes, totalOrAvg="avg", IGNORE_STATS=["GP"]):
+def remainingRateTeams(
+    league: League,
+    timeframes: List[str],
+    totalOrAvg: str = "avg",
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     averages = calculateLeagueAverages(
         league=league, timeframe=TIMEFRAMES[0], totalOrAvg=totalOrAvg
     )
@@ -395,8 +492,12 @@ def remainingRateTeams(league, timeframes, totalOrAvg="avg", IGNORE_STATS=["GP"]
 
 
 def remainingRateFreeAgents(
-    league, freeAgents, timeframes, totalOrAvg="avg", IGNORE_STATS=["GP"]
-):
+    league: League,
+    freeAgents: List[Player],
+    timeframes: List[str],
+    totalOrAvg: str = "avg",
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     averages = calculateLeagueAverages(
         league=league, timeframe=TIMEFRAMES[0], totalOrAvg=totalOrAvg
     )
@@ -454,9 +555,16 @@ def remainingRateFreeAgents(
     return resultMatrix
 
 
-def minuteTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
+def minuteTeamRatings(
+    league: League, totalOrAvg: str = "total", IGNORE_STATS: List[str] = ["GP"]
+) -> List[List[Any]]:
     pass
 
 
-def minuteFreeAgentRatings(league, freeAgents, totalOrAvg="total", IGNORE_STATS=["GP"]):
+def minuteFreeAgentRatings(
+    league: League,
+    freeAgents: List[Player],
+    totalOrAvg: str = "total",
+    IGNORE_STATS: List[str] = ["GP"],
+) -> List[List[Any]]:
     pass

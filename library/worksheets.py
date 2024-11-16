@@ -19,6 +19,25 @@ YELLOW_RGB = config.YELLOW_RGB
 GRAY_RGB = config.GRAY_RGB
 CATEGORIES = config.CATEGORIES
 
+NAMES = [
+    "total",  # 0
+    "pG",  # 1
+    "FA",  # 2
+    "FApG",
+    "cats",
+    "7",
+    "15",
+    "30",
+    "FAcats",
+    "FA7",
+    "FA15",
+    "FA30",
+    "rem",
+    "remFA",
+    "info",
+    "matchups",
+]
+
 now = datetime.now()
 updateTime = now.strftime("%m/%d/%Y, %H:%M:%S")
 info = [["Last updated", updateTime]]
@@ -50,7 +69,7 @@ def clearWorksheets():
         print("Error: ", ex)
 
 
-def numberToColumnLetter(num):
+def numberToColumnLetter(num: int):
     letters = ""
     while num:
         mod = (num - 1) % 26
@@ -61,7 +80,12 @@ def numberToColumnLetter(num):
 
 # columns=number of data columns
 def formatWorksheet(
-    batch, worksheet, columns=4, minValue="0", midValue="100", maxValue="200"
+    batch: gsf.SpreadsheetBatchUpdater,
+    worksheet: gspread.worksheet,
+    columns: int = 4,
+    minValue: str = "0",
+    midValue: str = "100",
+    maxValue: str = "200",
 ):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
     textColumns = (
@@ -116,7 +140,9 @@ def formatWorksheet(
     rules.save()
 
 
-def formatRemainingValueWorksheet(batch, worksheet, columns=8):
+def formatRemainingValueWorksheet(
+    batch: gsf.SpreadsheetBatchUpdater, worksheet: gspread.Worksheet, columns: int = 8
+):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
     topRowRange = "A1:" + chr(64 + columns) + "1"
     # For some reason, gspread-formatting does not like compound ranges
@@ -188,7 +214,9 @@ def formatRemainingValueWorksheet(batch, worksheet, columns=8):
     rules.save()
 
 
-def formatMatchupWorksheet(batch, worksheet):
+def formatMatchupWorksheet(
+    batch: gsf.SpreadsheetBatchUpdater, worksheet: gspread.Worksheet
+):
 
     numberRange = "B4:ZZ14"
 
@@ -254,7 +282,9 @@ def formatMatchupWorksheet(batch, worksheet):
     rules.save()
 
 
-def createWorksheet(spreadsheet: gspread.Spreadsheet, title, rows=500, cols=20):
+def createWorksheet(
+    spreadsheet: gspread.Spreadsheet, title: str, rows: int = 500, cols: int = 20
+):
     try:
         sheet = spreadsheet.worksheet(title=title)
     except gspread.WorksheetNotFound:
@@ -268,22 +298,24 @@ def initializeSpreadsheet():
     gc = gspread.service_account()
     spreadsheet = gc.open(getGoogleSheetName())
     totalWorksheet = spreadsheet.get_worksheet(0)
-    totalWorksheet.update_title("total")
-    avgWorksheet = createWorksheet(spreadsheet=spreadsheet, title="pG")
-    freeAgentWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA")
-    freeAgentAvgWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FApG")
-    teamMatrixTotalWorksheet = createWorksheet(spreadsheet=spreadsheet, title="cats")
-    teamMatrixSevenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="7")
-    teamMatrixFifteenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="15")
-    teamMatrixThirtyWorksheet = createWorksheet(spreadsheet=spreadsheet, title="30")
-    faMatrixTotalWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FAcats")
-    faMatrixSevenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA7")
-    faMatrixFifteenWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA15")
-    faMatrixThirtyWorksheet = createWorksheet(spreadsheet=spreadsheet, title="FA30")
-    remainingValueWorksheet = createWorksheet(spreadsheet=spreadsheet, title="rem")
-    remainingFAWorksheet = createWorksheet(spreadsheet=spreadsheet, title="remFA")
-    infoWorksheet = createWorksheet(spreadsheet=spreadsheet, title="info")
-    matchupWorksheet = createWorksheet(spreadsheet=spreadsheet, title="matchups")
+    totalWorksheet.update_title(NAMES[0])
+    avgWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[1])
+    freeAgentWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[2])
+    freeAgentAvgWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[3])
+    teamMatrixTotalWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[4])
+    teamMatrixSevenWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[5])
+    teamMatrixFifteenWorksheet = createWorksheet(
+        spreadsheet=spreadsheet, title=NAMES[6]
+    )
+    teamMatrixThirtyWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[7])
+    faMatrixTotalWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[8])
+    faMatrixSevenWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[9])
+    faMatrixFifteenWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[10])
+    faMatrixThirtyWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[11])
+    remainingValueWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[12])
+    remainingFAWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[13])
+    infoWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[14])
+    matchupWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[15])
 
     # names
     """"
@@ -355,22 +387,22 @@ def pushGoogleSheets():
     # Publish to Google Sheet
     gc = gspread.service_account()
     spreadsheet = gc.open(getGoogleSheetName())
-    totalWorksheet = spreadsheet.get_worksheet(0)
-    avgWorksheet = spreadsheet.get_worksheet(1)
-    freeAgentWorksheet = spreadsheet.get_worksheet(2)
-    freeAgentAvgWorksheet = spreadsheet.get_worksheet(3)
-    teamMatrixTotalWorksheet = spreadsheet.get_worksheet(4)
-    teamMatrixSevenWorksheet = spreadsheet.get_worksheet(5)
-    teamMatrixFifteenWorksheet = spreadsheet.get_worksheet(6)
-    teamMatrixThirtyWorksheet = spreadsheet.get_worksheet(7)
-    faMatrixTotalWorksheet = spreadsheet.get_worksheet(8)
-    faMatrixSevenWorksheet = spreadsheet.get_worksheet(9)
-    faMatrixFifteenWorksheet = spreadsheet.get_worksheet(10)
-    faMatrixThirtyWorksheet = spreadsheet.get_worksheet(11)
-    remainingValueWorksheet = spreadsheet.get_worksheet(12)
-    remainingFAWorksheet = spreadsheet.get_worksheet(13)
-    infoWorksheet = spreadsheet.get_worksheet(14)
-    matchupWorksheet = spreadsheet.get_worksheet(15)
+    totalWorksheet = spreadsheet.worksheet(NAMES[0])
+    avgWorksheet = spreadsheet.worksheet(NAMES[1])
+    freeAgentWorksheet = spreadsheet.worksheet(NAMES[2])
+    freeAgentAvgWorksheet = spreadsheet.worksheet(NAMES[3])
+    teamMatrixTotalWorksheet = spreadsheet.worksheet(NAMES[4])
+    teamMatrixSevenWorksheet = spreadsheet.worksheet(NAMES[5])
+    teamMatrixFifteenWorksheet = spreadsheet.worksheet(NAMES[6])
+    teamMatrixThirtyWorksheet = spreadsheet.worksheet(NAMES[7])
+    faMatrixTotalWorksheet = spreadsheet.worksheet(NAMES[8])
+    faMatrixSevenWorksheet = spreadsheet.worksheet(NAMES[9])
+    faMatrixFifteenWorksheet = spreadsheet.worksheet(NAMES[10])
+    faMatrixThirtyWorksheet = spreadsheet.worksheet(NAMES[11])
+    remainingValueWorksheet = spreadsheet.worksheet(NAMES[12])
+    remainingFAWorksheet = spreadsheet.worksheet(NAMES[13])
+    infoWorksheet = spreadsheet.worksheet(NAMES[14])
+    matchupWorksheet = spreadsheet.worksheet(NAMES[15])
 
     transposed_data = [list(row) for row in zip(*matchupData)]
     matchupWorksheet.update(values=transposed_data)

@@ -2,7 +2,7 @@ from typing import Dict, List
 import library.schedule as schedule
 import library.config as config
 import pandas as pd
-from espn_api.basketball import League
+from espn_api.basketball import League, Team, Player
 
 
 # 1. get all players,
@@ -125,7 +125,13 @@ def mergeStats(resultList: Dict[str, int], adderList) -> int:
     return 1
 
 
-def rosterRater(timeframe, totalOrAvg, team, averages, IGNORE_STATS):
+def rosterRater(
+    timeframe: str,
+    totalOrAvg: str,
+    team: Team,
+    averages: Dict[str, float],
+    IGNORE_STATS: List[str],
+) -> pd.DataFrame:
     rosterRatings = {}
     roster = team.roster
     for player in roster:
@@ -164,13 +170,13 @@ def combineAverageRatingTimeframes(team, averages, totalOrAvg, IGNORE_STATS):
 
 
 def combineTotalRatingTimeframes(
-    team,
-    IGNORE_STATS,
-    averagesWhole=None,
-    averagesSeven=None,
-    averagesFifteen=None,
-    averagesThirty=None,
-):
+    team: Team,
+    IGNORE_STATS: List[str],
+    averagesWhole: Dict[str, float] = None,
+    averagesSeven: Dict[str, float] = None,
+    averagesFifteen: Dict[str, float] = None,
+    averagesThirty: Dict[str, float] = None,
+) -> pd.DataFrame:
     seasonRatings = rosterRater(
         TIMEFRAMES[0], "total", team, averagesWhole, IGNORE_STATS
     )
@@ -195,7 +201,9 @@ def combineTotalRatingTimeframes(
     return result
 
 
-def leagueTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
+def leagueTeamRatings(
+    league: League, totalOrAvg: str = "total", IGNORE_STATS: List[str] = ["GP"]
+) -> pd.DataFrame:
     frames = []
     teams = league.teams
     if totalOrAvg == "total":
@@ -236,7 +244,12 @@ def leagueTeamRatings(league, totalOrAvg="total", IGNORE_STATS=["GP"]):
     return resultFrame
 
 
-def leagueFreeAgentRatings(league, freeAgents, totalOrAvg="total", IGNORE_STATS=["GP"]):
+def leagueFreeAgentRatings(
+    league: League,
+    freeAgents: List[Player],
+    totalOrAvg: str = "total",
+    IGNORE_STATS: List[str] = ["GP"],
+) -> pd.DataFrame:
     frames = []
     if totalOrAvg == "total":
         for timeframe in TIMEFRAMES:
@@ -271,7 +284,13 @@ def rateFreeAgents(timeframe, totalOrAvg, freeAgents, averages, IGNORE_STATS):
     return ratingFrame
 
 
-def compositeRateTeamCats(league, timeFrames, totalOrAvg, categoryList, IGNORE_STATS):
+def compositeRateTeamCats(
+    league: League,
+    timeFrames,
+    totalOrAvg: str,
+    categoryList: List[str],
+    IGNORE_STATS: List[str],
+) -:
     resultMatrix = [categoryList]
     if totalOrAvg == "total":
         for timeframe in timeFrames:
@@ -280,7 +299,7 @@ def compositeRateTeamCats(league, timeFrames, totalOrAvg, categoryList, IGNORE_S
             )
     else:
         averages = calculateLeagueAverages(
-            league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
+            league=league, timeframe=timeFrames, totalOrAvg=totalOrAvg
         )
 
     return resultMatrix

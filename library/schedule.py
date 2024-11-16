@@ -1,12 +1,16 @@
 from datetime import date
 from copy import deepcopy
+from typing import Dict
+from espn_api.basketball import League, Team
 import library.config as config
 
 ROSTER_POSITIONS = config.ROSTER_POSITIONS
 MAX_PLAYERS = config.MAX_PLAYERS
 
 
-def calculateExtraRemainingGames(league, teamNumber, ignorePlayers=0):
+def calculateExtraRemainingGames(
+    league: League, teamNumber: int, ignorePlayers: int = 0
+) -> Dict[str, int]:
     remainingGames = {}
     teamCount = 0
     now = date.today()
@@ -42,7 +46,7 @@ def calculateExtraRemainingGames(league, teamNumber, ignorePlayers=0):
     return remainingGames
 
 
-def calculateRemainingGames(league):
+def calculateRemainingGames(league: League) -> Dict[str, int]:
     remainingGames = {}
     teamCount = 0
     now = date.today()
@@ -70,7 +74,7 @@ def calculateRemainingGames(league):
     return remainingGames
 
 
-def myTeamSchedule(team):
+def myTeamSchedule(team: Team) -> Dict[date, int]:
     teamSchedule = {}
     roster = team.roster
     for player in roster:

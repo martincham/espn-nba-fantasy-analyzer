@@ -1,5 +1,7 @@
+from typing import List, Any, Dict
 from datetime import date, timedelta
 import json
+from espn_api.basketball import League, Team
 
 import library.schedule as schedule
 import library.config as config
@@ -21,7 +23,7 @@ IGNORE_STATS = config.IGNORE_STATS
 # 4. Maybe also calculate each of the 9 categories for each team
 
 
-def createMatchupSchedule(league):
+def createMatchupSchedule(league: League) -> List[List[Any]]:
     averagesWhole = rating.calculateLeagueAverages(
         league, TIMEFRAMES[0], totalOrAvg="avg"
     )
@@ -135,7 +137,7 @@ def createMatchupSchedule(league):
     return matchupSheet
 
 
-def teamRating(team, averages):
+def teamRating(team: Team, averages: Dict[str, float]) -> List[Dict[str, Any]]:
     teamRatings = []
     for player in team.roster:
         stats = player.stats
@@ -162,7 +164,9 @@ def teamRating(team, averages):
     return teamRatings
 
 
-def teamDayRating(teamRatings, date, timeframe=TIMEFRAMES[0]):
+def teamDayRating(
+    teamRatings: List[Dict[str, Any]], date: date, timeframe: str = TIMEFRAMES[0]
+) -> Dict[str, Any]:
     # team ratings must be sorted descending
     # we will greedily place best players first
     dayRating = 0

@@ -148,7 +148,9 @@ def rosterRater(
     return ratingFrame
 
 
-def combineAverageRatingTimeframes(team, averages, totalOrAvg, IGNORE_STATS):
+def combineAverageRatingTimeframes(
+    team: Team, averages: Dict[str, float], totalOrAvg: str, IGNORE_STATS: List[str]
+) -> pd.DataFrame:
     seasonRatings = rosterRater(TIMEFRAMES[0], totalOrAvg, team, averages, IGNORE_STATS)
     thirtyRating = rosterRater(TIMEFRAMES[1], totalOrAvg, team, averages, IGNORE_STATS)
     fifteenRatings = rosterRater(
@@ -268,7 +270,13 @@ def leagueFreeAgentRatings(
     return ratingFrame
 
 
-def rateFreeAgents(timeframe, totalOrAvg, freeAgents, averages, IGNORE_STATS):
+def rateFreeAgents(
+    timeframe: str,
+    totalOrAvg: str,
+    freeAgents: List[Player],
+    averages: Dict[str, float],
+    IGNORE_STATS: List[str],
+) -> pd.DataFrame:
     freeAgentRating = {}
     for player in freeAgents:
         stats = player.stats.get(timeframe)
@@ -290,7 +298,7 @@ def compositeRateTeamCats(
     totalOrAvg: str,
     categoryList: List[str],
     IGNORE_STATS: List[str],
-) -:
+):
     resultMatrix = [categoryList]
     if totalOrAvg == "total":
         for timeframe in timeFrames:

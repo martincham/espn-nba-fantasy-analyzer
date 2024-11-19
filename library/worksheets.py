@@ -36,6 +36,7 @@ NAMES = [
     "remFA",
     "info",
     "matchups",
+    "FAp32",
 ]
 
 now = datetime.now()
@@ -317,24 +318,6 @@ def initializeSpreadsheet():
     infoWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[14])
     matchupWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[15])
 
-    # names
-    """"
-    totalWorksheet.update_title("total")
-    avgWorksheet.update_title("pG")
-    freeAgentWorksheet.update_title("FA")
-    freeAgentAvgWorksheet.update_title("FApG")
-    teamMatrixTotalWorksheet.update_title("cats")
-    teamMatrixSevenWorksheet.update_title("cats7")
-    teamMatrixFifteenWorksheet.update_title("cats15")
-    teamMatrixThirtyWorksheet.update_title("cats30")
-    faMatrixTotalWorksheet.update_title("FAcats")
-    faMatrixSevenWorksheet.update_title("FA7")
-    faMatrixFifteenWorksheet.update_title("FA15")
-    faMatrixThirtyWorksheet.update_title("FA30")
-    remainingValueWorksheet.update_title("remValue")
-    remainingFAWorksheet.update_title("remFA")
-    infoWorksheet.update_title("info")
-    """
     columns = len(CATEGORIES) + 1
     with gsf.batch_updater(spreadsheet) as batch:
         formatWorksheet(batch=batch, worksheet=avgWorksheet)

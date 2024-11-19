@@ -405,7 +405,7 @@ def categoryRatePlayerList(
 
 def createPlayerMatrix(
     playerStats: Dict[str, float],
-    averages: Dict[str.float],
+    averages: Dict[str, float],
     categoryList: List[str],
     IGNORE_STATS: List[str],
 ) -> List[float]:
@@ -564,7 +564,57 @@ def minuteTeamRatings(
 def minuteFreeAgentRatings(
     league: League,
     freeAgents: List[Player],
-    totalOrAvg: str = "total",
-    IGNORE_STATS: List[str] = ["GP"],
-) -> List[List[Any]]:
-    pass
+) -> pd.DataFrame:
+    frames = []
+    for timeframe in TIMEFRAMES:
+        averages = calculateLeagueAverages(league, timeframe, totalOrAvg="total")
+        frame = rateFreeAgents(timeframe, "total", freeAgents, averages)
+        frames.append(frame)
+
+    ratingFrame = pd.concat(frames, axis=1)
+    ratingFrame["Player"] = ratingFrame.index
+    return ratingFrame
+
+
+def minuteRateFreeAgents(
+    timeframe: str,
+    totalOrAvg: str,
+    freeAgents: List[Player],
+    averages: Dict[str, float],
+) -> pd.DataFrame:
+    freeAgentRating = {}
+    for player in freeAgents:
+        stats = player.stats.get(timeframe)
+        playerStats = stats.get(totalOrAvg)
+        if playerStats is None:
+            rating = 0
+        else:
+            rating = minuteRatePlayer(playerStats, averages, IGNORE_STATS)
+        name = player.name
+        freeAgentRating.update({name: rating})
+    ratingFrame = pd.DataFrame(freeAgentRating, [timeframe])
+    ratingFrame = ratingFrame.T
+    return ratingFrame
+
+
+def minuteRatePlayer(
+    playerStats: Dict[str, float], averages: Dict[str, float]
+) -> float:
+    totalRating = 0
+    statCount = 0
+    if playerStats is None:
+        return 0
+    for stat in averages:
+        if stat in IGNORE_STATS:
+            continue
+        if stat in PERCENT_STATS:
+            totalRating += ratePercentStat(playerStats, averages, stat)
+            statCount += 1
+        else:
+            playerStat = playerStats.get(stat)
+            averageStat = averages.get(stat)
+            statRating = playerStat / averageStat
+            totalRating += statRating
+            statCount += 1
+    totalRating = (totalRating / statCount) * 100
+    return totalRating

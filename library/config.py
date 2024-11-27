@@ -59,10 +59,8 @@ except Exception as ex:  # file not found, initialize
             "REB",
             "3PM",
             "TO",
-            "FTM",
-            "FTA",
-            "FGM",
-            "FGA",
+            "FT%",
+            "FG%",
             "GP",
         ],
         "ignoredStats": ["FTM", "FTA", "TO", "FGA", "FGM", "GP"],
@@ -87,6 +85,8 @@ CATEGORIES = settings.get("categories")
 if "GP" not in CATEGORIES:
     CATEGORIES += ["GP"]  # must contain Games Played
 IGNORE_STATS = settings.get("ignoredStats")
+if "MIN" not in IGNORE_STATS:
+    IGNORE_STATS += ["MIN"]  # must contain Minutes Played
 TEAM_NUMBER = int(settings.get("teamNumber")) - 1  # switch to 0 indexing
 IGNORE_PLAYERS = settings.get("ignorePlayers")
 MAX_PLAYERS = int(settings.get("maxPlayers"))

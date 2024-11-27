@@ -270,10 +270,15 @@ def formatMatchupWorksheet(
             minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
         ),
     )
+    altMidPoint = gsf.InterpolationPoint(
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
+        type="NUMBER",
+        value="0",
+    )
     rule2 = gsf.ConditionalFormatRule(
         ranges=[gsf.GridRange.from_a1_range("B10:ZZ14", worksheet)],
         gradientRule=gsf.GradientRule(
-            minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
+            minpoint=minPoint, midpoint=altMidPoint, maxpoint=maxPoint
         ),
     )
     rules = gsf.get_conditional_format_rules(worksheet)
@@ -317,6 +322,7 @@ def initializeSpreadsheet():
     remainingFAWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[13])
     infoWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[14])
     matchupWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[15])
+    per32Worksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[16])
 
     columns = len(CATEGORIES) + 1
     with gsf.batch_updater(spreadsheet) as batch:
@@ -324,6 +330,7 @@ def initializeSpreadsheet():
         formatWorksheet(batch=batch, worksheet=totalWorksheet)
         formatWorksheet(batch=batch, worksheet=freeAgentWorksheet)
         formatWorksheet(batch=batch, worksheet=freeAgentAvgWorksheet)
+        formatWorksheet(batch=batch, worksheet=per32Worksheet, columns=8)
         formatWorksheet(
             batch=batch, worksheet=teamMatrixTotalWorksheet, columns=columns
         )
@@ -357,14 +364,24 @@ def pushGoogleSheets():
 
     matchupData = matchups.createMatchupSchedule(league=league)
 
-    avgLeagueRatings = rating.leagueTeamRatings(league, "avg", IGNORE_STATS)
-    totalLeagueRatings = rating.leagueTeamRatings(league, "total", IGNORE_STATS)
+    avgLeagueRatings = rating.leagueTeamRatings(
+        league=league, totalOrAvg="avg", IGNORE_STATS=IGNORE_STATS
+    )
+    totalLeagueRatings = rating.leagueTeamRatings(
+        league=league, totalOrAvg="total", IGNORE_STATS=IGNORE_STATS
+    )
 
     freeAgentRatings = rating.leagueFreeAgentRatings(
-        league, freeAgents, "total", IGNORE_STATS
+        league=league,
+        freeAgents=freeAgents,
+        totalOrAvg="total",
+        IGNORE_STATS=IGNORE_STATS,
     )
     freeAgentAvgRatings = rating.leagueFreeAgentRatings(
-        league, freeAgents, "avg", IGNORE_STATS
+        league=league,
+        freeAgents=freeAgents,
+        totalOrAvg="avg",
+        IGNORE_STATS=IGNORE_STATS,
     )
 
     # Publish to Google Sheet
@@ -386,6 +403,13 @@ def pushGoogleSheets():
     remainingFAWorksheet = spreadsheet.worksheet(NAMES[13])
     infoWorksheet = spreadsheet.worksheet(NAMES[14])
     matchupWorksheet = spreadsheet.worksheet(NAMES[15])
+    per32Worksheet = spreadsheet.worksheet(NAMES[16])
+
+    # TEST
+    freeAgentMinuteRatings = rating.minuteFreeAgentRatings(
+        league=league, freeAgents=freeAgents
+    )
+    per32Worksheet.update(values=freeAgentMinuteRatings)
 
     transposed_data = [list(row) for row in zip(*matchupData)]
     matchupWorksheet.update(values=transposed_data)

@@ -323,8 +323,7 @@ def categoryRateTeams(
     averages = calculateLeagueAverages(
         league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
     )
-    averages.update({"FG%": averages.get("FGM") / averages.get("FGA")})
-    averages.update({"FT%": averages.get("FTM") / averages.get("FTA")})
+
     titles = categoryList.copy()
     titles.extend(["Rating", "Player Name", "Team", "Pro Team"])
     resultMatrix = [titles]
@@ -564,37 +563,59 @@ def minuteTeamRatings(
 def minuteFreeAgentRatings(
     league: League,
     freeAgents: List[Player],
-) -> pd.DataFrame:
-    frames = []
+) -> List[List[Any]]:
+    CATEGORIES.update({"MIN": 0})
+    averagesList = []
     for timeframe in TIMEFRAMES:
-        averages = calculateLeagueAverages(league, timeframe, totalOrAvg="total")
-        frame = rateFreeAgents(timeframe, "total", freeAgents, averages)
-        frames.append(frame)
+        averagesList += [
+            calculateLeagueAverages(
+                league=league, timeframe=timeframe, totalOrAvg="total"
+            )
+        ]
+    resultMatrix = minuteRateFreeAgents(freeAgents, averagesList=averagesList)
 
-    ratingFrame = pd.concat(frames, axis=1)
-    ratingFrame["Player"] = ratingFrame.index
-    return ratingFrame
+    CATEGORIES.pop("MIN", None)
+    return resultMatrix
 
 
 def minuteRateFreeAgents(
-    timeframe: str,
-    totalOrAvg: str,
     freeAgents: List[Player],
-    averages: Dict[str, float],
-) -> pd.DataFrame:
-    freeAgentRating = {}
+    averagesList: List[Dict[str, float]],
+) -> List[List[Any]]:
+    resultMatrix = [
+        [
+            "total",
+            "tMPG",
+            "30",
+            "30MPGs",
+            "15",
+            "15MPG",
+            "7",
+            "7MPG",
+            "Player Name",
+            "Pro Team",
+            "Injury Status",
+        ]
+    ]
     for player in freeAgents:
-        stats = player.stats.get(timeframe)
-        playerStats = stats.get(totalOrAvg)
-        if playerStats is None:
-            rating = 0
-        else:
-            rating = minuteRatePlayer(playerStats, averages, IGNORE_STATS)
-        name = player.name
-        freeAgentRating.update({name: rating})
-    ratingFrame = pd.DataFrame(freeAgentRating, [timeframe])
-    ratingFrame = ratingFrame.T
-    return ratingFrame
+        playerMatrix = []
+        for index, timeframe in enumerate(TIMEFRAMES):
+            averages = averagesList[index]
+            stats = player.stats.get(timeframe)
+            playerStats = stats.get("total")
+            if playerStats is None:
+                playerMatrix += [0] * 2
+            else:
+                playerMatrix += [minuteRatePlayer(playerStats, averages)]
+                playerMatrix += [playerStats.get("MIN") / playerStats.get("GP")]
+        playerMatrix.append(player.name)
+        playerMatrix.append(player.proTeam)
+        injuryStatus = player.injuryStatus
+        if not isinstance(injuryStatus, str):
+            injuryStatus = "?"
+        playerMatrix.append(injuryStatus)
+        resultMatrix.append(playerMatrix)
+    return resultMatrix
 
 
 def minuteRatePlayer(
@@ -602,7 +623,11 @@ def minuteRatePlayer(
 ) -> float:
     totalRating = 0
     statCount = 0
-    if playerStats is None:
+    playerMinutes = playerStats.get("MIN")
+    averageMinutes = averages.get("MIN")
+    if playerMinutes is None or averageMinutes is None:
+        return 0
+    if playerMinutes == 0 or averageMinutes == 0:
         return 0
     for stat in averages:
         if stat in IGNORE_STATS:
@@ -613,7 +638,9 @@ def minuteRatePlayer(
         else:
             playerStat = playerStats.get(stat)
             averageStat = averages.get(stat)
-            statRating = playerStat / averageStat
+            playerStatPerMinute = playerStat / playerMinutes
+            averageStatPerMinute = averageStat / averageMinutes
+            statRating = playerStatPerMinute / averageStatPerMinute
             totalRating += statRating
             statCount += 1
     totalRating = (totalRating / statCount) * 100

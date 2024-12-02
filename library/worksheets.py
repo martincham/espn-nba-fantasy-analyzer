@@ -17,6 +17,8 @@ WHITE_RGB = config.WHITE_RGB
 GREEN_RGB = config.GREEN_RGB
 YELLOW_RGB = config.YELLOW_RGB
 GRAY_RGB = config.GRAY_RGB
+BLUE_RGB = config.BLUE_RGB
+ORANGE_RGB = config.ORANGE_RGB
 CATEGORIES = config.CATEGORIES
 
 
@@ -143,7 +145,7 @@ def formatWorksheet(
 
 
 def formatRemainingValueWorksheet(
-    batch: gsf.SpreadsheetBatchUpdater, worksheet: gspread.Worksheet, columns: int = 8
+    batch: gsf.SpreadsheetBatchUpdater, worksheet: gspread.Worksheet, columns: int = 9
 ):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
     topRowRange = "A1:" + chr(64 + columns) + "1"
@@ -151,6 +153,7 @@ def formatRemainingValueWorksheet(
     numberRange = "A2:" + chr(64 + columns + 2) + "1000"
     remRange = ["A2:A400", "C2:C400", "E2:E400", "G2:G400"]
     differentialRange = ["B2:B400", "D2:D400", "F2:F400", "H2:H400"]
+    gameRange = "I2:I400"
 
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
@@ -180,23 +183,47 @@ def formatRemainingValueWorksheet(
     )
 
     # Yellow-to-Gray gradient for differential
-    dminPoint = gsf.InterpolationPoint(
-        color=gsf.Color(YELLOW_RGB[0], YELLOW_RGB[1], YELLOW_RGB[2]),
+    dMinPoint = gsf.InterpolationPoint(
+        color=gsf.Color(GRAY_RGB[0], GRAY_RGB[1], GRAY_RGB[2]),
         type="MIN",
     )
-    dmidPoint = gsf.InterpolationPoint(
+
+    dMidPoint = gsf.InterpolationPoint(
         color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
         type="PERCENT",
         value="50",
     )
-    dmaxPoint = gsf.InterpolationPoint(
-        color=gsf.Color(GRAY_RGB[0], GRAY_RGB[1], GRAY_RGB[2]),
+    dMaxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(YELLOW_RGB[0], YELLOW_RGB[1], YELLOW_RGB[2]),
+        type="MAX",
+    )
+
+    # Blue-to-Orange gradient for Games
+    gMinPoint = gsf.InterpolationPoint(
+        color=gsf.Color(ORANGE_RGB[0], ORANGE_RGB[1], ORANGE_RGB[2]),
+        type="MIN",
+    )
+
+    gMidPoint = gsf.InterpolationPoint(
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
+        type="PERCENT",
+        value="50",
+    )
+    gMaxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(BLUE_RGB[0], BLUE_RGB[1], BLUE_RGB[2]),
         type="MAX",
     )
 
     # Apply conditional formatting gradients
     rules = gsf.get_conditional_format_rules(worksheet)
     rules.clear()
+    rule = gsf.ConditionalFormatRule(
+        ranges=[gsf.GridRange.from_a1_range(gameRange, worksheet)],
+        gradientRule=gsf.GradientRule(
+            minpoint=gMinPoint, midpoint=gMidPoint, maxpoint=gMaxPoint
+        ),
+    )
+    rules.append(rule)
     for numRange in remRange:
         rule = gsf.ConditionalFormatRule(
             ranges=[gsf.GridRange.from_a1_range(numRange, worksheet)],
@@ -209,7 +236,7 @@ def formatRemainingValueWorksheet(
         rule = gsf.ConditionalFormatRule(
             ranges=[gsf.GridRange.from_a1_range(diffRange, worksheet)],
             gradientRule=gsf.GradientRule(
-                minpoint=dminPoint, midpoint=dmidPoint, maxpoint=dmaxPoint
+                minpoint=dMinPoint, midpoint=dMidPoint, maxpoint=dMaxPoint
             ),
         )
         rules.append(rule)
@@ -327,36 +354,37 @@ def initializeSpreadsheet():
 
     columns = len(CATEGORIES) + 1
     with gsf.batch_updater(spreadsheet) as batch:
-        formatWorksheet(batch=batch, worksheet=avgWorksheet)
-        formatWorksheet(batch=batch, worksheet=totalWorksheet)
-        formatWorksheet(batch=batch, worksheet=freeAgentWorksheet)
-        formatWorksheet(batch=batch, worksheet=freeAgentAvgWorksheet)
-        formatWorksheet(batch=batch, worksheet=per32Worksheet, columns=8)
-        formatWorksheet(
-            batch=batch, worksheet=teamMatrixTotalWorksheet, columns=columns
-        )
-        formatWorksheet(
-            batch=batch, worksheet=teamMatrixSevenWorksheet, columns=columns
-        )
-        formatWorksheet(
-            batch=batch, worksheet=teamMatrixFifteenWorksheet, columns=columns
-        )
-        formatWorksheet(
-            batch=batch, worksheet=teamMatrixThirtyWorksheet, columns=columns
-        )
-        formatWorksheet(batch=batch, worksheet=faMatrixTotalWorksheet, columns=columns)
-        formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=columns)
-        formatWorksheet(
-            batch=batch, worksheet=faMatrixFifteenWorksheet, columns=columns
-        )
-        formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=columns)
+        # formatWorksheet(batch=batch, worksheet=avgWorksheet)
+        # formatWorksheet(batch=batch, worksheet=totalWorksheet)
+        # formatWorksheet(batch=batch, worksheet=freeAgentWorksheet)
+        # formatWorksheet(batch=batch, worksheet=freeAgentAvgWorksheet)
+        # formatWorksheet(batch=batch, worksheet=per32Worksheet, columns=8)
+        # formatWorksheet(
+        #     batch=batch, worksheet=teamMatrixTotalWorksheet, columns=columns
+        # )
+        # formatWorksheet(
+        #     batch=batch, worksheet=teamMatrixSevenWorksheet, columns=columns
+        # )
+        # formatWorksheet(
+        #     batch=batch, worksheet=teamMatrixFifteenWorksheet, columns=columns
+        # )
+        # formatWorksheet(
+        #     batch=batch, worksheet=teamMatrixThirtyWorksheet, columns=columns
+        # )
+        # formatWorksheet(batch=batch, worksheet=faMatrixTotalWorksheet, columns=columns)
+        # formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=columns)
+        # formatWorksheet(
+        #     batch=batch, worksheet=faMatrixFifteenWorksheet, columns=columns
+        # )
+        # formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=columns)
+
         formatRemainingValueWorksheet(
-            batch=batch, worksheet=remainingValueWorksheet, columns=8
+            batch=batch, worksheet=remainingValueWorksheet, columns=9
         )
         formatRemainingValueWorksheet(
-            batch=batch, worksheet=remainingFAWorksheet, columns=8
+            batch=batch, worksheet=remainingFAWorksheet, columns=9
         )
-        formatMatchupWorksheet(batch=batch, worksheet=matchupWorksheet)
+        # formatMatchupWorksheet(batch=batch, worksheet=matchupWorksheet)
 
 
 def pushGoogleSheets():
@@ -430,7 +458,6 @@ def pushGoogleSheets():
 
     remRatingMatrix = rating.remainingRateTeams(
         league=league,
-        totalOrAvg="avg",
         IGNORE_STATS=IGNORE_STATS,
     )
 

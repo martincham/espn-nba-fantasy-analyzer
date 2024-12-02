@@ -35,6 +35,8 @@ WHITE_RGB = [1, 1, 1]
 GREEN_RGB = [0.3, 0.8, 0.6]
 YELLOW_RGB = [1, 1, 0.8]
 GRAY_RGB = [0.8, 0.8, 0.8]
+BLUE_RGB = [0.498, 0.588, 1]
+ORANGE_RGB = [1, 0.82, 0.337]
 
 # load from setting file
 try:

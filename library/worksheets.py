@@ -19,6 +19,7 @@ YELLOW_RGB = config.YELLOW_RGB
 GRAY_RGB = config.GRAY_RGB
 CATEGORIES = config.CATEGORIES
 
+
 NAMES = [
     "total",  # 0
     "pG",  # 1
@@ -429,7 +430,6 @@ def pushGoogleSheets():
 
     remRatingMatrix = rating.remainingRateTeams(
         league=league,
-        timeframes=TIMEFRAMES,
         totalOrAvg="avg",
         IGNORE_STATS=IGNORE_STATS,
     )
@@ -439,7 +439,6 @@ def pushGoogleSheets():
     remFARatingMatrix = rating.remainingRateFreeAgents(
         league=league,
         freeAgents=freeAgents,
-        timeframes=TIMEFRAMES,
         IGNORE_STATS=IGNORE_STATS,
     )
 

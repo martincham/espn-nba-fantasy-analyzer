@@ -20,6 +20,9 @@ SEASON_ID = config.SEASON_ID
 TIMEFRAMES = config.TIMEFRAMES
 IGNORE_STATS = config.IGNORE_STATS
 LEAGUE = loading.loadLeague()
+EXTRA_GAMES = schedule.calculateExtraRemainingGames(
+    league=LEAGUE, teamNumber=TEAM_NUMBER, ignorePlayers=IGNORE_PLAYERS
+)
 
 
 def calculateLeagueAverages(
@@ -83,7 +86,7 @@ def averageStats(
     else:
         divisor = playerCount
     for stat in totals:
-        if stat in PERCENT_STATS:
+        if stat in PERCENT_STATS or stat == "GP":
             statAverage = totals.get(stat) / playerCount
         else:
             statAverage = totals.get(stat) / divisor

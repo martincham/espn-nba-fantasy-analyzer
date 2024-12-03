@@ -297,7 +297,7 @@ def categoryRateTeams(
     else:
         averages = TOTAL_AVERAGES[TIMEFRAMES.index(timeframe)]
     titles = categoryList.copy()
-    titles.extend(["Rating", "Player Name", "Team", "Pro Team"])
+    titles.extend(["Rating", "Player Name", "Team", "Pro Team", "Injury Status"])
     resultMatrix = [titles]
     teams = league.teams
     for team in teams:
@@ -331,7 +331,7 @@ def categoryRateFreeAgents(
         averages = TOTAL_AVERAGES[TIMEFRAMES.index(timeframe)]
 
     titles = categoryList.copy()
-    titles.extend(["Rating", "Player Name", "Team", "Pro Team"])
+    titles.extend(["Rating", "Player Name", "Team", "Pro Team", "Injury Status"])
     resultMatrix = [titles]
     freeAgentMatrix = categoryRatePlayerList(
         freeAgents, timeframe, totalOrAvg, averages, categoryList, IGNORE_STATS
@@ -371,6 +371,7 @@ def categoryRatePlayerList(
 
         playerMatrix.append(teamName if teamName is not None else "")
         playerMatrix.append(proTeam if proTeam is not None else "")
+        playerMatrix.append(str(player.injuryStatus))
         resultMatrix.append(playerMatrix)
 
     return resultMatrix

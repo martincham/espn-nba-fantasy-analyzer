@@ -97,7 +97,7 @@ def formatWorksheet(
     )
 
     topRowRange = (
-        "A1:" + chr(64 + columns + 3) + "1"
+        "A1:" + chr(64 + columns + 4) + "1"
     )  # plus 2 for  name and team columns
     numberRange = "A2:" + chr(64 + columns + 2) + "1000"
 
@@ -151,9 +151,9 @@ def formatRemainingValueWorksheet(
     topRowRange = "A1:" + chr(64 + columns) + "1"
     # For some reason, gspread-formatting does not like compound ranges
     numberRange = "A2:" + chr(64 + columns + 2) + "1000"
-    remRange = ["A2:A400", "C2:C400", "E2:E400", "G2:G400"]
-    differentialRange = ["B2:B400", "D2:D400", "F2:F400", "H2:H400"]
-    gameRange = "I2:I400"
+    remRange = ["A2:A500", "C2:C500", "E2:E500", "G2:G500"]
+    differentialRange = ["B2:B500", "D2:D500", "F2:F500", "H2:H500"]
+    gameRange = "I2:I500"
 
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
@@ -354,29 +354,29 @@ def initializeSpreadsheet():
 
     columns = len(CATEGORIES) + 1
     with gsf.batch_updater(spreadsheet) as batch:
-        # formatWorksheet(batch=batch, worksheet=avgWorksheet)
-        # formatWorksheet(batch=batch, worksheet=totalWorksheet)
-        # formatWorksheet(batch=batch, worksheet=freeAgentWorksheet)
-        # formatWorksheet(batch=batch, worksheet=freeAgentAvgWorksheet)
-        # formatWorksheet(batch=batch, worksheet=per32Worksheet, columns=8)
-        # formatWorksheet(
-        #     batch=batch, worksheet=teamMatrixTotalWorksheet, columns=columns
-        # )
-        # formatWorksheet(
-        #     batch=batch, worksheet=teamMatrixSevenWorksheet, columns=columns
-        # )
-        # formatWorksheet(
-        #     batch=batch, worksheet=teamMatrixFifteenWorksheet, columns=columns
-        # )
-        # formatWorksheet(
-        #     batch=batch, worksheet=teamMatrixThirtyWorksheet, columns=columns
-        # )
-        # formatWorksheet(batch=batch, worksheet=faMatrixTotalWorksheet, columns=columns)
-        # formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=columns)
-        # formatWorksheet(
-        #     batch=batch, worksheet=faMatrixFifteenWorksheet, columns=columns
-        # )
-        # formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=columns)
+        formatWorksheet(batch=batch, worksheet=avgWorksheet)
+        formatWorksheet(batch=batch, worksheet=totalWorksheet)
+        formatWorksheet(batch=batch, worksheet=freeAgentWorksheet)
+        formatWorksheet(batch=batch, worksheet=freeAgentAvgWorksheet)
+        formatWorksheet(batch=batch, worksheet=per32Worksheet, columns=8)
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixTotalWorksheet, columns=columns
+        )
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixSevenWorksheet, columns=columns
+        )
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixFifteenWorksheet, columns=columns
+        )
+        formatWorksheet(
+            batch=batch, worksheet=teamMatrixThirtyWorksheet, columns=columns
+        )
+        formatWorksheet(batch=batch, worksheet=faMatrixTotalWorksheet, columns=columns)
+        formatWorksheet(batch=batch, worksheet=faMatrixSevenWorksheet, columns=columns)
+        formatWorksheet(
+            batch=batch, worksheet=faMatrixFifteenWorksheet, columns=columns
+        )
+        formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=columns)
 
         formatRemainingValueWorksheet(
             batch=batch, worksheet=remainingValueWorksheet, columns=9
@@ -384,7 +384,7 @@ def initializeSpreadsheet():
         formatRemainingValueWorksheet(
             batch=batch, worksheet=remainingFAWorksheet, columns=9
         )
-        # formatMatchupWorksheet(batch=batch, worksheet=matchupWorksheet)
+        formatMatchupWorksheet(batch=batch, worksheet=matchupWorksheet)
 
 
 def pushGoogleSheets():

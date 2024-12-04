@@ -17,7 +17,10 @@ WHITE_RGB = config.WHITE_RGB
 GREEN_RGB = config.GREEN_RGB
 YELLOW_RGB = config.YELLOW_RGB
 GRAY_RGB = config.GRAY_RGB
+BLUE_RGB = config.BLUE_RGB
+ORANGE_RGB = config.ORANGE_RGB
 CATEGORIES = config.CATEGORIES
+
 
 NAMES = [
     "total",  # 0
@@ -36,6 +39,7 @@ NAMES = [
     "remFA",
     "info",
     "matchups",
+    "FAp32",
 ]
 
 now = datetime.now()
@@ -63,7 +67,8 @@ def clearWorksheets():
     try:
         gc = gspread.service_account()
         spreadsheet = gc.open(getGoogleSheetName())
-        for worksheet in spreadsheet:
+        for name in NAMES:
+            worksheet = spreadsheet.worksheet(name)
             worksheet.clear()
     except Exception as ex:
         print("Error: ", ex)
@@ -87,21 +92,34 @@ def formatWorksheet(
     midValue: str = "100",
     maxValue: str = "200",
 ):
-    columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
+    columnsRange = "A:" + numberToColumnLetter(num=columns)
+    afterNameRange = (
+        numberToColumnLetter(num=columns + 2)
+        + ":"
+        + numberToColumnLetter(num=columns + 10)
+    )
     textColumns = (
-        numberToColumnLetter(columns + 1) + ":" + numberToColumnLetter(columns + 4)
+        numberToColumnLetter(num=columns + 1)
+        + ":"
+        + numberToColumnLetter(num=columns + 1)
     )
 
     topRowRange = (
-        "A1:" + chr(64 + columns + 3) + "1"
+        "A1:" + chr(64 + columns + 10) + "1"
     )  # plus 2 for  name and team columns
     numberRange = "A2:" + chr(64 + columns + 2) + "1000"
+    gameRange = (
+        numberToColumnLetter(num=columns + 6)
+        + ":"
+        + numberToColumnLetter(num=columns + 6)
+    )
 
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
     batch.set_frozen(worksheet=worksheet, rows=1)
     # Format Numbers
     batch.set_column_width(worksheet, columnsRange, 40)
+    batch.set_column_width(worksheet, afterNameRange, 50)
     numberFormat = gsf.CellFormat(
         numberFormat=gsf.NumberFormat(type="NUMBER", pattern="#,##0"),
     )
@@ -113,6 +131,12 @@ def formatWorksheet(
         ranges=[(topRowRange, topRowFormat), (numberRange, numberFormat)],
     )
 
+    # Gradients
+
+    rules = gsf.get_conditional_format_rules(worksheet)
+    rules.clear()
+
+    # Normal Green-to-Red gradient
     minPoint = gsf.InterpolationPoint(
         color=gsf.Color(RED_RGB[0], RED_RGB[1], RED_RGB[2]),
         type="NUMBER",
@@ -134,21 +158,43 @@ def formatWorksheet(
             minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
         ),
     )
-    rules = gsf.get_conditional_format_rules(worksheet)
-    rules.clear()
+    rules.append(rule)
+
+    # Blue-to-Orange gradient for Games
+    gMinPoint = gsf.InterpolationPoint(
+        color=gsf.Color(ORANGE_RGB[0], ORANGE_RGB[1], ORANGE_RGB[2]),
+        type="MIN",
+    )
+
+    gMidPoint = gsf.InterpolationPoint(
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
+        type="PERCENT",
+        value="50",
+    )
+    gMaxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(BLUE_RGB[0], BLUE_RGB[1], BLUE_RGB[2]),
+        type="MAX",
+    )
+    rule = gsf.ConditionalFormatRule(
+        ranges=[gsf.GridRange.from_a1_range(gameRange, worksheet)],
+        gradientRule=gsf.GradientRule(
+            minpoint=gMinPoint, midpoint=gMidPoint, maxpoint=gMaxPoint
+        ),
+    )
     rules.append(rule)
     rules.save()
 
 
 def formatRemainingValueWorksheet(
-    batch: gsf.SpreadsheetBatchUpdater, worksheet: gspread.Worksheet, columns: int = 8
+    batch: gsf.SpreadsheetBatchUpdater, worksheet: gspread.Worksheet, columns: int = 9
 ):
     columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
     topRowRange = "A1:" + chr(64 + columns) + "1"
     # For some reason, gspread-formatting does not like compound ranges
     numberRange = "A2:" + chr(64 + columns + 2) + "1000"
-    remRange = ["A2:A400", "C2:C400", "E2:E400", "G2:G400"]
-    differentialRange = ["B2:B400", "D2:D400", "F2:F400", "H2:H400"]
+    remRange = ["A2:A500", "C2:C500", "E2:E500", "G2:G500"]
+    differentialRange = ["B2:B500", "D2:D500", "F2:F500", "H2:H500"]
+    gameRange = "I2:I500"
 
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
@@ -178,23 +224,47 @@ def formatRemainingValueWorksheet(
     )
 
     # Yellow-to-Gray gradient for differential
-    dminPoint = gsf.InterpolationPoint(
-        color=gsf.Color(YELLOW_RGB[0], YELLOW_RGB[1], YELLOW_RGB[2]),
+    dMinPoint = gsf.InterpolationPoint(
+        color=gsf.Color(GRAY_RGB[0], GRAY_RGB[1], GRAY_RGB[2]),
         type="MIN",
     )
-    dmidPoint = gsf.InterpolationPoint(
+
+    dMidPoint = gsf.InterpolationPoint(
         color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
         type="PERCENT",
         value="50",
     )
-    dmaxPoint = gsf.InterpolationPoint(
-        color=gsf.Color(GRAY_RGB[0], GRAY_RGB[1], GRAY_RGB[2]),
+    dMaxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(YELLOW_RGB[0], YELLOW_RGB[1], YELLOW_RGB[2]),
+        type="MAX",
+    )
+
+    # Blue-to-Orange gradient for Games
+    gMinPoint = gsf.InterpolationPoint(
+        color=gsf.Color(ORANGE_RGB[0], ORANGE_RGB[1], ORANGE_RGB[2]),
+        type="MIN",
+    )
+
+    gMidPoint = gsf.InterpolationPoint(
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
+        type="PERCENT",
+        value="50",
+    )
+    gMaxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(BLUE_RGB[0], BLUE_RGB[1], BLUE_RGB[2]),
         type="MAX",
     )
 
     # Apply conditional formatting gradients
     rules = gsf.get_conditional_format_rules(worksheet)
     rules.clear()
+    rule = gsf.ConditionalFormatRule(
+        ranges=[gsf.GridRange.from_a1_range(gameRange, worksheet)],
+        gradientRule=gsf.GradientRule(
+            minpoint=gMinPoint, midpoint=gMidPoint, maxpoint=gMaxPoint
+        ),
+    )
+    rules.append(rule)
     for numRange in remRange:
         rule = gsf.ConditionalFormatRule(
             ranges=[gsf.GridRange.from_a1_range(numRange, worksheet)],
@@ -207,7 +277,7 @@ def formatRemainingValueWorksheet(
         rule = gsf.ConditionalFormatRule(
             ranges=[gsf.GridRange.from_a1_range(diffRange, worksheet)],
             gradientRule=gsf.GradientRule(
-                minpoint=dminPoint, midpoint=dmidPoint, maxpoint=dmaxPoint
+                minpoint=dMinPoint, midpoint=dMidPoint, maxpoint=dMaxPoint
             ),
         )
         rules.append(rule)
@@ -269,10 +339,15 @@ def formatMatchupWorksheet(
             minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
         ),
     )
+    altMidPoint = gsf.InterpolationPoint(
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
+        type="NUMBER",
+        value="0",
+    )
     rule2 = gsf.ConditionalFormatRule(
         ranges=[gsf.GridRange.from_a1_range("B10:ZZ14", worksheet)],
         gradientRule=gsf.GradientRule(
-            minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
+            minpoint=minPoint, midpoint=altMidPoint, maxpoint=maxPoint
         ),
     )
     rules = gsf.get_conditional_format_rules(worksheet)
@@ -297,8 +372,7 @@ def createWorksheet(
 def initializeSpreadsheet():
     gc = gspread.service_account()
     spreadsheet = gc.open(getGoogleSheetName())
-    totalWorksheet = spreadsheet.get_worksheet(0)
-    totalWorksheet.update_title(NAMES[0])
+    totalWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[0])
     avgWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[1])
     freeAgentWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[2])
     freeAgentAvgWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[3])
@@ -316,31 +390,15 @@ def initializeSpreadsheet():
     remainingFAWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[13])
     infoWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[14])
     matchupWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[15])
+    per32Worksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[16])
 
-    # names
-    """"
-    totalWorksheet.update_title("total")
-    avgWorksheet.update_title("pG")
-    freeAgentWorksheet.update_title("FA")
-    freeAgentAvgWorksheet.update_title("FApG")
-    teamMatrixTotalWorksheet.update_title("cats")
-    teamMatrixSevenWorksheet.update_title("cats7")
-    teamMatrixFifteenWorksheet.update_title("cats15")
-    teamMatrixThirtyWorksheet.update_title("cats30")
-    faMatrixTotalWorksheet.update_title("FAcats")
-    faMatrixSevenWorksheet.update_title("FA7")
-    faMatrixFifteenWorksheet.update_title("FA15")
-    faMatrixThirtyWorksheet.update_title("FA30")
-    remainingValueWorksheet.update_title("remValue")
-    remainingFAWorksheet.update_title("remFA")
-    infoWorksheet.update_title("info")
-    """
     columns = len(CATEGORIES) + 1
     with gsf.batch_updater(spreadsheet) as batch:
         formatWorksheet(batch=batch, worksheet=avgWorksheet)
         formatWorksheet(batch=batch, worksheet=totalWorksheet)
         formatWorksheet(batch=batch, worksheet=freeAgentWorksheet)
         formatWorksheet(batch=batch, worksheet=freeAgentAvgWorksheet)
+        formatWorksheet(batch=batch, worksheet=per32Worksheet, columns=8)
         formatWorksheet(
             batch=batch, worksheet=teamMatrixTotalWorksheet, columns=columns
         )
@@ -359,11 +417,12 @@ def initializeSpreadsheet():
             batch=batch, worksheet=faMatrixFifteenWorksheet, columns=columns
         )
         formatWorksheet(batch=batch, worksheet=faMatrixThirtyWorksheet, columns=columns)
+
         formatRemainingValueWorksheet(
-            batch=batch, worksheet=remainingValueWorksheet, columns=8
+            batch=batch, worksheet=remainingValueWorksheet, columns=9
         )
         formatRemainingValueWorksheet(
-            batch=batch, worksheet=remainingFAWorksheet, columns=8
+            batch=batch, worksheet=remainingFAWorksheet, columns=9
         )
         formatMatchupWorksheet(batch=batch, worksheet=matchupWorksheet)
 
@@ -374,14 +433,14 @@ def pushGoogleSheets():
 
     matchupData = matchups.createMatchupSchedule(league=league)
 
-    avgLeagueRatings = rating.leagueTeamRatings(league, "avg", IGNORE_STATS)
-    totalLeagueRatings = rating.leagueTeamRatings(league, "total", IGNORE_STATS)
+    avgLeagueRatings = rating.leagueTeamRatings(league=league, totalOrAvg="avg")
+    totalLeagueRatings = rating.leagueTeamRatings(league=league, totalOrAvg="total")
 
     freeAgentRatings = rating.leagueFreeAgentRatings(
-        league, freeAgents, "total", IGNORE_STATS
+        freeAgents=freeAgents, totalOrAvg="total"
     )
     freeAgentAvgRatings = rating.leagueFreeAgentRatings(
-        league, freeAgents, "avg", IGNORE_STATS
+        freeAgents=freeAgents, totalOrAvg="avg"
     )
 
     # Publish to Google Sheet
@@ -403,6 +462,13 @@ def pushGoogleSheets():
     remainingFAWorksheet = spreadsheet.worksheet(NAMES[13])
     infoWorksheet = spreadsheet.worksheet(NAMES[14])
     matchupWorksheet = spreadsheet.worksheet(NAMES[15])
+    per32Worksheet = spreadsheet.worksheet(NAMES[16])
+
+    # TEST
+    freeAgentMinuteRatings = rating.minuteFreeAgentRatings(
+        league=league, freeAgents=freeAgents
+    )
+    per32Worksheet.update(values=freeAgentMinuteRatings)
 
     transposed_data = [list(row) for row in zip(*matchupData)]
     matchupWorksheet.update(values=transposed_data)
@@ -413,17 +479,15 @@ def pushGoogleSheets():
     infoWorksheet.update(values=info)
 
     titles = ["Total", "30", "15", "7", "Player", "Team"]
-    avgWorksheet.update(values=[titles] + avgLeagueRatings.values.tolist())
-    totalWorksheet.update(values=[titles] + totalLeagueRatings.values.tolist())
-    freeAgentWorksheet.update(values=[titles] + freeAgentRatings.values.tolist())
-    freeAgentAvgWorksheet.update(values=[titles] + freeAgentAvgRatings.values.tolist())
+    avgWorksheet.update(values=avgLeagueRatings)
+    totalWorksheet.update(values=totalLeagueRatings)
+    freeAgentWorksheet.update(values=freeAgentRatings)
+    freeAgentAvgWorksheet.update(values=freeAgentAvgRatings)
 
     categoryList = CATEGORIES
 
     remRatingMatrix = rating.remainingRateTeams(
         league=league,
-        timeframes=TIMEFRAMES,
-        totalOrAvg="avg",
         IGNORE_STATS=IGNORE_STATS,
     )
 
@@ -432,23 +496,22 @@ def pushGoogleSheets():
     remFARatingMatrix = rating.remainingRateFreeAgents(
         league=league,
         freeAgents=freeAgents,
-        timeframes=TIMEFRAMES,
         IGNORE_STATS=IGNORE_STATS,
     )
 
     remainingFAWorksheet.update(values=remFARatingMatrix)
 
     teamRatingMatrixTotal = rating.categoryRateTeams(
-        league, TIMEFRAMES[0], "total", categoryList, IGNORE_STATS
+        league, TIMEFRAMES[0], "avg", categoryList, IGNORE_STATS
     )
     teamRatingMatrixSeven = rating.categoryRateTeams(
-        league, TIMEFRAMES[1], "total", categoryList, IGNORE_STATS
+        league, TIMEFRAMES[1], "avg", categoryList, IGNORE_STATS
     )
     teamRatingMatrixFifteen = rating.categoryRateTeams(
-        league, TIMEFRAMES[2], "total", categoryList, IGNORE_STATS
+        league, TIMEFRAMES[2], "avg", categoryList, IGNORE_STATS
     )
     teamRatingMatrixThirty = rating.categoryRateTeams(
-        league, TIMEFRAMES[3], "total", categoryList, IGNORE_STATS
+        league, TIMEFRAMES[3], "avg", categoryList, IGNORE_STATS
     )
 
     teamMatrixTotalWorksheet.update(values=teamRatingMatrixTotal)
@@ -457,16 +520,16 @@ def pushGoogleSheets():
     teamMatrixThirtyWorksheet.update(values=teamRatingMatrixThirty)
 
     faRatingMatrixTotal = rating.categoryRateFreeAgents(
-        league, freeAgents, TIMEFRAMES[0], "total", categoryList, IGNORE_STATS
+        league, freeAgents, TIMEFRAMES[0], "avg", categoryList, IGNORE_STATS
     )
     faRatingMatrixSeven = rating.categoryRateFreeAgents(
-        league, freeAgents, TIMEFRAMES[1], "total", categoryList, IGNORE_STATS
+        league, freeAgents, TIMEFRAMES[1], "avg", categoryList, IGNORE_STATS
     )
     faRatingMatrixFifteen = rating.categoryRateFreeAgents(
-        league, freeAgents, TIMEFRAMES[2], "total", categoryList, IGNORE_STATS
+        league, freeAgents, TIMEFRAMES[2], "avg", categoryList, IGNORE_STATS
     )
     faRatingMatrixThirty = rating.categoryRateFreeAgents(
-        league, freeAgents, TIMEFRAMES[3], "total", categoryList, IGNORE_STATS
+        league, freeAgents, TIMEFRAMES[3], "avg", categoryList, IGNORE_STATS
     )
 
     faMatrixTotalWorksheet.update(values=faRatingMatrixTotal)

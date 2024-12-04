@@ -25,6 +25,11 @@ PERCENT_MAP = {
     "STR": ["STL", "TO"],
     "FTR": ["FTA", "FGA"],
 }
+INJURY_MAP = {
+    "ACTIVE": "H",
+    "OUT": "OUT",
+    "DAY_TO_DAY": "D2D",
+}
 # files
 SETTING_FILE = "settings.txt"
 LEAGUE_FILE = "league.pickle"
@@ -35,6 +40,8 @@ WHITE_RGB = [1, 1, 1]
 GREEN_RGB = [0.3, 0.8, 0.6]
 YELLOW_RGB = [1, 1, 0.8]
 GRAY_RGB = [0.8, 0.8, 0.8]
+BLUE_RGB = [0.522, 0.601, 1]
+ORANGE_RGB = [1, 0.878, 0.545]
 
 # load from setting file
 try:
@@ -59,10 +66,8 @@ except Exception as ex:  # file not found, initialize
             "REB",
             "3PM",
             "TO",
-            "FTM",
-            "FTA",
-            "FGM",
-            "FGA",
+            "FT%",
+            "FG%",
             "GP",
         ],
         "ignoredStats": ["FTM", "FTA", "TO", "FGA", "FGM", "GP"],
@@ -87,6 +92,8 @@ CATEGORIES = settings.get("categories")
 if "GP" not in CATEGORIES:
     CATEGORIES += ["GP"]  # must contain Games Played
 IGNORE_STATS = settings.get("ignoredStats")
+if "MIN" not in IGNORE_STATS:
+    IGNORE_STATS += ["MIN"]  # must contain Minutes Played
 TEAM_NUMBER = int(settings.get("teamNumber")) - 1  # switch to 0 indexing
 IGNORE_PLAYERS = settings.get("ignorePlayers")
 MAX_PLAYERS = int(settings.get("maxPlayers"))

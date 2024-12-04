@@ -16,6 +16,9 @@ TEAM_SIZE = config.TEAM_SIZE
 TIMEFRAMES = config.TIMEFRAMES
 IGNORE_STATS = config.IGNORE_STATS
 
+PER_GAME_AVERAGES = rating.PER_GAME_AVERAGES
+TOTAL_AVERAGES = rating.TOTAL_AVERAGES
+
 
 # 1. League matchup schedule
 # 2. For each matchup, get games each team will play on each day, and value of players playing
@@ -24,23 +27,11 @@ IGNORE_STATS = config.IGNORE_STATS
 
 
 def createMatchupSchedule(league: League) -> List[List[Any]]:
-    averagesWhole = rating.calculateLeagueAverages(
-        league, TIMEFRAMES[0], totalOrAvg="avg"
-    )
-    averagesThirty = rating.calculateLeagueAverages(
-        league, TIMEFRAMES[1], totalOrAvg="avg"
-    )
-    averagesFifteen = rating.calculateLeagueAverages(
-        league, TIMEFRAMES[2], totalOrAvg="avg"
-    )
-    averagesSeven = rating.calculateLeagueAverages(
-        league, TIMEFRAMES[3], totalOrAvg="avg"
-    )
     averages = {
-        "total": averagesWhole,
-        "30": averagesThirty,
-        "15": averagesFifteen,
-        "7": averagesSeven,
+        "total": PER_GAME_AVERAGES[0],
+        "30": PER_GAME_AVERAGES[1],
+        "15": PER_GAME_AVERAGES[2],
+        "7": PER_GAME_AVERAGES[3],
     }
 
     matchupSheet = []

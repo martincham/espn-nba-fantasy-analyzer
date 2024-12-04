@@ -10,10 +10,11 @@ SETTING_FILE = config.SETTING_FILE
 
 def clear_screen():
     # Check if the system is Windows
-    if os.name == 'nt':
-        os.system('cls')  # Windows
+    if os.name == "nt":
+        os.system("cls")  # Windows
     else:
-        os.system('clear')  # macOS and Linux
+        os.system("clear")  # macOS and Linux
+
 
 def main():
     league = loading.loadLeague()
@@ -28,7 +29,8 @@ def main():
         "[6] Exit",  # 5 index
     ]
     terminalMainMenu = TerminalMenu(
-        menu_entries=mainMenu, title="ESPN Fantasy BBALL Analyzer",
+        menu_entries=mainMenu,
+        title="ESPN Fantasy BBALL Analyzer",
     )
 
     # Intro Messages
@@ -68,7 +70,7 @@ def googleSheetsMenu():
     exitMenu = False
     menu = [
         "[1] Push Google Sheet",  # 0 index
-        "[2] Format Google Sheet",  # 1 index
+        "[2] Initialize/Reformat Google Sheet",  # 1 index
         "[3] Clear Google Sheet",  # 2 index
         "[4] Set Sheet Name",  # 3 index
         None,  # 4 index
@@ -111,7 +113,8 @@ def settingsMenu():
         "[6] Back",  # 5 index
     ]
     terminalSettingsMenu = TerminalMenu(
-        menu_entries=settingsMenu, title="Settings:", skip_empty_entries=True)
+        menu_entries=settingsMenu, title="Settings:", skip_empty_entries=True
+    )
 
     while not exitSettingsMenu:
         settingsMenuEntry = terminalSettingsMenu.show()

@@ -2,7 +2,6 @@ from typing import Dict, List, Any
 import library.schedule as schedule
 import library.config as config
 import library.loading as loading
-import pandas as pd
 from espn_api.basketball import League, Team, Player
 
 
@@ -151,77 +150,6 @@ def ratePlayer(
     return totalRating
 
 
-def rosterRater(
-    timeframe: str,
-    totalOrAvg: str,
-    team: Team,
-    averages: Dict[str, float],
-    IGNORE_STATS: List[str],
-) -> pd.DataFrame:
-    rosterRatings = {}
-    roster = team.roster
-    for player in roster:
-        stats = player.stats.get(timeframe)
-        playerAverages = stats.get(totalOrAvg)
-        if playerAverages is None:
-            rating = 0
-        else:
-            rating = ratePlayer(playerAverages, averages, IGNORE_STATS)
-        name = player.name
-        rosterRatings.update({name: rating})
-    ratingFrame = pd.DataFrame(rosterRatings, [timeframe])
-    ratingFrame = ratingFrame.T
-    return ratingFrame
-
-
-def combineAverageRatingTimeframes(
-    team: Team, averages: Dict[str, float], totalOrAvg: str, IGNORE_STATS: List[str]
-) -> pd.DataFrame:
-    seasonRatings = rosterRater(TIMEFRAMES[0], totalOrAvg, team, averages, IGNORE_STATS)
-    thirtyRating = rosterRater(TIMEFRAMES[1], totalOrAvg, team, averages, IGNORE_STATS)
-    fifteenRatings = rosterRater(
-        TIMEFRAMES[2], totalOrAvg, team, averages, IGNORE_STATS
-    )
-    sevenRatings = rosterRater(TIMEFRAMES[3], totalOrAvg, team, averages, IGNORE_STATS)
-
-    result = pd.concat(
-        [seasonRatings, thirtyRating, fifteenRatings, sevenRatings], axis=1
-    )
-
-    result["Player"] = result.index
-
-    teamNameList = [team.team_abbrev] * len(team.roster)
-    # teamPositionList = [team.roster[i].position for i in range(len(team.roster))]
-    # result["Position"] = teamPositionList
-    result["Team"] = teamNameList
-    return result
-
-
-def combineTotalRatingTimeframes(team: Team, IGNORE_STATS: List[str]) -> pd.DataFrame:
-    seasonRatings = rosterRater(
-        TIMEFRAMES[0], "total", team, TOTAL_AVERAGES[0], IGNORE_STATS
-    )
-    thirtyRating = rosterRater(
-        TIMEFRAMES[1], "total", team, TOTAL_AVERAGES[1], IGNORE_STATS
-    )
-    fifteenRatings = rosterRater(
-        TIMEFRAMES[2], "total", team, TOTAL_AVERAGES[2], IGNORE_STATS
-    )
-    sevenRatings = rosterRater(
-        TIMEFRAMES[3], "total", team, TOTAL_AVERAGES[3], IGNORE_STATS
-    )
-
-    result = pd.concat(
-        [seasonRatings, thirtyRating, fifteenRatings, sevenRatings], axis=1
-    )
-
-    result["Player"] = result.index
-
-    teamNameList = [team.team_abbrev] * len(team.roster)
-    result["Team"] = teamNameList
-    return result
-
-
 def leagueTeamRatings(league: League, totalOrAvg: str = "total") -> List[List[Any]]:
     resultMatrix = [
         ["Total", "30", "15", "7", "Player", "Team", "ProT", "Inj", "Pos", "+Gms"]
@@ -233,19 +161,6 @@ def leagueTeamRatings(league: League, totalOrAvg: str = "total") -> List[List[An
             playerList=roster, totalOrAvg=totalOrAvg, teamName=team.team_abbrev
         )
         resultMatrix.extend(teamMatrix)
-    # if totalOrAvg == "total":
-
-    #     for team in teams:
-    #         teamRating = combineTotalRatingTimeframes(team, IGNORE_STATS)
-    #         frames.append(teamRating)
-    # else:
-    #     # on the other hand, this just uses season averages
-    #     averages = PER_GAME_AVERAGES[0]
-    #     for team in teams:
-    #         teamRating = combineAverageRatingTimeframes(
-    #             team, averages, totalOrAvg, IGNORE_STATS
-    #         )
-    #         frames.append(teamRating)
     return resultMatrix
 
 
@@ -284,56 +199,21 @@ def ratePlayerList(
         injuryCode = INJURY_MAP.get(str(player.injuryStatus))
         playerMatrix.append(injuryCode if injuryCode is not None else "")
         playerMatrix.append(str(player.position))
-        playerMatrix.append(EXTRA_GAMES.get(proTeam, 0))
+        playerMatrix.append(EXTRA_GAMES.get(proTeam, ""))
         resultMatrix.append(playerMatrix)
 
     return resultMatrix
 
 
 def leagueFreeAgentRatings(
-    league: League,
     freeAgents: List[Player],
     totalOrAvg: str = "total",
-    IGNORE_STATS: List[str] = ["GP"],
 ) -> List[List[Any]]:
-    frames = []
-    if totalOrAvg == "total":
-        for index, timeframe in enumerate(TIMEFRAMES):
-            averages = TOTAL_AVERAGES[index]
-            frame = rateFreeAgents(
-                timeframe, "total", freeAgents, averages, IGNORE_STATS
-            )
-            frames.append(frame)
-    else:
-        for index, timeframe in enumerate(TIMEFRAMES):
-            averages = PER_GAME_AVERAGES[index]
-            frame = rateFreeAgents(timeframe, "avg", freeAgents, averages, IGNORE_STATS)
-            frames.append(frame)
-    ratingFrame = pd.concat(frames, axis=1)
-    ratingFrame["Player"] = ratingFrame.index
-    return ratingFrame
-
-
-def rateFreeAgents(
-    timeframe: str,
-    totalOrAvg: str,
-    freeAgents: List[Player],
-    averages: Dict[str, float],
-    IGNORE_STATS: List[str],
-) -> List[List[Any]]:
-    freeAgentRating = {}
-    for player in freeAgents:
-        stats = player.stats.get(timeframe)
-        playerStats = stats.get(totalOrAvg)
-        if playerStats is None:
-            rating = 0
-        else:
-            rating = ratePlayer(playerStats, averages, IGNORE_STATS)
-        name = player.name
-        freeAgentRating.update({name: rating})
-    ratingFrame = pd.DataFrame(freeAgentRating, [timeframe])
-    ratingFrame = ratingFrame.T
-    return ratingFrame
+    resultMatrix = [
+        ["Total", "30", "15", "7", "Player", "Team", "ProT", "Inj", "Pos", "+Gms"]
+    ]
+    resultMatrix.extend(ratePlayerList(playerList=freeAgents, totalOrAvg=totalOrAvg))
+    return resultMatrix
 
 
 def categoryRateTeams(

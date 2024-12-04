@@ -437,16 +437,10 @@ def pushGoogleSheets():
     totalLeagueRatings = rating.leagueTeamRatings(league=league, totalOrAvg="total")
 
     freeAgentRatings = rating.leagueFreeAgentRatings(
-        league=league,
-        freeAgents=freeAgents,
-        totalOrAvg="total",
-        IGNORE_STATS=IGNORE_STATS,
+        freeAgents=freeAgents, totalOrAvg="total"
     )
     freeAgentAvgRatings = rating.leagueFreeAgentRatings(
-        league=league,
-        freeAgents=freeAgents,
-        totalOrAvg="avg",
-        IGNORE_STATS=IGNORE_STATS,
+        freeAgents=freeAgents, totalOrAvg="avg"
     )
 
     # Publish to Google Sheet
@@ -487,8 +481,8 @@ def pushGoogleSheets():
     titles = ["Total", "30", "15", "7", "Player", "Team"]
     avgWorksheet.update(values=avgLeagueRatings)
     totalWorksheet.update(values=totalLeagueRatings)
-    freeAgentWorksheet.update(values=[titles] + freeAgentRatings.values.tolist())
-    freeAgentAvgWorksheet.update(values=[titles] + freeAgentAvgRatings.values.tolist())
+    freeAgentWorksheet.update(values=freeAgentRatings)
+    freeAgentAvgWorksheet.update(values=freeAgentAvgRatings)
 
     categoryList = CATEGORIES
 

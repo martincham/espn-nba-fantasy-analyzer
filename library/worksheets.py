@@ -67,7 +67,8 @@ def clearWorksheets():
     try:
         gc = gspread.service_account()
         spreadsheet = gc.open(getGoogleSheetName())
-        for worksheet in spreadsheet:
+        for name in NAMES:
+            worksheet = spreadsheet.worksheet(name)
             worksheet.clear()
     except Exception as ex:
         print("Error: ", ex)
@@ -91,21 +92,34 @@ def formatWorksheet(
     midValue: str = "100",
     maxValue: str = "200",
 ):
-    columnsRange = "A:" + chr(64 + columns)  # 65 = ascii "A"
+    columnsRange = "A:" + numberToColumnLetter(num=columns)
+    afterNameRange = (
+        numberToColumnLetter(num=columns + 2)
+        + ":"
+        + numberToColumnLetter(num=columns + 10)
+    )
     textColumns = (
-        numberToColumnLetter(columns + 1) + ":" + numberToColumnLetter(columns + 4)
+        numberToColumnLetter(num=columns + 1)
+        + ":"
+        + numberToColumnLetter(num=columns + 1)
     )
 
     topRowRange = (
-        "A1:" + chr(64 + columns + 4) + "1"
+        "A1:" + chr(64 + columns + 10) + "1"
     )  # plus 2 for  name and team columns
     numberRange = "A2:" + chr(64 + columns + 2) + "1000"
+    gameRange = (
+        numberToColumnLetter(num=columns + 6)
+        + ":"
+        + numberToColumnLetter(num=columns + 6)
+    )
 
     # Top Row Formatting
     topRowFormat = gsf.CellFormat(textFormat=gsf.TextFormat(bold=True))
     batch.set_frozen(worksheet=worksheet, rows=1)
     # Format Numbers
     batch.set_column_width(worksheet, columnsRange, 40)
+    batch.set_column_width(worksheet, afterNameRange, 50)
     numberFormat = gsf.CellFormat(
         numberFormat=gsf.NumberFormat(type="NUMBER", pattern="#,##0"),
     )
@@ -117,6 +131,12 @@ def formatWorksheet(
         ranges=[(topRowRange, topRowFormat), (numberRange, numberFormat)],
     )
 
+    # Gradients
+
+    rules = gsf.get_conditional_format_rules(worksheet)
+    rules.clear()
+
+    # Normal Green-to-Red gradient
     minPoint = gsf.InterpolationPoint(
         color=gsf.Color(RED_RGB[0], RED_RGB[1], RED_RGB[2]),
         type="NUMBER",
@@ -138,8 +158,29 @@ def formatWorksheet(
             minpoint=minPoint, midpoint=midPoint, maxpoint=maxPoint
         ),
     )
-    rules = gsf.get_conditional_format_rules(worksheet)
-    rules.clear()
+    rules.append(rule)
+
+    # Blue-to-Orange gradient for Games
+    gMinPoint = gsf.InterpolationPoint(
+        color=gsf.Color(ORANGE_RGB[0], ORANGE_RGB[1], ORANGE_RGB[2]),
+        type="MIN",
+    )
+
+    gMidPoint = gsf.InterpolationPoint(
+        color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
+        type="PERCENT",
+        value="50",
+    )
+    gMaxPoint = gsf.InterpolationPoint(
+        color=gsf.Color(BLUE_RGB[0], BLUE_RGB[1], BLUE_RGB[2]),
+        type="MAX",
+    )
+    rule = gsf.ConditionalFormatRule(
+        ranges=[gsf.GridRange.from_a1_range(gameRange, worksheet)],
+        gradientRule=gsf.GradientRule(
+            minpoint=gMinPoint, midpoint=gMidPoint, maxpoint=gMaxPoint
+        ),
+    )
     rules.append(rule)
     rules.save()
 
@@ -331,8 +372,7 @@ def createWorksheet(
 def initializeSpreadsheet():
     gc = gspread.service_account()
     spreadsheet = gc.open(getGoogleSheetName())
-    totalWorksheet = spreadsheet.get_worksheet(0)
-    totalWorksheet.update_title(NAMES[0])
+    totalWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[0])
     avgWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[1])
     freeAgentWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[2])
     freeAgentAvgWorksheet = createWorksheet(spreadsheet=spreadsheet, title=NAMES[3])
@@ -393,12 +433,8 @@ def pushGoogleSheets():
 
     matchupData = matchups.createMatchupSchedule(league=league)
 
-    avgLeagueRatings = rating.leagueTeamRatings(
-        league=league, totalOrAvg="avg", IGNORE_STATS=IGNORE_STATS
-    )
-    totalLeagueRatings = rating.leagueTeamRatings(
-        league=league, totalOrAvg="total", IGNORE_STATS=IGNORE_STATS
-    )
+    avgLeagueRatings = rating.leagueTeamRatings(league=league, totalOrAvg="avg")
+    totalLeagueRatings = rating.leagueTeamRatings(league=league, totalOrAvg="total")
 
     freeAgentRatings = rating.leagueFreeAgentRatings(
         league=league,
@@ -449,8 +485,8 @@ def pushGoogleSheets():
     infoWorksheet.update(values=info)
 
     titles = ["Total", "30", "15", "7", "Player", "Team"]
-    avgWorksheet.update(values=[titles] + avgLeagueRatings.values.tolist())
-    totalWorksheet.update(values=[titles] + totalLeagueRatings.values.tolist())
+    avgWorksheet.update(values=avgLeagueRatings)
+    totalWorksheet.update(values=totalLeagueRatings)
     freeAgentWorksheet.update(values=[titles] + freeAgentRatings.values.tolist())
     freeAgentAvgWorksheet.update(values=[titles] + freeAgentAvgRatings.values.tolist())
 

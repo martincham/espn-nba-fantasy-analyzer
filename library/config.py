@@ -30,6 +30,7 @@ INJURY_MAP = {
     "OUT": "OUT",
     "DAY_TO_DAY": "D2D",
 }
+VALID_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 # files
 SETTING_FILE = "settings.txt"
 LEAGUE_FILE = "league.pickle"

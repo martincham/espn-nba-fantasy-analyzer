@@ -16,6 +16,7 @@ IGNORE_PLAYERS = config.IGNORE_PLAYERS
 PERCENT_STATS = config.PERCENT_STATS
 PERCENT_MAP = config.PERCENT_MAP
 INJURY_MAP = config.INJURY_MAP
+VALID_POSITIONS = config.VALID_POSITIONS
 SEASON_ID = config.SEASON_ID
 TIMEFRAMES = config.TIMEFRAMES
 IGNORE_STATS = config.IGNORE_STATS
@@ -24,6 +25,16 @@ EXTRA_GAMES = schedule.calculateExtraRemainingGames(
     league=LEAGUE, teamNumber=TEAM_NUMBER, ignorePlayers=IGNORE_PLAYERS
 )
 REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)
+
+
+def getPlayerPosition(player: Player) -> str:
+    slots = player.eligibleSlots
+    result = ""
+    for slot in slots:
+        if slot in VALID_POSITIONS:
+            result += "/" + slot
+    result = result[1:]
+    return result
 
 
 def calculateLeagueAverages(
@@ -198,7 +209,7 @@ def ratePlayerList(
         playerMatrix.append(proTeam if proTeam is not None else "")
         injuryCode = INJURY_MAP.get(str(player.injuryStatus))
         playerMatrix.append(injuryCode if injuryCode is not None else "")
-        playerMatrix.append(str(player.position))
+        playerMatrix.append(getPlayerPosition(player=player))
         playerMatrix.append(EXTRA_GAMES.get(proTeam, ""))
         resultMatrix.append(playerMatrix)
 
@@ -304,7 +315,7 @@ def categoryRatePlayerList(
         playerMatrix.append(proTeam if proTeam is not None else "")
         injuryCode = INJURY_MAP.get(str(player.injuryStatus))
         playerMatrix.append(injuryCode if injuryCode is not None else "")
-        playerMatrix.append(str(player.position))
+        playerMatrix.append(getPlayerPosition(player=player))
         playerMatrix.append(EXTRA_GAMES.get(proTeam, ""))
         resultMatrix.append(playerMatrix)
 
@@ -333,12 +344,7 @@ def createPlayerMatrix(
     return playerMatrix
 
 
-def remainingRateTeams(
-    league: League,
-    IGNORE_STATS: List[str] = ["GP"],
-) -> List[List[Any]]:
-    averages = PER_GAME_AVERAGES[0]
-
+def remainingRateTeams(league: League) -> List[List[Any]]:
     resultMatrix = []
     resultMatrix.append(
         [
@@ -358,51 +364,56 @@ def remainingRateTeams(
     )
     teams = league.teams
 
-    remainingGames = REMAINING_GAMES
-    remainingExtraGames = EXTRA_GAMES
-    avgExtraGames = sum(remainingExtraGames.values()) / len(remainingExtraGames)
-    avgRemainingGames = sum(remainingGames.values()) / len(remainingGames)
     for team in teams:
         roster = team.roster
-        for player in roster:
-            playerRatingList = []
-            proTeam = player.proTeam
-            remGames = remainingGames.get(proTeam)
-            if remGames is None:
-                continue  # Player is a free agent (in the real NBA, not fantasy) ond not on a team
-            extraGames = remainingExtraGames.get(proTeam)
-            redundantGames = remGames - extraGames
-            for timeframe in TIMEFRAMES:
-                playerStats = player.stats.get(timeframe)
-                playerAvgStats = playerStats.get("avg")
-                if playerAvgStats is None:
-                    playerRatingList.append(0)
-                    playerRatingList.append(0)
-                    continue
-                rating = ratePlayer(
-                    playerStats=playerAvgStats,
-                    averages=averages,
-                    IGNORE_STATS=IGNORE_STATS,
-                )
-
-                adjustedRating = rating * (extraGames / avgExtraGames)
-                scheduleValue = adjustedRating - rating
-                playerRatingList.append(adjustedRating)
-                playerRatingList.append(scheduleValue)
-            playerRatingList.append(extraGames)
-            playerRatingList.append(player.name)
-            playerRatingList.append(team.team_abbrev)
-            playerRatingList.append(proTeam)
-            resultMatrix.append(playerRatingList)
+        teamMatrix = remainingRatePlayerList(roster, teamName=team.team_abbrev)
+        resultMatrix.extend(teamMatrix)
     return resultMatrix
 
 
-def remainingRateFreeAgents(
-    league: League,
-    freeAgents: List[Player],
-    IGNORE_STATS: List[str] = ["GP"],
+def remainingRatePlayerList(
+    playerList: List[Player], teamName: str = "?"
 ) -> List[List[Any]]:
-    averages = TOTAL_AVERAGES[0]
+    averages = PER_GAME_AVERAGES[0]
+    remainingGames = REMAINING_GAMES
+    remainingExtraGames = EXTRA_GAMES
+    avgExtraGames = sum(remainingExtraGames.values()) / len(remainingExtraGames)
+    resultMatrix = []
+    for player in playerList:
+        playerMatrix = []
+        proTeam = player.proTeam
+        remGames = remainingGames.get(proTeam)
+        if remGames is None:
+            continue  # Player is a free agent (in the real NBA, not fantasy) ond not on a team
+        extraGames = remainingExtraGames.get(proTeam)
+        for timeframe in TIMEFRAMES:
+            playerStats = player.stats.get(timeframe)
+            playerAvgStats = playerStats.get("avg")
+            if playerAvgStats is None:
+                playerMatrix.append(0)
+                playerMatrix.append(0)
+                continue
+            rating = ratePlayer(
+                playerStats=playerAvgStats,
+                averages=averages,
+                IGNORE_STATS=IGNORE_STATS,
+            )
+            adjustedRating = rating * (extraGames / avgExtraGames)
+            scheduleValue = adjustedRating - rating
+            playerMatrix.append(adjustedRating)
+            playerMatrix.append(scheduleValue)
+        # Don't add player if they have no data
+        if all(x == 0 for x in playerMatrix):
+            continue
+        playerMatrix.append(extraGames)
+        playerMatrix.append(player.name)
+        playerMatrix.append(teamName)
+        playerMatrix.append(proTeam)
+        resultMatrix.append(playerMatrix)
+    return resultMatrix
+
+
+def remainingRateFreeAgents(freeAgents: List[Player]) -> List[List[Any]]:
     resultMatrix = []
     resultMatrix.append(
         [
@@ -420,43 +431,7 @@ def remainingRateFreeAgents(
             "ProT",
         ]
     )
-
-    remainingGames = REMAINING_GAMES
-    remainingExtraGames = EXTRA_GAMES
-    avgExtraGames = sum(remainingExtraGames.values()) / len(remainingExtraGames)
-    avgRemainingGames = sum(remainingGames.values()) / len(remainingGames)
-    for player in freeAgents:
-        playerRatingList = []
-        proTeam = player.proTeam
-        remGames = remainingGames.get(proTeam)
-        if remGames is None:
-            continue  # Player is a free agent (in the real NBA, not fantasy) ond not on a team
-        extraGames = remainingExtraGames.get(proTeam)
-        redundantGames = remGames - extraGames
-        for timeframe in TIMEFRAMES:
-            playerStats = player.stats.get(timeframe)
-            playerAvgStats = playerStats.get("avg")
-            if playerAvgStats is None:
-                playerRatingList.append(0)
-                playerRatingList.append(0)
-                continue
-            rating = ratePlayer(
-                playerStats=playerAvgStats,
-                averages=averages,
-                IGNORE_STATS=IGNORE_STATS,
-            )
-
-            totalRating = remGames * rating
-            extraGamesRating = extraGames * rating
-            redundantGamesRating = redundantGames * (rating - 80)
-            adjustedRating = extraGamesRating + redundantGamesRating
-            scheduleValue = adjustedRating - totalRating
-            playerRatingList.append(adjustedRating)
-            playerRatingList.append(extraGamesRating)
-        playerRatingList.append(extraGames)
-        playerRatingList.append(player.name)
-        playerRatingList.append(proTeam)
-        resultMatrix.append(playerRatingList)
+    resultMatrix.extend(remainingRatePlayerList(playerList=freeAgents))
     return resultMatrix
 
 

@@ -20,6 +20,7 @@ GRAY_RGB = config.GRAY_RGB
 BLUE_RGB = config.BLUE_RGB
 ORANGE_RGB = config.ORANGE_RGB
 CATEGORIES = config.CATEGORIES
+LEAGUE = rating.LEAGUE
 
 
 NAMES = [
@@ -119,7 +120,7 @@ def formatWorksheet(
     batch.set_frozen(worksheet=worksheet, rows=1)
     # Format Numbers
     batch.set_column_width(worksheet, columnsRange, 40)
-    batch.set_column_width(worksheet, afterNameRange, 50)
+    batch.set_column_width(worksheet, afterNameRange, 60)
     numberFormat = gsf.CellFormat(
         numberFormat=gsf.NumberFormat(type="NUMBER", pattern="#,##0"),
     )
@@ -215,8 +216,8 @@ def formatRemainingValueWorksheet(
     )
     midPoint = gsf.InterpolationPoint(
         color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
-        type="PERCENT",
-        value="50",
+        type="NUMBER",
+        value="100",
     )
     maxPoint = gsf.InterpolationPoint(
         color=gsf.Color(GREEN_RGB[0], GREEN_RGB[1], GREEN_RGB[2]),
@@ -231,8 +232,8 @@ def formatRemainingValueWorksheet(
 
     dMidPoint = gsf.InterpolationPoint(
         color=gsf.Color(WHITE_RGB[0], WHITE_RGB[1], WHITE_RGB[2]),
-        type="PERCENT",
-        value="50",
+        type="NUMBER",
+        value="0",
     )
     dMaxPoint = gsf.InterpolationPoint(
         color=gsf.Color(YELLOW_RGB[0], YELLOW_RGB[1], YELLOW_RGB[2]),
@@ -428,7 +429,7 @@ def initializeSpreadsheet():
 
 
 def pushGoogleSheets():
-    league = loading.loadLeague()
+    league = LEAGUE
     freeAgents = loading.loadFreeAgents()
 
     matchupData = matchups.createMatchupSchedule(league=league)
@@ -478,7 +479,6 @@ def pushGoogleSheets():
     info = [["Last updated", updateTime]]
     infoWorksheet.update(values=info)
 
-    titles = ["Total", "30", "15", "7", "Player", "Team"]
     avgWorksheet.update(values=avgLeagueRatings)
     totalWorksheet.update(values=totalLeagueRatings)
     freeAgentWorksheet.update(values=freeAgentRatings)
@@ -486,18 +486,11 @@ def pushGoogleSheets():
 
     categoryList = CATEGORIES
 
-    remRatingMatrix = rating.remainingRateTeams(
-        league=league,
-        IGNORE_STATS=IGNORE_STATS,
-    )
+    remRatingMatrix = rating.remainingRateTeams(league=league)
 
     remainingValueWorksheet.update(values=remRatingMatrix)
 
-    remFARatingMatrix = rating.remainingRateFreeAgents(
-        league=league,
-        freeAgents=freeAgents,
-        IGNORE_STATS=IGNORE_STATS,
-    )
+    remFARatingMatrix = rating.remainingRateFreeAgents(freeAgents=freeAgents)
 
     remainingFAWorksheet.update(values=remFARatingMatrix)
 

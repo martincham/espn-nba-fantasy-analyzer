@@ -4,8 +4,10 @@ from simple_term_menu import TerminalMenu
 import library.config as config
 import library.loading as loading
 import library.worksheets as worksheets
+import library.rating as rating
 
 SETTING_FILE = config.SETTING_FILE
+LEAGUE = rating.LEAGUE
 
 
 def clear_screen():
@@ -17,7 +19,7 @@ def clear_screen():
 
 
 def main():
-    league = loading.loadLeague()
+    league = LEAGUE
     clear_screen()
     exitMainMenu = False
     mainMenu = [

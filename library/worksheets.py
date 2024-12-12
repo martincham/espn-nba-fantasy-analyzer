@@ -3,7 +3,8 @@ from datetime import datetime
 import gspread
 import gspread_formatting as gsf
 import library.loading as loading
-import library.rating as rating
+
+# import library.rating as rating  # hmmmmm
 import library.config as config
 import library.matchups as matchups
 
@@ -20,7 +21,7 @@ GRAY_RGB = config.GRAY_RGB
 BLUE_RGB = config.BLUE_RGB
 ORANGE_RGB = config.ORANGE_RGB
 CATEGORIES = config.CATEGORIES
-LEAGUE = rating.LEAGUE
+LEAGUE
 
 
 NAMES = [
@@ -429,6 +430,10 @@ def initializeSpreadsheet():
 
 
 def pushGoogleSheets():
+    import library.rating as rating
+
+    global LEAGUE
+    LEAGUE = loading.LEAGUE
     league = LEAGUE
     freeAgents = loading.loadFreeAgents()
 
@@ -486,6 +491,7 @@ def pushGoogleSheets():
 
     categoryList = CATEGORIES
 
+    categoryList.pop(categoryList.index("MIN"))
     remRatingMatrix = rating.remainingRateTeams(league=league)
 
     remainingValueWorksheet.update(values=remRatingMatrix)

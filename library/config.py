@@ -25,6 +25,7 @@ PERCENT_MAP = {
     "STR": ["STL", "TO"],
     "FTR": ["FTA", "FGA"],
 }
+NEGATIVE_STATS = ["TO"]
 INJURY_MAP = {
     "ACTIVE": "H",
     "OUT": "OUT",
@@ -91,7 +92,9 @@ ROSTER_POSITIONS = settings.get("rosterPositions")
 TEAM_SIZE = settings.get("teamSize")
 CATEGORIES = settings.get("categories")
 if "GP" not in CATEGORIES:
-    CATEGORIES += ["GP"]  # must contain Games Played
+    CATEGORIES += ["GP"]  # must contain Games Played for per-game calculations
+if "MIN" not in CATEGORIES:
+    CATEGORIES += ["MIN"]  # must contain Minutes for per-minute calculations
 IGNORE_STATS = settings.get("ignoredStats")
 if "MIN" not in IGNORE_STATS:
     IGNORE_STATS += ["MIN"]  # must contain Minutes Played

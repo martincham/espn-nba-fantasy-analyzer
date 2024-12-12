@@ -6,6 +6,7 @@ from espn_api.basketball import League, Team
 import library.schedule as schedule
 import library.config as config
 import library.rating as rating
+import main
 
 
 SCHEDULE_FILE = "2025.txt"
@@ -16,8 +17,8 @@ TEAM_SIZE = config.TEAM_SIZE
 TIMEFRAMES = config.TIMEFRAMES
 IGNORE_STATS = config.IGNORE_STATS
 
-PER_GAME_AVERAGES = rating.PER_GAME_AVERAGES
-TOTAL_AVERAGES = rating.TOTAL_AVERAGES
+PER_GAME_AVERAGES = main.PER_GAME_AVERAGES
+TOTAL_AVERAGES = main.TOTAL_AVERAGES
 
 
 # 1. League matchup schedule

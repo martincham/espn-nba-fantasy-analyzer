@@ -1,30 +1,20 @@
 from typing import Dict, List, Any
-import library.schedule as schedule
-import library.config as config
-import library.loading as loading
 from espn_api.basketball import League, Team, Player
+import library.config as config
+import library.globals as g
 
-
-# 1. get all players,
-#     - loop over all players, create total values
-#     - calculate averages
-# 2. loop over players again
-#     - calculate value rating
 CATEGORIES = {cat: 0 for cat in config.CATEGORIES}
+CATEGORY_LIST = config.CATEGORIES
 TEAM_NUMBER = config.TEAM_NUMBER
 IGNORE_PLAYERS = config.IGNORE_PLAYERS
 PERCENT_STATS = config.PERCENT_STATS
+NEGATIVE_STATS = config.NEGATIVE_STATS
 PERCENT_MAP = config.PERCENT_MAP
 INJURY_MAP = config.INJURY_MAP
 VALID_POSITIONS = config.VALID_POSITIONS
 SEASON_ID = config.SEASON_ID
 TIMEFRAMES = config.TIMEFRAMES
 IGNORE_STATS = config.IGNORE_STATS
-LEAGUE = loading.loadLeague()
-EXTRA_GAMES = schedule.calculateExtraRemainingGames(
-    league=LEAGUE, teamNumber=TEAM_NUMBER, ignorePlayers=IGNORE_PLAYERS
-)
-REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)
 
 
 def getPlayerPosition(player: Player) -> str:
@@ -35,33 +25,6 @@ def getPlayerPosition(player: Player) -> str:
             result += "/" + slot
     result = result[1:]
     return result
-
-
-def calculateLeagueAverages(
-    league: League,
-    timeframe: str = str(SEASON_ID) + "_total",
-    totalOrAvg: str = "total",
-) -> Dict[str, int]:
-    averages = CATEGORIES.copy()
-    for percentStat in PERCENT_MAP.keys():
-        if percentStat in averages:
-            averages.update({cat: 0 for cat in PERCENT_MAP.get(percentStat)})
-    totals = averages.copy()
-    playerCount = 0
-
-    teams = league.teams
-    for team in teams:
-        roster = team.roster
-        for player in roster:
-            if player.lineupSlot == "IR":  # Ignore Injury Reserve players
-                continue
-            stats = player.stats
-            total = stats.get(timeframe)
-            playerCount += mergeStats(totals, total)
-    averages = averageStats(
-        totals=totals, averages=averages, playerCount=playerCount, totalOrAvg=totalOrAvg
-    )
-    return averages
 
 
 def ratePercentStat(
@@ -87,57 +50,6 @@ def ratePercentStat(
     return statRating
 
 
-def averageStats(
-    totals: Dict[str, int],
-    averages: Dict[str, float],
-    playerCount: int,
-    totalOrAvg: str,
-) -> Dict[str, float]:
-    if totalOrAvg == "avg":
-        divisor = totals.get("GP")
-    else:
-        divisor = playerCount
-    for stat in totals:
-        if stat in PERCENT_STATS or stat == "GP":
-            statAverage = totals.get(stat) / playerCount
-        else:
-            statAverage = totals.get(stat) / divisor
-        averages.update({stat: statAverage})
-    return averages
-
-
-def createLeagueAverages(
-    league: League, totalOrAvg: str = "total"
-) -> List[Dict[str, float]]:
-    averageList = []
-    for timeframe in TIMEFRAMES:
-        averages = calculateLeagueAverages(
-            league=league, timeframe=timeframe, totalOrAvg=totalOrAvg
-        )
-        averageList.append(averages)
-    return averageList
-
-
-# returns 1 if player has stats, 0 otherwise
-def mergeStats(resultList: Dict[str, int], adderList) -> int:
-    totalValues = adderList.get("total", None)
-    if totalValues is None:
-        return 0
-    for item in resultList:
-        value = totalValues.get(item)
-
-        update = resultList.get(item) + value
-        resultList.update({item: update})
-    return 1
-
-
-###############
-#  AVERAGES  #
-##############
-TOTAL_AVERAGES = createLeagueAverages(league=LEAGUE, totalOrAvg="total")
-PER_GAME_AVERAGES = createLeagueAverages(league=LEAGUE, totalOrAvg="avg")
-
-
 def ratePlayer(
     playerStats: Dict[str, float], averages: Dict[str, float], IGNORE_STATS: List[str]
 ) -> float:
@@ -155,6 +67,8 @@ def ratePlayer(
             playerStat = playerStats.get(stat)
             averageStat = averages.get(stat)
             statRating = playerStat / averageStat
+            if statRating != 0 and stat in NEGATIVE_STATS:
+                statRating = 2 - statRating
             totalRating += statRating
             statCount += 1
     totalRating = (totalRating / statCount) * 100
@@ -185,9 +99,9 @@ def ratePlayerList(
         playerMatrix = []
         for index, timeframe in enumerate(TIMEFRAMES):
             if totalOrAvg == "total":
-                averages = TOTAL_AVERAGES[index]
+                averages = g.TOTAL_AVERAGES[index]
             else:
-                averages = PER_GAME_AVERAGES[index]
+                averages = g.PER_GAME_AVERAGES[index]
             stats = player.stats.get(timeframe)
             playerStats = stats.get(totalOrAvg)
             proTeam = player.proTeam
@@ -210,7 +124,7 @@ def ratePlayerList(
         injuryCode = INJURY_MAP.get(str(player.injuryStatus))
         playerMatrix.append(injuryCode if injuryCode is not None else "")
         playerMatrix.append(getPlayerPosition(player=player))
-        playerMatrix.append(EXTRA_GAMES.get(proTeam, ""))
+        playerMatrix.append(g.EXTRA_GAMES.get(proTeam, ""))
         resultMatrix.append(playerMatrix)
 
     return resultMatrix
@@ -235,9 +149,9 @@ def categoryRateTeams(
     IGNORE_STATS: List[str] = ["GP"],
 ) -> List[List[Any]]:
     if totalOrAvg == "avg":
-        averages = PER_GAME_AVERAGES[TIMEFRAMES.index(timeframe)]
+        averages = g.PER_GAME_AVERAGES[TIMEFRAMES.index(timeframe)]
     else:
-        averages = TOTAL_AVERAGES[TIMEFRAMES.index(timeframe)]
+        averages = g.TOTAL_AVERAGES[TIMEFRAMES.index(timeframe)]
     titles = categoryList.copy()
     titles.extend(["Rating", "Player Name", "Team", "ProT", "Inj", "Pos", "+Gms"])
     resultMatrix = [titles]
@@ -268,9 +182,9 @@ def categoryRateFreeAgents(
     IGNORE_STATS: List[str] = ["GP"],
 ) -> List[List[Any]]:
     if totalOrAvg == "avg":
-        averages = PER_GAME_AVERAGES[TIMEFRAMES.index(timeframe)]
+        averages = g.PER_GAME_AVERAGES[TIMEFRAMES.index(timeframe)]
     else:
-        averages = TOTAL_AVERAGES[TIMEFRAMES.index(timeframe)]
+        averages = g.TOTAL_AVERAGES[TIMEFRAMES.index(timeframe)]
 
     titles = categoryList.copy()
     titles.extend(["Rating", "Player Name", "Team", "ProT", "Inj", "Pos", "+Gms"])
@@ -302,7 +216,7 @@ def categoryRatePlayerList(
             playerMatrix = [0] * (categoryNum + 1)
 
         else:
-            playerMatrix = createPlayerMatrix(
+            playerMatrix = categoryRatePlayer(
                 playerStats, averages, categoryList, IGNORE_STATS
             )
             player
@@ -316,13 +230,13 @@ def categoryRatePlayerList(
         injuryCode = INJURY_MAP.get(str(player.injuryStatus))
         playerMatrix.append(injuryCode if injuryCode is not None else "")
         playerMatrix.append(getPlayerPosition(player=player))
-        playerMatrix.append(EXTRA_GAMES.get(proTeam, ""))
+        playerMatrix.append(g.EXTRA_GAMES.get(proTeam, ""))
         resultMatrix.append(playerMatrix)
 
     return resultMatrix
 
 
-def createPlayerMatrix(
+def categoryRatePlayer(
     playerStats: Dict[str, float],
     averages: Dict[str, float],
     categoryList: List[str],
@@ -338,7 +252,10 @@ def createPlayerMatrix(
             playerMatrix.append(statRating)
         else:
             statAverage = averages.get(cat)
-            statRating = (stat / statAverage) * 100
+            statRating = stat / statAverage
+            if statRating != 0 and cat in NEGATIVE_STATS:
+                statRating = 2 - statRating
+            statRating = statRating * 100
             playerMatrix.append(statRating)
     playerMatrix.append(ratePlayer(playerStats, averages, IGNORE_STATS))
     return playerMatrix
@@ -374,9 +291,9 @@ def remainingRateTeams(league: League) -> List[List[Any]]:
 def remainingRatePlayerList(
     playerList: List[Player], teamName: str = "?"
 ) -> List[List[Any]]:
-    averages = PER_GAME_AVERAGES[0]
-    remainingGames = REMAINING_GAMES
-    remainingExtraGames = EXTRA_GAMES
+    averages = g.PER_GAME_AVERAGES[0]
+    remainingGames = g.REMAINING_GAMES
+    remainingExtraGames = g.EXTRA_GAMES
     avgExtraGames = sum(remainingExtraGames.values()) / len(remainingExtraGames)
     resultMatrix = []
     for player in playerList:
@@ -446,7 +363,7 @@ def minuteFreeAgentRatings(
     freeAgents: List[Player],
 ) -> List[List[Any]]:
     CATEGORIES.update({"MIN": 0})
-    resultMatrix = minuteRateFreeAgents(freeAgents, averagesList=TOTAL_AVERAGES)
+    resultMatrix = minuteRateFreeAgents(freeAgents, averagesList=g.TOTAL_AVERAGES)
 
     CATEGORIES.pop("MIN", None)
     return resultMatrix

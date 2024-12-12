@@ -4,8 +4,15 @@ from simple_term_menu import TerminalMenu
 import library.config as config
 import library.loading as loading
 import library.worksheets as worksheets
+import library.schedule as schedule
+import library.averages as averages
+import library.globals as g
 
 SETTING_FILE = config.SETTING_FILE
+TOTAL_AVERAGES = None
+PER_GAME_AVERAGES = None
+TEAM_NUMBER = config.TEAM_NUMBER
+IGNORE_PLAYERS = config.IGNORE_PLAYERS
 
 
 def clear_screen():
@@ -17,13 +24,13 @@ def clear_screen():
 
 
 def main():
-    league = loading.loadLeague()
+    league = g.LEAGUE
     clear_screen()
     exitMainMenu = False
     mainMenu = [
-        "[1] Refresh League",  # 0 index
+        "[1] Load/Refresh League",  # 0 index
         "[2] Google Sheets Menu",  # 1 index
-        "[3] Excel Spreadsheets Menu",  # 2 index
+        None,  # 2 index Excel Spreadsheets Menu
         "[4] Settings",  # 3 index
         None,  # 4 index
         "[6] Exit",  # 5 index
@@ -53,7 +60,18 @@ def main():
         if mainMenuEntry == 0:
             print("Refreshing league from ESPN\n...")
             if refreshLeague() == 1:
+                g.init()
+                league = g.LEAGUE
                 print("Successfully refreshed league \n")
+                print("ESPN Fantasy League:", end=" ")
+                print(league.settings.name)
+                print("Season:", end=" ")
+                print(league.year)
+                print("Last refreshed:", end=" ")
+                print(loading.getLeagueSavedTime())
+
+            else:
+                print("League could not load")
 
         elif mainMenuEntry == 1:
             googleSheetsMenu()
@@ -84,6 +102,9 @@ def googleSheetsMenu():
         menuEntry = terminalMenu.show()
 
         if menuEntry == 0:
+            if g.LEAGUE is None:
+                print("NO LEAGUE LOADED. Please refresh league.")
+                return
             print("Pushing Google Sheet...")
             worksheets.pushGoogleSheets()
             print("Sheet pushed.")
@@ -107,8 +128,8 @@ def settingsMenu():
     settingsMenu = [
         "[1] Set ESPN Info",  # 0 index
         "[2] Set Season",  # 1 index
-        "[3] Set Ignored Stats",  # 2 index
-        "[4] Set Roster Positions",  # 3 index
+        None,  # 2 index Ignored Stats
+        None,  # 3 index Roster Positions
         None,  # 4 index
         "[6] Back",  # 5 index
     ]
@@ -136,7 +157,7 @@ def espnInfoMenu():
     espnMenu = [
         "[1] Set SWID",  # 0 index
         "[2] Set espn_s2",  # 1 index
-        "[3] Set league_id",  # 2 index
+        "[3] Set leagueId",  # 2 index
         "[2] Set team number",  # 3 index
         None,
         "[6] Back",  # 5 index
@@ -153,7 +174,7 @@ def espnInfoMenu():
         elif espnMenuEntry == 1:
             changeSetting("espn_s2")
         elif espnMenuEntry == 2:
-            changeSetting("league_id")
+            changeSetting("leagueId")
         elif espnMenuEntry == 3:
             changeSetting("teamNumber")
         elif espnMenuEntry == 5:

@@ -106,7 +106,7 @@ Change ESPN Info:
 | ignoredStats    | Stats to leave out of player rating, eg: if your team is not optimizing for REB or TO       |
 | rosterPositions | Not yet implemented.                                                                        |
 | ignorePlayers   | Used in remaining valuation. WIP                                                            |
-| maxPlayers      | Used in remaining valuation. WIP                                                            |
+| dailyPlayers    | Used in remaining valuation. WIP                                                            |
 
 SWID and espn_s2 required for private leagues, ([finding SWID and espn_s2](https://github.com/cwendt94/espn-api/discussions/150)), league_id is required for all leagues. Your team number is required to calculate remaining value.
 

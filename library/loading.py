@@ -4,15 +4,11 @@ import pickle
 import os
 import time
 from espn_api.basketball import League, Player
-import library.config as config
+import library.config as c
 
-LEAGUE_FILE = config.LEAGUE_FILE
-FREE_AGENTS_FILE = config.FREE_AGENTS_FILE
-SETTING_FILE = config.SETTING_FILE
-SWID = config.SWID
-ESPN_S2 = config.ESPN_S2
-SEASON_ID = config.SEASON_ID
-LEAGUE_ID = config.LEAGUE_ID
+LEAGUE_FILE = c.LEAGUE_FILE
+FREE_AGENTS_FILE = c.FREE_AGENTS_FILE
+SETTING_FILE = c.SETTING_FILE
 
 
 def saveFile(filename: str, data):
@@ -38,10 +34,10 @@ def reloadLeague():
         fileInfo = file.read()
         leagueInfo = json.loads(fileInfo)
         league = League(
-            league_id=LEAGUE_ID,
-            year=SEASON_ID,
-            espn_s2=ESPN_S2,
-            swid=SWID,
+            league_id=c.LEAGUE_ID,
+            year=c.SEASON_ID,
+            espn_s2=c.ESPN_S2,
+            swid=c.SWID,
             debug=False,
         )
         file.close()

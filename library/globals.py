@@ -22,9 +22,9 @@ if LEAGUE is not None:
     REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)
 
 
-def init():
+def init() -> int:
     global LEAGUE
-    LEAGUE = loading.reloadLeague()
+    LEAGUE = loading.loadLeague()
     if LEAGUE is not None:
         global TOTAL_AVERAGES
         TOTAL_AVERAGES = averages.createLeagueAverages(
@@ -40,3 +40,6 @@ def init():
         )
         global REMAINING_GAMES
         REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)
+        return 1
+    else:
+        return 0

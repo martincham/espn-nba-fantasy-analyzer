@@ -6,7 +6,7 @@ from espn_api.basketball import League, Team
 import library.schedule as schedule
 import library.config as config
 import library.rating as rating
-import main
+import library.globals as g
 
 
 SCHEDULE_FILE = "2025.txt"
@@ -17,9 +17,6 @@ TEAM_SIZE = config.TEAM_SIZE
 TIMEFRAMES = config.TIMEFRAMES
 IGNORE_STATS = config.IGNORE_STATS
 
-PER_GAME_AVERAGES = main.PER_GAME_AVERAGES
-TOTAL_AVERAGES = main.TOTAL_AVERAGES
-
 
 # 1. League matchup schedule
 # 2. For each matchup, get games each team will play on each day, and value of players playing
@@ -29,10 +26,10 @@ TOTAL_AVERAGES = main.TOTAL_AVERAGES
 
 def createMatchupSchedule(league: League) -> List[List[Any]]:
     averages = {
-        "total": PER_GAME_AVERAGES[0],
-        "30": PER_GAME_AVERAGES[1],
-        "15": PER_GAME_AVERAGES[2],
-        "7": PER_GAME_AVERAGES[3],
+        "total": g.PER_GAME_AVERAGES[0],
+        "30": g.PER_GAME_AVERAGES[1],
+        "15": g.PER_GAME_AVERAGES[2],
+        "7": g.PER_GAME_AVERAGES[3],
     }
 
     matchupSheet = []

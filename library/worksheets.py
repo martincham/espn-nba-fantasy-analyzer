@@ -3,10 +3,10 @@ from datetime import datetime
 import gspread
 import gspread_formatting as gsf
 import library.loading as loading
-
-# import library.rating as rating  # hmmmmm
+import library.rating as rating
 import library.config as config
 import library.matchups as matchups
+import library.globals as g
 
 
 ROSTER_POSITIONS = config.ROSTER_POSITIONS
@@ -21,7 +21,6 @@ GRAY_RGB = config.GRAY_RGB
 BLUE_RGB = config.BLUE_RGB
 ORANGE_RGB = config.ORANGE_RGB
 CATEGORIES = config.CATEGORIES
-LEAGUE
 
 
 NAMES = [
@@ -430,11 +429,7 @@ def initializeSpreadsheet():
 
 
 def pushGoogleSheets():
-    import library.rating as rating
-
-    global LEAGUE
-    LEAGUE = loading.LEAGUE
-    league = LEAGUE
+    league = g.LEAGUE
     freeAgents = loading.loadFreeAgents()
 
     matchupData = matchups.createMatchupSchedule(league=league)

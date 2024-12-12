@@ -6,22 +6,13 @@ import library.loading as loading
 import library.worksheets as worksheets
 import library.schedule as schedule
 import library.averages as averages
+import library.globals as g
 
 SETTING_FILE = config.SETTING_FILE
 TOTAL_AVERAGES = None
 PER_GAME_AVERAGES = None
 TEAM_NUMBER = config.TEAM_NUMBER
 IGNORE_PLAYERS = config.IGNORE_PLAYERS
-EXTRA_GAMES = None
-REMAINING_GAMES = None
-LEAGUE = loading.loadLeague()
-if LEAGUE is not None:
-    TOTAL_AVERAGES = averages.createLeagueAverages(league=LEAGUE, totalOrAvg="total")
-    PER_GAME_AVERAGES = averages.createLeagueAverages(league=LEAGUE, totalOrAvg="avg")
-    EXTRA_GAMES = schedule.calculateExtraRemainingGames(
-        league=LEAGUE, teamNumber=TEAM_NUMBER, ignorePlayers=IGNORE_PLAYERS
-    )
-    REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)
 
 
 def clear_screen():
@@ -33,7 +24,7 @@ def clear_screen():
 
 
 def main():
-    global LEAGUE
+    league = g.LEAGUE
     clear_screen()
     exitMainMenu = False
     mainMenu = [
@@ -51,33 +42,16 @@ def main():
 
     # Intro Messages
     print("ESPN Fantasy League:", end=" ")
-    if LEAGUE is None:
+    if league is None:
         print("*no league saved*")
     else:
-        print(LEAGUE.settings.name)
+        print(league.settings.name)
         print("Season:", end=" ")
-        print(LEAGUE.year)
+        print(league.year)
         print("Last refreshed:", end=" ")
         print(loading.getLeagueSavedTime())
         print("Selected Google Sheet:", end=" ")
         print(worksheets.getGoogleSheetName(), "\n")
-        ###############
-        #  AVERAGES  #
-        ##############
-        global TOTAL_AVERAGES
-        TOTAL_AVERAGES = averages.createLeagueAverages(
-            league=LEAGUE, totalOrAvg="total"
-        )
-        global PER_GAME_AVERAGES
-        PER_GAME_AVERAGES = averages.createLeagueAverages(
-            league=LEAGUE, totalOrAvg="avg"
-        )
-        global EXTRA_GAMES
-        EXTRA_GAMES = schedule.calculateExtraRemainingGames(
-            league=LEAGUE, teamNumber=TEAM_NUMBER, ignorePlayers=IGNORE_PLAYERS
-        )
-        global REMAINING_GAMES
-        REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)
 
     # MENU
     while not exitMainMenu:
@@ -86,12 +60,13 @@ def main():
         if mainMenuEntry == 0:
             print("Refreshing league from ESPN\n...")
             if refreshLeague() == 1:
+                g.init()
+                league = g.LEAGUE
                 print("Successfully refreshed league \n")
-                LEAGUE = loading.loadLeague()
                 print("ESPN Fantasy League:", end=" ")
-                print(LEAGUE.settings.name)
+                print(league.settings.name)
                 print("Season:", end=" ")
-                print(LEAGUE.year)
+                print(league.year)
                 print("Last refreshed:", end=" ")
                 print(loading.getLeagueSavedTime())
 
@@ -127,7 +102,7 @@ def googleSheetsMenu():
         menuEntry = terminalMenu.show()
 
         if menuEntry == 0:
-            if LEAGUE is None:
+            if g.LEAGUE is None:
                 print("NO LEAGUE LOADED. Please refresh league.")
                 return
             print("Pushing Google Sheet...")

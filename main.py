@@ -211,6 +211,7 @@ def changeSetting(settingName):
                 json.dump(settings, file, indent=4)
                 print("Updated.")
                 file.close()
+                config.init()
             else:
                 print("Not updated.")
         else:

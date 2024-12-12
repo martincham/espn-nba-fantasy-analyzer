@@ -446,24 +446,32 @@ def pushGoogleSheets():
 
     # Publish to Google Sheet
     gc = gspread.service_account()
-    spreadsheet = gc.open(getGoogleSheetName())
-    totalWorksheet = spreadsheet.worksheet(NAMES[0])
-    avgWorksheet = spreadsheet.worksheet(NAMES[1])
-    freeAgentWorksheet = spreadsheet.worksheet(NAMES[2])
-    freeAgentAvgWorksheet = spreadsheet.worksheet(NAMES[3])
-    teamMatrixTotalWorksheet = spreadsheet.worksheet(NAMES[4])
-    teamMatrixSevenWorksheet = spreadsheet.worksheet(NAMES[5])
-    teamMatrixFifteenWorksheet = spreadsheet.worksheet(NAMES[6])
-    teamMatrixThirtyWorksheet = spreadsheet.worksheet(NAMES[7])
-    faMatrixTotalWorksheet = spreadsheet.worksheet(NAMES[8])
-    faMatrixSevenWorksheet = spreadsheet.worksheet(NAMES[9])
-    faMatrixFifteenWorksheet = spreadsheet.worksheet(NAMES[10])
-    faMatrixThirtyWorksheet = spreadsheet.worksheet(NAMES[11])
-    remainingValueWorksheet = spreadsheet.worksheet(NAMES[12])
-    remainingFAWorksheet = spreadsheet.worksheet(NAMES[13])
-    infoWorksheet = spreadsheet.worksheet(NAMES[14])
-    matchupWorksheet = spreadsheet.worksheet(NAMES[15])
-    per32Worksheet = spreadsheet.worksheet(NAMES[16])
+    try:
+        spreadsheet = gc.open(getGoogleSheetName())
+    except Exception as ex:
+        print("Error:", ex)
+        return
+    try:
+        totalWorksheet = spreadsheet.worksheet(NAMES[0])
+        avgWorksheet = spreadsheet.worksheet(NAMES[1])
+        freeAgentWorksheet = spreadsheet.worksheet(NAMES[2])
+        freeAgentAvgWorksheet = spreadsheet.worksheet(NAMES[3])
+        teamMatrixTotalWorksheet = spreadsheet.worksheet(NAMES[4])
+        teamMatrixSevenWorksheet = spreadsheet.worksheet(NAMES[5])
+        teamMatrixFifteenWorksheet = spreadsheet.worksheet(NAMES[6])
+        teamMatrixThirtyWorksheet = spreadsheet.worksheet(NAMES[7])
+        faMatrixTotalWorksheet = spreadsheet.worksheet(NAMES[8])
+        faMatrixSevenWorksheet = spreadsheet.worksheet(NAMES[9])
+        faMatrixFifteenWorksheet = spreadsheet.worksheet(NAMES[10])
+        faMatrixThirtyWorksheet = spreadsheet.worksheet(NAMES[11])
+        remainingValueWorksheet = spreadsheet.worksheet(NAMES[12])
+        remainingFAWorksheet = spreadsheet.worksheet(NAMES[13])
+        infoWorksheet = spreadsheet.worksheet(NAMES[14])
+        matchupWorksheet = spreadsheet.worksheet(NAMES[15])
+        per32Worksheet = spreadsheet.worksheet(NAMES[16])
+    except Exception as ex:
+        print("Error (is spreadsheet initialized?):", ex)
+        return
 
     # TEST
     freeAgentMinuteRatings = rating.minuteFreeAgentRatings(
@@ -485,8 +493,8 @@ def pushGoogleSheets():
     freeAgentAvgWorksheet.update(values=freeAgentAvgRatings)
 
     categoryList = CATEGORIES
-
-    categoryList.pop(categoryList.index("MIN"))
+    if "MIN" in categoryList:
+        categoryList.pop(categoryList.index("MIN"))
     remRatingMatrix = rating.remainingRateTeams(league=league)
 
     remainingValueWorksheet.update(values=remRatingMatrix)

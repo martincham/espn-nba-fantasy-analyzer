@@ -8,6 +8,8 @@ Thanks to [cwendt94/espn-api](https://github.com/cwendt94/espn-api) for fetching
 
 ## Setup:
 
+### [See the Wiki for in-depth setup instructions](https://github.com/martincham/espn-nba-fantasy-analyzer/wiki/Getting-Started-with-ENFA)
+
 Requires pandas, gspread, gspread-formatting, espn-api, and simple-term-menu packages:
 
 ```
@@ -39,9 +41,9 @@ Last refreshed: Sat Apr 20 19:34:39 2024
 Selected Google Sheet: testSheet
 
 ESPN Fantasy BBALL Analyzer
-> [1] Refresh League
+> [1] Load/Refresh League
   [2] Google Sheets Menu
-  [3] Excel Spreadsheets Menu
+
   [4] Settings
 
   [6] Exit
@@ -54,16 +56,16 @@ _[1] Refresh League_ will pull data for your league from ESPN. The data will be 
 ```
 Google Sheet:
 > [1] Push Google Sheet
-  [2] Format Google Sheet
+  [2] Initialize/Reformat Google Sheet
   [3] Clear Google Sheet
   [4] Set Sheet Name
 
-  [6] Exit
+  [6] Back
 ```
 
 _[1] Push_ runs all the algorithms and pushes data to your GSheet.
 
-_[2] Format_ Will setup color coding and other formatting. Run this once **before** you push data, and every time you change categories.
+_[2] Initialize/Reformat_ Will setup color coding and other formatting. Run this once **before** you push data, and every time you change categories.
 
 _[3 Clear]_ Will delete all the data from your sheets. Usefull for when you've removed categories.
 
@@ -75,10 +77,10 @@ Sheet name must match exactly. I suggest **no spaces**! eg: "fantasyStatsSheet24
 Settings:
 > [1] Set ESPN Info
   [2] Set Season
-  [3] Set Ignored Stats
-  [4] Set Roster Positions
-  [5] Set Worksheet Name
-  [6] Exit
+
+
+
+  [6] Back
 ```
 
 You can either manually edit the json in settings.txt, or you can use this settings menu.
@@ -95,22 +97,9 @@ Change ESPN Info:
   [6] Exit
 ```
 
-| Setting         | Description                                                                                 |
-| --------------- | ------------------------------------------------------------------------------------------- |
-| SWID            | ESPN credential **Keep Private**                                                            |
-| epsn_s2         | ESPN credential **Keep Private**                                                            |
-| leagueID        | Identifies your fantasy league                                                              |
-| teamNumber      | Identifies your team in the league. Necessary for remaining value calculation               |
-| googleSheet     | name of the GSheet you want to send data to                                                 |
-| categories      | The list of stats you want to rate players on and have individually rated on category pages |
-| ignoredStats    | Stats to leave out of player rating, eg: if your team is not optimizing for REB or TO       |
-| rosterPositions | Not yet implemented.                                                                        |
-| ignorePlayers   | Used in remaining valuation. WIP                                                            |
-| dailyPlayers    | Used in remaining valuation. WIP                                                            |
+### [See the Wiki for details on the Settings and settings.txt](https://github.com/martincham/espn-nba-fantasy-analyzer/wiki/Settings-Details)
 
 SWID and espn_s2 required for private leagues, ([finding SWID and espn_s2](https://github.com/cwendt94/espn-api/discussions/150)), league_id is required for all leagues. Your team number is required to calculate remaining value.
-
-"categories" does not yet support percentage based stats like FG%. Stats like TO and GP can behave weirdly too, so they should be in "ignoredStats".
 
 ## Reading the Data:
 
@@ -131,6 +120,8 @@ There are two of each type of sheet, one for rostered players, and one for free-
 | pG       | FApG        | Rates players based on per game stats. Will not devalue based on time missed due to injury. |
 | cats     | FAcats      | Individual rating for stats in "categories". Used total, not perGame numbers                |
 | 7/15/30  | FA7/15/30   | ^Same, but over last 7 days, 15 days, 30 days                                               |
-| remValue | FArem       | WIP but attempts to rate players based on their schedule. _see below_                       |
+| remValue | FArem       | Rates players based on their schedule fit in your roster. _see below_                       |
+| matchups |             | Compares your value each day to your opponent.                                              |
+|          | FAp32       | Rates Free Agents per 32 minutes. Can also show playing time trends.                        |
 
 Remaining value: For example, if you have a few Spurs on your roster, another Spur would sit on your bench and would maybe play only 10 games in the last X weeks of the season. Perhaps the Sun's schedule plays on different days than the players you have rostered so a Sun's player would play 30 games in the remaining X weeks. Even if the Sun player is worse, because they can play more on your roster, their remaining value would be higher. This functionality is being tuned, but you can adjust your performance by making "ignorePlayers" equal to the number of players you drop/add each week, and "maxPlayers" equal to 1 less than the max players on your team.

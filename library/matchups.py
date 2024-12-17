@@ -4,18 +4,17 @@ import json
 from espn_api.basketball import League, Team
 
 import library.schedule as schedule
-import library.config as config
+import library.config as c
 import library.rating as rating
 import library.globals as g
 
 
 SCHEDULE_FILE = "2025.txt"
-TEAM_NUMBER = config.TEAM_NUMBER
-ROSTER_POSITIONS = config.ROSTER_POSITIONS
-POSITION_HEIRARCHY = config.POSITION_HEIRARCHY
-TEAM_SIZE = config.TEAM_SIZE
-TIMEFRAMES = config.TIMEFRAMES
-IGNORE_STATS = config.IGNORE_STATS
+ROSTER_POSITIONS = c.ROSTER_POSITIONS
+POSITION_HEIRARCHY = c.POSITION_HEIRARCHY
+TEAM_SIZE = c.TEAM_SIZE
+TIMEFRAMES = c.TIMEFRAMES
+IGNORE_STATS = c.IGNORE_STATS
 
 
 # 1. League matchup schedule
@@ -42,7 +41,7 @@ def createMatchupSchedule(league: League) -> List[List[Any]]:
     except Exception as ex:  # file not found, initialize
         print("Could not find schedule file:", ex)
 
-    team = league.teams[TEAM_NUMBER]
+    team = league.teams[c.TEAM_NUMBER]
     teamRatings = teamRating(team=team, averages=averages)
     schedule = team.schedule
     # Setup Labels in first Column

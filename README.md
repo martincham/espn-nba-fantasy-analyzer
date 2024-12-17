@@ -8,7 +8,7 @@ Thanks to [cwendt94/espn-api](https://github.com/cwendt94/espn-api) for fetching
 
 ## Setup:
 
-### [See the Wiki for in-depth setup instructions](https://github.com/martincham/espn-nba-fantasy-analyzer/wiki/Getting-Started-with-ENFA)
+### [Video with setup and explanation](https://www.youtube.com/watch?v=rRVzx607mJM)
 
 Requires pandas, gspread, gspread-formatting, espn-api, and simple-term-menu packages:
 
@@ -23,6 +23,8 @@ To install, either download and unpack the .zip, or run:
 ```
 git clone https://github.com/martincham/espn-nba-fantasy-analyzer
 ```
+
+### [See the Wiki for in-depth setup instructions](https://github.com/martincham/espn-nba-fantasy-analyzer/wiki/Getting-Started-with-ENFA)
 
 ## Using the tool:
 

@@ -63,7 +63,7 @@ def teamTradeMenu(teamIndex: int):
 
     terminalMenu = TerminalMenu(
         menu_entries=menu,
-        title=g.LEAGUE.teams[teamIndex].team_name,
+        title=team.team_name,
         skip_empty_entries=True,
     )
 
@@ -73,7 +73,7 @@ def teamTradeMenu(teamIndex: int):
         if menuEntry == 0:
             exitMenu = True
 
-        elif menuEntry > 0 and menuEntry <= len(g.LEAGUE.teams):
+        elif menuEntry > 0 and menuEntry <= len(team.roster):
             if tradeForMenu(teamIndex=teamIndex, oppIndex=menuEntry - 1) == 1:
                 return 1
 
@@ -112,4 +112,10 @@ def tradePlayers(teamIndex: int, oppIndex: int, myIndex: int):
     g.LEAGUE.teams[teamIndex].roster[oppIndex] = temp
     # Recalculate extra games
     g.initExtraGames()
+    print(
+        "Traded "
+        + temp.name
+        + " for "
+        + g.LEAGUE.teams[c.TEAM_NUMBER].roster[myIndex].name
+    )
     return 1

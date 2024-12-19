@@ -449,7 +449,7 @@ def pushGoogleSheets():
     try:
         spreadsheet = gc.open(getGoogleSheetName())
     except Exception as ex:
-        print("Error:", ex)
+        print("Error (is your gspread setup and sheetname correct?):", ex)
         return
     try:
         totalWorksheet = spreadsheet.worksheet(NAMES[0])

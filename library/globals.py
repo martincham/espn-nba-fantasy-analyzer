@@ -1,23 +1,25 @@
-import library.config as config
+import library.config as c
 import library.loading as loading
 import library.averages as averages
 import library.schedule as schedule
 
-TEAM_NUMBER = config.TEAM_NUMBER
-IGNORE_PLAYERS = config.IGNORE_PLAYERS
+
 EXTRA_GAMES = None
 REMAINING_GAMES = None
 TOTAL_AVERAGES = None
 PER_GAME_AVERAGES = None
 
-SETTING_FILE = config.SETTING_FILE
+SETTING_FILE = c.SETTING_FILE
 LEAGUE = loading.loadLeague()
 
 if LEAGUE is not None:
     TOTAL_AVERAGES = averages.createLeagueAverages(league=LEAGUE, totalOrAvg="total")
     PER_GAME_AVERAGES = averages.createLeagueAverages(league=LEAGUE, totalOrAvg="avg")
     EXTRA_GAMES = schedule.calculateExtraRemainingGames(
-        league=LEAGUE, teamNumber=TEAM_NUMBER, ignorePlayers=IGNORE_PLAYERS
+        league=LEAGUE,
+        averages=PER_GAME_AVERAGES[0],
+        teamNumber=c.TEAM_NUMBER,
+        ignorePlayers=c.IGNORE_PLAYERS,
     )
     REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)
 
@@ -36,10 +38,25 @@ def init() -> int:
         )
         global EXTRA_GAMES
         EXTRA_GAMES = schedule.calculateExtraRemainingGames(
-            league=LEAGUE, teamNumber=TEAM_NUMBER, ignorePlayers=IGNORE_PLAYERS
+            league=LEAGUE,
+            averages=PER_GAME_AVERAGES[0],
+            teamNumber=c.TEAM_NUMBER,
+            ignorePlayers=c.IGNORE_PLAYERS,
         )
         global REMAINING_GAMES
         REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)
         return 1
     else:
         return 0
+
+
+def initExtraGames():
+    global EXTRA_GAMES
+    EXTRA_GAMES = schedule.calculateExtraRemainingGames(
+        league=LEAGUE,
+        averages=PER_GAME_AVERAGES[0],
+        teamNumber=c.TEAM_NUMBER,
+        ignorePlayers=c.IGNORE_PLAYERS,
+    )
+    global REMAINING_GAMES
+    REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)

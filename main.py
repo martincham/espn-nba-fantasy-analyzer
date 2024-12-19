@@ -4,8 +4,7 @@ from simple_term_menu import TerminalMenu
 import library.config as config
 import library.loading as loading
 import library.worksheets as worksheets
-import library.schedule as schedule
-import library.averages as averages
+import library.customizer as customizer
 import library.globals as g
 
 SETTING_FILE = config.SETTING_FILE
@@ -30,7 +29,7 @@ def main():
     mainMenu = [
         "[1] Load/Refresh League",  # 0 index
         "[2] Google Sheets Menu",  # 1 index
-        None,  # 2 index Excel Spreadsheets Menu
+        "[3] Trade Machine",  # 2 index
         "[4] Settings",  # 3 index
         None,  # 4 index
         "[6] Exit",  # 5 index
@@ -75,6 +74,9 @@ def main():
 
         elif mainMenuEntry == 1:
             googleSheetsMenu()
+
+        elif mainMenuEntry == 2:
+            customizer.customizeMenu()
 
         elif mainMenuEntry == 3:
             settingsMenu()

@@ -4,11 +4,13 @@
 
 ### Generates overall, and category player valuations over various timespans
 
+<img src="assets/totalSheet.png" alt="worksheet example" width="400"/>
+
 Thanks to [cwendt94/espn-api](https://github.com/cwendt94/espn-api) for fetching data from ESPN.
 
 ## Setup:
 
-### [See the Wiki for in-depth setup instructions](https://github.com/martincham/espn-nba-fantasy-analyzer/wiki/Getting-Started-with-ENFA)
+### [Video with setup and explanation](https://www.youtube.com/watch?v=rRVzx607mJM)
 
 Requires pandas, gspread, gspread-formatting, espn-api, and simple-term-menu packages:
 
@@ -24,6 +26,8 @@ To install, either download and unpack the .zip, or run:
 git clone https://github.com/martincham/espn-nba-fantasy-analyzer
 ```
 
+### [See the Wiki for in-depth setup instructions](https://github.com/martincham/espn-nba-fantasy-analyzer/wiki)
+
 ## Using the tool:
 
 to run (while [in the folder](https://www.geeksforgeeks.org/cd-command-in-linux-with-examples/)):
@@ -36,14 +40,14 @@ to run (while [in the folder](https://www.geeksforgeeks.org/cd-command-in-linux-
 
 ```
 ESPN Fantasy League: YOUR_LEAGUE_NAME_HERE
-Season: 2024
-Last refreshed: Sat Apr 20 19:34:39 2024
-Selected Google Sheet: testSheet
+Season: 2025
+Last refreshed: Sat Apr 20 19:34:39 2025
+Selected Google Sheet: SHEET_NAME_HERE
 
 ESPN Fantasy BBALL Analyzer
-> [1] Load/Refresh League
-  [2] Google Sheets Menu
-
+  [1] Load/Refresh League
+> [2] Google Sheets Menu
+  [3] Trade Machine
   [4] Settings
 
   [6] Exit

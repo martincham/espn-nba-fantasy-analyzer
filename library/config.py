@@ -1,5 +1,8 @@
 import json
 
+# config.py handles loading and intializing settings.txt.
+# Some settings can be changed within the program and reloaded with init(), so globals should be referenced from here.
+
 ###################
 # Not Adjustable
 POSITION_HEIRARCHY = ["SG/SF", "SG/SF", "SG/SF", "PG", "F", "PF/C", "UT"]

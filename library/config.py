@@ -171,6 +171,8 @@ def init() -> int:
     global MAX_PLAYERS
     MAX_PLAYERS = int(settings.get("dailyPlayers"))
 
+    validateCategories()
+
 
 def validateCategories():
     for category in CATEGORIES:
@@ -180,4 +182,3 @@ def validateCategories():
 
 
 init()
-validateCategories()

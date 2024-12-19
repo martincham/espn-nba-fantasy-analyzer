@@ -116,7 +116,7 @@ def init() -> int:
             "espn_s2": "456",
             "leagueId": 1640258594,
             "seasonId": 2025,
-            "teamNumber": 8,
+            "teamNumber": 1,
             "googleSheet": "SheetNameHere",
             "categories": [
                 "PTS",
@@ -170,15 +170,6 @@ def init() -> int:
     IGNORE_PLAYERS = settings.get("ignorePlayers")
     global MAX_PLAYERS
     MAX_PLAYERS = int(settings.get("dailyPlayers"))
-
-    validateCategories()
-
-
-def validateCategories():
-    for category in CATEGORIES:
-        if category not in VALID_CATEGORIES:
-            print("Invalid category:", category)
-            quit()
 
 
 init()

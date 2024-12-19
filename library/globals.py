@@ -60,3 +60,28 @@ def initExtraGames():
     )
     global REMAINING_GAMES
     REMAINING_GAMES = schedule.calculateRemainingGames(league=LEAGUE)
+
+
+def validate():
+    if c.TEAM_NUMBER > len(LEAGUE.teams):
+        print(
+            "Invalid team number:",
+            c.TEAM_NUMBER,
+            "(league has",
+            len(LEAGUE.teams),
+            " teams)",
+        )
+        quit()
+    elif c.TEAM_NUMBER < 1:
+        print("Invalid team number:", c.TEAM_NUMBER)
+        quit()
+
+    validateCategories()
+    initExtraGames()  # in case teamNumber changed
+
+
+def validateCategories():
+    for category in c.CATEGORIES:
+        if category not in c.VALID_CATEGORIES:
+            print("Invalid category:", category)
+            quit()

@@ -19,7 +19,8 @@ def calculateExtraRemainingGames(
     now = date.today()
 
     if teamNumber > len(league.teams) - 1:
-        return 0
+        print("Error: teamNumber is greater than number of teams in league")
+        return {"ALL": 0}
     myTeam = deepcopy(league.teams[teamNumber])
     # Sorts roster by whole season per-game rating, then remove the worst IGNORE_PLAYERS from roster
     ratedRoster = {

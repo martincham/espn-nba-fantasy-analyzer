@@ -6,7 +6,7 @@
 
 -> [Example Spreadsheet.](https://docs.google.com/spreadsheets/d/1G-0nVugkNMVrBBEXdQlxErq5SRi_kooEDjpoAkX2Cxs/edit?usp=sharing)
 
-<img src="assets/totalSheet.png" alt="worksheet example" width="400"/>
+<img src="assets/totalSheet.png" alt="worksheet example" width="500"/>
 
 Thanks to [cwendt94/espn-api](https://github.com/cwendt94/espn-api) for fetching data from ESPN.
 
@@ -111,10 +111,10 @@ SWID and espn_s2 required for private leagues, ([finding SWID and espn_s2](https
 
 This utility scores players where 100 is the **average production of players rostered in your league**, over the specified timespan. Averages can shift as players are rostered/dropped. A score of 200 will have double the production, 50 will have half. Rating will use all stats in "categories" unless in "ignoredStats".
 
+<img src="assets/catsSheet.png" alt="worksheet example" width="800"/>
+
 If the average number of Points per Game (PPG) is 15, a player with 15 PPG will have a rating of 100. A player with 30 PPG will be rated 200.
 If the average number of Steals per Game (SPG) is .8, a player with .8 SPG will have a rating of 100. A player with 1.6 SPG will be rated 200. The 1.6 SPG player is as valuable as the 30 PPG player (in fantasy).
-
-<img width="577" alt="Screenshot 2024-09-10 at 2 50 01 PM" src="https://github.com/user-attachments/assets/d5c4984f-77ef-469c-adda-d102f11a07f5">
 
 There are two of each type of sheet, one for rostered players, and one for free-agents.
 
@@ -122,7 +122,7 @@ There are two of each type of sheet, one for rostered players, and one for free-
 | -------- | ----------- | ------------------------------------------------------------------------------------------- |
 | total    | FA          | Rates players based on total stat accrual. Players who play more will be valued higher.     |
 | pG       | FApG        | Rates players based on per game stats. Will not devalue based on time missed due to injury. |
-| cats     | FAcats      | Individual rating for stats in "categories". Used total, not perGame numbers                |
+| cats     | FAcats      | Individual rating for stats in "categories". Uses perGame numbers                |
 | 7/15/30  | FA7/15/30   | ^Same, but over last 7 days, 15 days, 30 days                                               |
 | remValue | FArem       | Rates players based on their schedule fit in your roster. _see below_                       |
 | matchups |             | Compares your value each day to your opponent.                                              |

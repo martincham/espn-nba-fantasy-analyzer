@@ -19,6 +19,53 @@ PERCENT_MAP = {
     "FTR": ["FTA", "FGA"],
 }
 VALID_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
+VALID_CATEGORIES = [
+    "PTS",
+    "BLK",
+    "STL",
+    "AST",
+    "OREB",
+    "DREB",
+    "REB",
+    "EJ",
+    "FF",
+    "PF",
+    "TF",
+    "TO",
+    "DQ",
+    "FGM",
+    "FGA",
+    "FTM",
+    "FTA",
+    "3PM",
+    "3PA",
+    "FG%",
+    "FT%",
+    "3PT%",
+    "AFG%",
+    "FGMI",
+    "FTMI",
+    "3PMI",
+    "APG",
+    "BPG",
+    "MPG",
+    "PPG",
+    "RPG",
+    "SPG",
+    "TOPG",
+    "3PG",
+    "PPM",
+    "A/TO",
+    "STR",
+    "DD",
+    "TD",
+    "QD",
+    "MIN",
+    "GS",
+    "GP",
+    "TW",
+    "FTR",
+]
 TIMEFRAMES = ["_total", "_last_30", "_last_15", "_last_7"]  # suffixes
 PERCENT_STATS = ["FG%", "AFG%", "FT%", "3P%", "A/TO", "STR", "FTR"]
 
@@ -123,6 +170,15 @@ def init() -> int:
     IGNORE_PLAYERS = settings.get("ignorePlayers")
     global MAX_PLAYERS
     MAX_PLAYERS = int(settings.get("dailyPlayers"))
+
+    validateCategories()
+
+
+def validateCategories():
+    for category in CATEGORIES:
+        if category not in VALID_CATEGORIES:
+            print("Invalid category:", category)
+            quit()
 
 
 init()

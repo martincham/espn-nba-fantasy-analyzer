@@ -40,14 +40,14 @@ to run (while [in the folder](https://www.geeksforgeeks.org/cd-command-in-linux-
 
 ```
 ESPN Fantasy League: YOUR_LEAGUE_NAME_HERE
-Season: 2024
-Last refreshed: Sat Apr 20 19:34:39 2024
-Selected Google Sheet: testSheet
+Season: 2025
+Last refreshed: Sat Apr 20 19:34:39 2025
+Selected Google Sheet: SHEET_NAME_HERE
 
 ESPN Fantasy BBALL Analyzer
-> [1] Load/Refresh League
-  [2] Google Sheets Menu
-
+  [1] Load/Refresh League
+> [2] Google Sheets Menu
+  [3] Trade Machine
   [4] Settings
 
   [6] Exit

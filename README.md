@@ -122,7 +122,7 @@ There are two of each type of sheet, one for rostered players, and one for free-
 | -------- | ----------- | ------------------------------------------------------------------------------------------- |
 | total    | FA          | Rates players based on total stat accrual. Players who play more will be valued higher.     |
 | pG       | FApG        | Rates players based on per game stats. Will not devalue based on time missed due to injury. |
-| cats     | FAcats      | Individual rating for stats in "categories". Used total, not perGame numbers                |
+| cats     | FAcats      | Individual rating for stats in "categories". Uses perGame numbers                |
 | 7/15/30  | FA7/15/30   | ^Same, but over last 7 days, 15 days, 30 days                                               |
 | remValue | FArem       | Rates players based on their schedule fit in your roster. _see below_                       |
 | matchups |             | Compares your value each day to your opponent.                                              |

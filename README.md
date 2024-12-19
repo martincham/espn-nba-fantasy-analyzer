@@ -111,8 +111,6 @@ SWID and espn_s2 required for private leagues, ([finding SWID and espn_s2](https
 
 This utility scores players where 100 is the **average production of players rostered in your league**, over the specified timespan. Averages can shift as players are rostered/dropped. A score of 200 will have double the production, 50 will have half. Rating will use all stats in "categories" unless in "ignoredStats".
 
-<img src="assets/exampleESPN.webp" alt="worksheet example" width="400"/>
-
 If the average number of Points per Game (PPG) is 15, a player with 15 PPG will have a rating of 100. A player with 30 PPG will be rated 200.
 If the average number of Steals per Game (SPG) is .8, a player with .8 SPG will have a rating of 100. A player with 1.6 SPG will be rated 200. The 1.6 SPG player is as valuable as the 30 PPG player (in fantasy).
 

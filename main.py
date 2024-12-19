@@ -178,7 +178,8 @@ def espnInfoMenu():
         elif espnMenuEntry == 2:
             changeSetting("leagueId")
         elif espnMenuEntry == 3:
-            changeSetting("teamNumber")
+            if changeSetting("teamNumber") == 1:
+                g.initExtraGames()  # teamNumber changed, so recalculate extra games
         elif espnMenuEntry == 5:
             exitEspnMenu = True
 
@@ -193,7 +194,7 @@ def rosterPositionMenu():
     return 0
 
 
-def changeSetting(settingName):
+def changeSetting(settingName) -> int:
     try:
         file = open(SETTING_FILE, "r")
         fileInfo = file.read()
@@ -219,6 +220,7 @@ def changeSetting(settingName):
         else:
             print("Not updated.")
         file.close()
+        return 1
 
     except FileNotFoundError as ex:
         print("Could not find login file:", ex)

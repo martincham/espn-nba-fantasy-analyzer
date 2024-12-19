@@ -1,4 +1,4 @@
-# schedule.py calculates games remaining for each pro team.
+# schedule.py calculates games remaining for each pro team, and how it affects your teams schedule.
 
 
 from datetime import date
@@ -8,6 +8,7 @@ from espn_api.basketball import League, Team, Player
 import library.config as c
 
 
+# Extra games is the number of games a team will play on days where you have space for an extra game.
 def calculateExtraRemainingGames(
     league: League,
     averages: Dict[str, float],
@@ -64,6 +65,7 @@ def calculateExtraRemainingGames(
     return remainingGames
 
 
+# Remaining games is the number of games remaining for each team in the league.
 def calculateRemainingGames(league: League) -> Dict[str, int]:
     remainingGames = {}
     teamCount = 0

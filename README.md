@@ -2,7 +2,9 @@
 
 # ESPN NBA Fantasy Analyzer
 
-### Generates overall, and category player valuations over various timespans
+### Generates overall, and category player valuations over various timespans.
+
+-> [Example Spreadsheet.](https://docs.google.com/spreadsheets/d/1G-0nVugkNMVrBBEXdQlxErq5SRi_kooEDjpoAkX2Cxs/edit?usp=sharing)
 
 <img src="assets/totalSheet.png" alt="worksheet example" width="400"/>
 

@@ -1,13 +1,14 @@
+# schedule.py calculates games remaining for each pro team, and how it affects your teams schedule.
+
+
 from datetime import date
 from copy import deepcopy
 from typing import Dict, List
 from espn_api.basketball import League, Team, Player
 import library.config as c
 
-ROSTER_POSITIONS = c.ROSTER_POSITIONS
-MAX_PLAYERS = c.MAX_PLAYERS
 
-
+# Extra games is the number of games a team will play on days where you have space for an extra game.
 def calculateExtraRemainingGames(
     league: League,
     averages: Dict[str, float],
@@ -30,7 +31,6 @@ def calculateExtraRemainingGames(
             else ratePlayer(
                 playerStats=player.stats.get(c.TIMEFRAMES[0]).get("avg"),
                 averages=averages,
-                IGNORE_STATS=c.IGNORE_STATS,
             )
         )
         for player in myTeam.roster
@@ -54,7 +54,7 @@ def calculateExtraRemainingGames(
                 gameDay = gameTime.date()
                 if gameDay > now:
                     if gameDay in mySchedule:
-                        if mySchedule.get(gameDay) < MAX_PLAYERS:
+                        if mySchedule.get(gameDay) < c.MAX_PLAYERS:
                             gameCount += 1
             remainingGames[proTeam] = gameCount
             teamCount += 1
@@ -65,6 +65,7 @@ def calculateExtraRemainingGames(
     return remainingGames
 
 
+# Remaining games is the number of games remaining for each team in the league.
 def calculateRemainingGames(league: League) -> Dict[str, int]:
     remainingGames = {}
     teamCount = 0
@@ -108,6 +109,10 @@ def myTeamSchedule(playerList: List[Player]) -> Dict[date, int]:
     return teamSchedule
 
 
+# Duplicate rating code from rating.py. Needed here to sort players on the rosters by value, and to avoid circular imports.
+# Least X valued players can be dropped. X = "ignoredPlayers" in settings.txt
+
+
 def ratePercentStat(
     playerStats: Dict[str, float], averages: Dict[str, float], stat: str
 ) -> float:
@@ -131,15 +136,13 @@ def ratePercentStat(
     return statRating
 
 
-def ratePlayer(
-    playerStats: Dict[str, float], averages: Dict[str, float], IGNORE_STATS: List[str]
-) -> float:
+def ratePlayer(playerStats: Dict[str, float], averages: Dict[str, float]) -> float:
     totalRating = 0
     statCount = 0
     if playerStats is None:
         return 0
     for stat in averages:
-        if stat in IGNORE_STATS:
+        if stat in c.IGNORE_STATS:
             continue
         if stat in c.PERCENT_STATS:
             totalRating += ratePercentStat(playerStats, averages, stat)

@@ -10,7 +10,6 @@ import library.globals as g
 SETTING_FILE = config.SETTING_FILE
 TOTAL_AVERAGES = None
 PER_GAME_AVERAGES = None
-TEAM_NUMBER = config.TEAM_NUMBER
 IGNORE_PLAYERS = config.IGNORE_PLAYERS
 
 
@@ -108,6 +107,7 @@ def googleSheetsMenu():
                 print("NO LEAGUE LOADED. Please refresh league.")
                 return
             print("Pushing Google Sheet...")
+            g.validate()
             worksheets.pushGoogleSheets()
             print("Sheet pushed.")
         elif menuEntry == 1:

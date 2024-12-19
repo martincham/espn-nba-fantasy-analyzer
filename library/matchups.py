@@ -10,11 +10,8 @@ import library.globals as g
 
 
 SCHEDULE_FILE = "2025.txt"
-ROSTER_POSITIONS = c.ROSTER_POSITIONS
 POSITION_HEIRARCHY = c.POSITION_HEIRARCHY
-TEAM_SIZE = c.TEAM_SIZE
 TIMEFRAMES = c.TIMEFRAMES
-IGNORE_STATS = c.IGNORE_STATS
 
 
 # 1. League matchup schedule
@@ -64,9 +61,9 @@ def createMatchupSchedule(league: League) -> List[List[Any]]:
             team.team_name,
         ]
     )
-    matchupSheet[0].extend(ROSTER_POSITIONS)
+    matchupSheet[0].extend(c.ROSTER_POSITIONS)
     matchupSheet[0].extend(["Opponent"])
-    matchupSheet[0].extend(ROSTER_POSITIONS)
+    matchupSheet[0].extend(c.ROSTER_POSITIONS)
 
     for index, matchup in enumerate(schedule):
         opponent = (
@@ -130,10 +127,10 @@ def teamRating(team: Team, averages: Dict[str, float]) -> List[Dict[str, Any]]:
     for player in team.roster:
         stats = player.stats
         playerSeasonRating = rating.ratePlayer(
-            stats.get(TIMEFRAMES[0]).get("avg"), averages.get("total"), IGNORE_STATS
+            stats.get(TIMEFRAMES[0]).get("avg"), averages.get("total"), c.IGNORE_STATS
         )
         player15Rating = rating.ratePlayer(
-            stats.get(TIMEFRAMES[2]).get("avg"), averages.get("15"), IGNORE_STATS
+            stats.get(TIMEFRAMES[2]).get("avg"), averages.get("15"), c.IGNORE_STATS
         )
         # making a set of datetime.dates for easier lookup
         gameDays = {game["date"].date() for game in player.schedule.values()}
@@ -158,10 +155,10 @@ def teamDayRating(
     # team ratings must be sorted descending
     # we will greedily place best players first
     dayRating = 0
-    playingToday = ROSTER_POSITIONS.copy()
+    playingToday = c.ROSTER_POSITIONS.copy()
     placed = 0
     for player in teamRatings:
-        if placed >= len(ROSTER_POSITIONS):
+        if placed >= len(c.ROSTER_POSITIONS):
             break
         if player.get("lineupSlot") == "IR" or player.get("injuryStatus") == "OUT":
             continue

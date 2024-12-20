@@ -314,7 +314,10 @@ def remainingRatePlayerList(
                 averages=averages,
                 IGNORE_STATS=IGNORE_STATS,
             )
-            adjustedRating = rating * (extraGames / avgExtraGames)
+            if avgExtraGames == 0:
+                adjustedRating = rating
+            else:
+                adjustedRating = rating * (extraGames / avgExtraGames)
             scheduleValue = adjustedRating - rating
             playerMatrix.append(adjustedRating)
             playerMatrix.append(scheduleValue)

@@ -37,7 +37,8 @@ def calculateExtraRemainingGames(
     }
     sortedRoster = sorted(ratedRoster.items(), key=lambda x: x[1], reverse=True)
     finalRoster = [player for (player, rating) in sortedRoster]
-    del finalRoster[-ignorePlayers:]  # removes last X players from list
+    if ignorePlayers > 0:
+        del finalRoster[-ignorePlayers:]  # removes last X players from list
     mySchedule = myTeamSchedule(finalRoster)
 
     teams = league.teams

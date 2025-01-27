@@ -160,7 +160,7 @@ def espnInfoMenu():
         "[1] Set SWID",  # 0 index
         "[2] Set espn_s2",  # 1 index
         "[3] Set leagueId",  # 2 index
-        "[2] Set team number",  # 3 index
+        "[4] Set team number",  # 3 index
         None,
         "[6] Back",  # 5 index
     ]

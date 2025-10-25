@@ -42,10 +42,16 @@ def averageStats(
     playerCount: int,
     totalOrAvg: str,
 ) -> Dict[str, float]:
+    if playerCount == 0:
+        playerCount = 1
     if totalOrAvg == "avg":
         divisor = totals.get("GP")
+        if divisor == 0:
+            divisor = 1
     else:
         divisor = playerCount
+        if divisor == 0:
+            divisor = 1
     for stat in totals:
         if stat in PERCENT_STATS or stat == "GP":
             statAverage = totals.get(stat) / playerCount

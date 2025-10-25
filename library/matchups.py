@@ -66,11 +66,8 @@ def createMatchupSchedule(league: League) -> List[List[Any]]:
     matchupSheet[0].extend(c.ROSTER_POSITIONS)
 
     for index, matchup in enumerate(schedule):
-        opponent = (
-            matchup.away_team
-            if matchup.home_team.team_name == team.team_name
-            else matchup.home_team
-        )
+        isHome = matchup.home_team.team_name == team.team_name
+        opponent = matchup.away_team if isHome else matchup.home_team
         opponentRatings = teamRating(team=opponent, averages=averages)
         # Loop over days in the matchup
         dateRange = scheduleDates[str(index + 1)]  # whoops i made schedule 1 starting

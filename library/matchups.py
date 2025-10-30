@@ -9,7 +9,7 @@ import library.rating as rating
 import library.globals as g
 
 
-SCHEDULE_FILE = "2025.txt"
+SCHEDULE_FILE = str(c.SEASON_ID) + ".txt"
 POSITION_HEIRARCHY = c.POSITION_HEIRARCHY
 TIMEFRAMES = c.TIMEFRAMES
 

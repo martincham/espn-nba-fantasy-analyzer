@@ -75,6 +75,8 @@ def createLeagueAverages(
 
 # returns 1 if player has stats, 0 otherwise
 def mergeStats(resultList: Dict[str, int], adderList) -> int:
+    if adderList is None:
+        return 0
     totalValues = adderList.get("total", None)
     if totalValues is None:
         return 0

@@ -12,8 +12,6 @@ Thanks to [cwendt94/espn-api](https://github.com/cwendt94/espn-api) for fetching
 
 ## Setup:
 
-### [Video with setup and explanation](https://www.youtube.com/watch?v=rRVzx607mJM)
-
 Requires pandas, gspread, gspread-formatting, espn-api, and simple-term-menu packages:
 
 ```

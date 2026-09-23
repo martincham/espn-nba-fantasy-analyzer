@@ -94,9 +94,10 @@ To start over, stop the app and delete `draftState.json`.
   - New players are priced at **Avg paid** by default. You can edit the price in the side panel or on the My Team tab.
 - **Team ratings row:** under the budget row, each league category has a column and a rating. 100 means the average team in the simulated league, and the badge shows your rank.
   - Bars point up when you beat the average team and down when you trail it. TO is inverted, so up is always better.
+  - Each category shows how far you're ahead of or behind the average team (+15, −6), your chance of winning it in a given week, and your rank. The first box counts the categories you're winning, with expected categories won per week and your chance of winning the week.
   - Whenever a change moves a rating, a small +/− chip shows by how much for a few seconds. **Open My Team** in the row's first box shows the details.
   - **Punt** checkboxes: tick one to give up that category on purpose. The Fit column then ignores it. Nothing is ever punted unless you tick it.
-- **Fit:** each player's value to *your current team*, on the same scale as Value. Categories you're already winning count less: your team's rating in a category counts in full up to 110, then less and less, and not at all past 140 (Settings → Enough in a category). Sort by Fit during the draft to find who helps you most.
+- **Fit:** each player's value to *your current team*, on the same scale as Value. It's how much he raises your weekly category win chances, so categories you're already winning count less. Steady categories (PTS, FG%, FT%) reach a sure win sooner than swingy ones (BLK, STL). Settings → Fit can switch to a simple fade instead: full weight up to 110, nothing past 140. Sort by Fit during the draft to find who helps you most.
   - **Fit edge** = Fit $ − Avg paid: the bargain *for your team*, where Edge is the bargain for anyone. **Fit $** (Fit converted to dollars) and **Fit rank** are in the player panel. ESPN's own suggested price is also in the panel now.
 - **Rearrange:** on **My Team**, drag between slots or click one slot and then another.
   - **×** removes a player and **Clear roster** empties every slot.
@@ -106,7 +107,7 @@ To start over, stop the app and delete `draftState.json`.
 - **Settings tab:**
   - **Replacement player:** the per-game rating of the free agent who fills a hurt player's games. Lower it to make health count more; 0 counts missed games as lost.
   - **Core players:** how many players per team share the money (default 7). The rest of the roster are priced at $1.
-  - **Enough in a category:** where Fit starts fading a category you're winning (110) and where more stops counting (140).
+  - **Fit:** *Win chances* (default) or *Simple fade*, with the fade's start (110) and end (140).
   - **Avg paid scale:** Auto fits ESPN's prices to your league's budget. Drag the slider to set your own multiplier.
   - **Categories in player value:** starts from `ignoredStats` in settings.txt. Team ranks always show every category.
   - **Players who count:** how many of your best players count toward team totals. Starts from `ignorePlayers`.

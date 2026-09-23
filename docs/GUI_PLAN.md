@@ -57,7 +57,7 @@ Per player (`players[].player`):
 | `POST /api/price` | `{id, price}` |
 | `POST /api/clear-roster`, `/api/reset-adjustments` | Bulk clears |
 | `POST /api/reset-draft` | Unmark every pick and empty my roster |
-| `POST /api/settings` | `{marketScale?, rated?, ignorePlayers?, replacement?, core?, fadeStart?, fadeEnd?, punt?}`. `null` goes back to the default |
+| `POST /api/settings` | `{marketScale?, rated?, ignorePlayers?, replacement?, core?, fadeStart?, fadeEnd?, punt?, fitModel?}`. `null` goes back to the default |
 | `POST /api/state` | `{state}`. Restores a previous state (Undo) |
 | `POST /api/refresh` | Re-download the pool from ESPN |
 | `GET /api/version` | Server boot ID + `gui/static` fingerprint. With `--reload`, the page polls it and reloads on change |
@@ -147,7 +147,8 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
    - After scaling, mid-tier Edge averages about +1 to +3. The top 12 average about −21, the market's star premium over a linear dollar curve.
 10. **Fit** (`valuation.team_fit`): value to my current team, on the player scale.
    - My team = my players + average players in open slots (a full roster swaps out my weakest player).
-   - Each team category rating passes through `Fade(start=110, end=140)`: full weight up to 110, weight falling linearly to 0 at 140, so the useful rating tops out at 125.
+   - Default (`fit_by_wins`): each team category rating counts as its weekly win utility, Φ((rating − 100) ÷ spread) with per-category spreads fitted on the league's 2025-26 matchups and shrunk toward 25. Below 100 it keeps its slope at 100, so weak categories are never faded.
+   - Alternative (`fit_by_fade`): `Fade(start=110, end=140)`, full weight up to 110, weight falling linearly to 0 at 140.
    - Fit = 100 + (useful total with the player − useful total with an average player) × counted ÷ categories. Punted categories (team-row checkboxes, never automatic) are left out.
    - **Fit $** converts Fit at the league's $/point (`valuation.pricing`). **Fit edge** = Fit $ − Avg paid, a board column. **Fit rank** ranks Fit among players not taken.
 11. **During the draft** other teams' picks are marked taken with no price: only that a player is gone matters. There's no inflation tracking. Your own picks keep a price (default Avg paid) for your budget.

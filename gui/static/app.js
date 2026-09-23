@@ -170,7 +170,7 @@ function renderCatRow() {
     el.style.setProperty("--cats", t.categories.length);
     el.innerHTML = `<div class="cr-head"><span class="lbl" id="crLbl">My team</span><span class="v" id="crOverall"></span>
         <span class="wl" id="crDots" aria-hidden="true">${t.categories.map((c, i) => `<i id="wl-${i}" title="${esc(c.cat)}"></i>`).join("")}</span>
-        <span class="s" id="crSub"></span>
+        <span class="s" id="crOdds"></span><span class="s" id="crSub"></span>
         <button class="linkbtn" type="button" id="crOpen">Open My Team</button></div>` +
       t.categories.map((c, i) => `<div class="cc" id="cc-${i}">
         <span class="ctop"><span class="lbl">${esc(c.cat)}</span>
@@ -188,6 +188,9 @@ function renderCatRow() {
   $("crOverall").textContent = `Winning ${wins} of ${t.categories.length}`;
   $("crOverall").title = `Better than the average team in ${wins} categories, worse in ${losses}${even ? `, even in ${even}` : ""}`;
   t.categories.forEach((c, i) => { $(`wl-${i}`).className = outcome(c.rating); $(`wl-${i}`).title = `${c.cat}: ${signed(c.rating - 100)}`; });
+  $("crOdds").innerHTML = t.matchupWin == null ? "" :
+    `<b>${t.expectedWins.toFixed(1)}</b> cats a week · wins the week <b>${Math.round(t.matchupWin * 100)}%</b>`;
+  $("crOdds").title = "Expected categories won per week, and the chance of winning 5 or more, against the average team";
   $("crSub").textContent = `vs the average team${t.filled < B.meta.rosterSize ? ` · ${B.meta.rosterSize - t.filled} empty slots at replacement` : ""}`;
   const next = {};
   t.categories.forEach((c, i) => {
@@ -205,11 +208,11 @@ function renderCatRow() {
     bar.style.height = `${Math.min(Math.abs(r - 100), 40) / 40 * 50}%`;
     // The margin over the average team is the headline; the rating and rank sit under it.
     cell.querySelector(".rv").textContent = signed(r - 100);
-    cell.querySelector(".rt").textContent = Math.round(r);
+    cell.querySelector(".rt").textContent = c.win == null ? Math.round(r) : `${Math.round(c.win * 100)}%`;
     const rk = cell.querySelector(".rk");
     rk.textContent = ord(c.rank);
     rk.className = "rk " + (c.rank <= 3 ? "top" : c.rank >= n - 2 ? "low" : "mid");
-    cell.title = `${c.cat}: ${outcome(r) === "w" ? "winning" : outcome(r) === "l" ? "losing" : "even"} by ${Math.abs(Math.round(r - 100))} vs the average team (rating ${Math.round(r)}), ${ord(c.rank)} of ${n}${c.reverse ? " (lower totals are better)" : ""}${c.punt ? ". Punted: Fit ignores it" : ""}`;
+    cell.title = `${c.cat}: ${outcome(r) === "w" ? "winning" : outcome(r) === "l" ? "losing" : "even"} by ${Math.abs(Math.round(r - 100))} vs the average team (rating ${Math.round(r)})${c.win == null ? "" : `, wins ${Math.round(c.win * 100)}% of weeks`}, ${ord(c.rank)} of ${n}${c.reverse ? " (lower totals are better)" : ""}${c.punt ? ". Punted: Fit ignores it" : ""}`;
     const prev = prevRatings && prevRatings[c.cat];
     const d = prev == null ? 0 : Math.round(r) - Math.round(prev);
     if (d) {
@@ -253,7 +256,7 @@ const COLS = [
   { key: "delta", label: "Δ", title: "Change in per-game rating points (100 = average player), e.g. +10. Spread across categories by scaling every counting stat and shot attempt." },
   { key: "projPg", label: "Per gm", title: "Projected per-game rating" },
   { key: "value", label: "Value", title: "Projected per-game rating over 82 games: Exp GP at his rating, the games he misses at the replacement rating (Settings)" },
-  { key: "fit", label: "Fit", title: "Value to your current team: categories you're already winning count less (fading from the Settings range), punted ones not at all. 100 = an average player." },
+  { key: "fit", label: "Fit", title: "Value to your current team: how much he raises your weekly category win chances. Categories you're already winning count less, punted ones not at all. 100 = an average player." },
   { key: "avg", label: "Avg paid", title: "Average price in ESPN auction drafts, scaled to this league's budget" },
   { key: "ours", label: "Ours", cls: "ours-h", title: "Our value before the draft" },
   { key: "edge", label: "Edge", cls: "ours-h", title: "Ours − Avg paid" },
@@ -475,7 +478,7 @@ function renderTeam() {
     <div class="overall">
       <div><span class="lbl">Overall</span><span class="v">${ord(t.overall)}</span><span class="s">of ${n} by roto points</span></div>
       <div><span class="lbl">Roto points</span><span class="v">${t.roto}</span><span class="s">of ${t.rotoMax} possible</span></div>
-      <div><span class="lbl">H2H cats won</span><span class="v">${t.expectedWins.toFixed(1)}–${(t.categories.length - t.expectedWins).toFixed(1)}</span><span class="s">expected per week vs. an average opponent</span></div>
+      <div><span class="lbl">H2H cats won</span><span class="v">${t.expectedWins.toFixed(1)}–${(t.categories.length - t.expectedWins).toFixed(1)}</span><span class="s">expected per week vs the average team${t.matchupWin == null ? "" : ` · wins the week ${Math.round(t.matchupWin * 100)}%`}</span></div>
     </div>
     <div class="catwrap"><table class="cattab" aria-label="Category ranks">
       <thead><tr><th class="l" scope="col">Cat</th><th class="l" scope="col">worse ← league → better</th><th scope="col">Rank</th><th scope="col">Yours</th><th scope="col">vs avg</th></tr></thead>
@@ -892,12 +895,19 @@ function renderSettings() {
       </div>
     </section>
     <section class="set">
-      <div class="set-t"><h3>Enough in a category</h3>
-        <p>In head-to-head you win a category or you don't, so strength past winning it is wasted. For the Fit column, your team's rating in a category counts in full up to the first number, less and less above it, and not at all past the second.</p></div>
+      <div class="set-t"><h3>Fit</h3>
+        <p>How the Fit column values strength in a category you're already winning. In head-to-head you win a category or you don't, so strength past a sure win is wasted. Weak categories always keep full weight: punt one with its checkbox in the team row.</p></div>
       <div class="set-c">
+        <div class="seg" role="group" aria-label="Fit model">
+          <button type="button" data-fit-model="wins" aria-pressed="${m.fitModel === "wins"}">Win chances</button>
+          <button type="button" data-fit-model="fade" aria-pressed="${m.fitModel === "fade"}">Simple fade</button></div>
+        ${m.fitModel === "wins" ? `<p class="hint">Values each player by how much he raises your chance of winning each category in a week. Steady categories reach a sure win sooner than swingy ones. Weekly spread per category, from this league's 2025-26 results:</p>
+        <p class="hint spreads">${m.categories.map((c) => `${esc(c)} <b>${m.spreads[c]}</b>`).join(" · ")}</p>
+        <p class="hint">A team at 110 wins ${winAt(110, 20)}% of weeks in a category with spread 20, and ${winAt(110, 28)}% with spread 28.</p>` : `
         <label class="inline" for="setFadeStart">Start fading at <input class="numin" type="text" inputmode="numeric" id="setFadeStart" value="${m.fade[0]}" aria-label="Start fading at"></label>
         <label class="inline" for="setFadeEnd">Worth nothing past <input class="numin" type="text" inputmode="numeric" id="setFadeEnd" value="${m.fade[1]}" aria-label="Worth nothing past"></label>
-        <p class="hint">${room.fadeStart != null || room.fadeEnd != null ? `<button class="linkbtn" type="button" id="setFadeReset">Use default (${d.fade[0]} to ${d.fade[1]})</button>` : `Default. 100 is the average team.`} Punt a category with its checkbox in the team row: Fit then ignores it.${m.punt.length ? ` Punted now: ${m.punt.map(esc).join(", ")}.` : ""}</p>
+        <p class="hint">${room.fadeStart != null || room.fadeEnd != null ? `<button class="linkbtn" type="button" id="setFadeReset">Use default (${d.fade[0]} to ${d.fade[1]})</button>` : "Default."} 100 is the average team.</p>`}
+        ${m.punt.length ? `<p class="hint">Punted now: ${m.punt.map(esc).join(", ")}.</p>` : ""}
       </div>
     </section>
     <section class="set">
@@ -943,6 +953,12 @@ function renderSettings() {
       </dl></div>
     </section>`;
 }
+// Weekly win chance (%) at a team category rating, for a given spread.
+function winAt(rating, spread) {
+  const z = (rating - 100) / spread, t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
+  const erf = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(z * z) / 2);
+  return Math.round(50 * (1 + Math.sign(z) * erf));
+}
 // A 140-rated star who plays 50 games, valued at a given replacement rating.
 function repExample(rep) {
   const g = B.meta.gamesInSeason, v = (140 * 50 + rep * (g - 50)) / g;
@@ -983,6 +999,8 @@ setEl.addEventListener("change", (e) => {
   }
 });
 setEl.addEventListener("click", (e) => {
+  const model = e.target.closest("[data-fit-model]");
+  if (model) return act("settings", { fitModel: model.dataset.fitModel });
   const id = e.target.id;
   if (id === "setScaleAuto") act("settings", { marketScale: null });
   else if (id === "setCatsReset") act("settings", { rated: null });

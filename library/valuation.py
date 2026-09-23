@@ -9,8 +9,9 @@ Stats are plain dicts keyed by ESPN stat names ("PTS", "FGA", "FG%", ...).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Callable, Dict, Iterable, List, Optional, Sequence
 
 NEGATIVE_STATS = ["TO"]
 PERCENT_MAP = {
@@ -557,6 +558,70 @@ class Fade:
         return a + x - x * x / (2 * (b - a))
 
 
+# --------------------------------------------------------------------------
+# Weekly win chances
+# --------------------------------------------------------------------------
+
+# How much a team's category rating swings from week to week, as the spread
+# (in rating points) of a normal curve: P(win a category) = Φ((rating − 100) / spread).
+# Fitted on one season of this league's head-to-head results (2025-26: 22 weeks,
+# 12 teams), then pulled halfway toward the overall fit of 25 so a single
+# season doesn't overfit. Steady categories (PTS, FG%, FT%) have small spreads:
+# a small edge wins most weeks. Swingy ones (STL, BLK, TO) have large spreads.
+OVERALL_SPREAD = 25.0
+CATEGORY_SPREAD = {
+    "PTS": 20.0, "REB": 21.0, "AST": 24.5, "STL": 29.0, "BLK": 28.0,
+    "3PM": 26.0, "TO": 27.5, "FG%": 20.0, "FT%": 20.0,
+}
+
+
+def spread(cat: str) -> float:
+    return CATEGORY_SPREAD.get(cat, OVERALL_SPREAD)
+
+
+def normal_cdf(z: float) -> float:
+    return 0.5 * (1 + math.erf(z / math.sqrt(2)))
+
+
+def win_chance(rating: float, cat: str) -> float:
+    """Chance of beating the average team in a category in a given week."""
+    return normal_cdf((rating - 100) / spread(cat))
+
+
+def win_utility(rating: float, cat: str) -> float:
+    """Win chance, except below 100 it keeps the slope it has at 100.
+
+    Above 100 extra strength fades as the category becomes a sure win. Below
+    100 it doesn't fade: a losing category is one to fix, and giving up on it
+    (punting) is always the user's choice, never automatic.
+    """
+    if rating >= 100:
+        return win_chance(rating, cat)
+    return 0.5 + (rating - 100) / (spread(cat) * math.sqrt(2 * math.pi))
+
+
+def matchup_win(chances: Sequence[float]) -> float:
+    """Chance of winning a week: more categories than the opponent.
+
+    Categories are treated as independent. With an even count, a split
+    counts as half a win.
+    """
+    dist = [1.0]
+    for p in chances:
+        nxt = [0.0] * (len(dist) + 1)
+        for k, q in enumerate(dist):
+            nxt[k] += q * (1 - p)
+            nxt[k + 1] += q * p
+        dist = nxt
+    n = len(chances)
+    return sum(q for k, q in enumerate(dist) if 2 * k > n) + sum(0.5 * q for k, q in enumerate(dist) if 2 * k == n)
+
+
+# A category's win utility is scaled back to rating points at the overall
+# spread, so Fit stays on the player scale (≈ Value on an unsaturated team).
+WIN_UTILITY_SCALE = OVERALL_SPREAD * math.sqrt(2 * math.pi)
+
+
 def team_fit(
     rows: Sequence[Valued],
     mine: Sequence[int],
@@ -564,16 +629,16 @@ def team_fit(
     sim: LeagueSim,
     baseline: Baseline,
     categories: Sequence[str],
-    fade: Fade,
+    useful: Callable[[float, str], float],
 ) -> Dict[int, float]:
     """Each player's value to my current team, on the player rating scale.
 
     My team is my players plus average players (rating 100) in the open slots.
     A player's fit compares my team with him against my team with an average
-    player in his place, category by category, counting only the useful part
-    of each team category rating (see Fade). It's scaled so that on a team
-    with nothing faded, fit ≈ the player's value. Players already on my team
-    are compared with an average player in their place.
+    player in his place, category by category, counting only the `useful`
+    part of each team category rating: a Fade, or weekly win chances (see
+    fit_by_wins). Players already on my team are compared with an average
+    player in their place.
     """
     cats = [c for c in categories if c in shape.categories]
     if not cats or not rows:
@@ -589,7 +654,7 @@ def team_fit(
     def useful_total(members) -> float:
         totals = team_totals(members, shape.counted)
         ratings = team_ratings(totals, sim.average_team, cats, shape.reverse)
-        return sum(fade.useful(ratings.get(c, 100.0)) for c in cats)
+        return sum(useful(ratings.get(c, 100.0), c) for c in cats)
 
     scale_to_player = shape.counted / len(cats)
     fits: Dict[int, float] = {}
@@ -618,3 +683,12 @@ def team_fit(
         pad = [average] * (shape.roster_size - len(my))
         fits[i] = 100 + (useful_total(others + [my[k]] + pad) - useful_total(others + [average] + pad)) * scale_to_player
     return fits
+
+
+def fit_by_fade(fade: Fade) -> Callable[[float, str], float]:
+    return lambda rating, cat: fade.useful(rating)
+
+
+def fit_by_wins(rating: float, cat: str) -> float:
+    """Useful rating = weekly win utility, in rating points at the overall spread."""
+    return win_utility(rating, cat) * WIN_UTILITY_SCALE

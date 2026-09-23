@@ -218,8 +218,24 @@ class BoardTest(unittest.TestCase):
         # With every category already "enough", nobody adds much.
         spread = lambda: (lambda f: max(f) - min(f))([r["fit"] for r in b.snapshot()["rows"]])
         normal = spread()
+        b.update_settings(fitModel="fade")
+        normal = spread()
         b.update_settings(fadeStart=80, fadeEnd=81)
         self.assertLess(spread(), normal / 2)
+
+    def test_win_chances(self):
+        b = self.board
+        snap = b.snapshot()
+        self.assertEqual(snap["meta"]["fitModel"], "wins")
+        team = snap["team"]
+        for c in team["categories"]:
+            self.assertTrue(0 <= c["win"] <= 1)
+            if abs(c["rating"] - 100) > 1:
+                self.assertEqual(c["win"] > 0.5, c["rating"] > 100)
+        self.assertAlmostEqual(team["expectedWins"], sum(c["win"] for c in team["categories"]), places=1)
+        self.assertTrue(0 <= team["matchupWin"] <= 1)
+        b.update_settings(fitModel="nonsense")
+        self.assertEqual(b.fit_model, "wins")
 
     def test_reset_draft(self):
         b, ids = self.board, self.ids

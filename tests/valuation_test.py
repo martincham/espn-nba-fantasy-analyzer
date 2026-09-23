@@ -131,6 +131,22 @@ class DraftValueTest(unittest.TestCase):
         s = v.scale_for_rating(line(), avg, CATS, 300)
         self.assertAlmostEqual(v.rate(v.scale(line(), s), avg, CATS), 300, places=3)
 
+    def test_win_chances(self):
+        self.assertAlmostEqual(v.win_chance(100, "PTS"), 0.5)
+        self.assertGreater(v.win_chance(110, "PTS"), v.win_chance(110, "BLK"))  # PTS is steadier
+        self.assertAlmostEqual(v.win_chance(120, "XYZ"), v.normal_cdf(20 / v.OVERALL_SPREAD))
+        # Above 100 strength fades; below 100 it keeps full weight (no automatic punting).
+        slope = lambda r: v.win_utility(r + 1, "PTS") - v.win_utility(r, "PTS")
+        self.assertLess(slope(140), slope(100) / 4)
+        self.assertAlmostEqual(slope(60), slope(99), places=6)
+
+    def test_matchup_win(self):
+        self.assertAlmostEqual(v.matchup_win([0.5] * 9), 0.5)
+        self.assertAlmostEqual(v.matchup_win([1.0] * 5 + [0.0] * 4), 1.0)
+        self.assertAlmostEqual(v.matchup_win([1.0] * 4 + [0.0] * 5), 0.0)
+        self.assertAlmostEqual(v.matchup_win([0.5, 0.5]), 0.5)  # a 1-1 split counts half
+        self.assertGreater(v.matchup_win([0.6] * 9), 0.6)  # small edges add up over 9 categories
+
     def test_fade(self):
         fade = v.Fade(110, 140)
         self.assertEqual(fade.useful(90), 90)

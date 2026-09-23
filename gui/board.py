@@ -36,8 +36,9 @@ DEFAULT_CORE = 7  # players per team worth paying for; the rest are $1 streamers
 DEFAULT_FADE = (110, 140)  # team category rating where extra strength starts to stop helping, and stops
 DEFAULT_ROOM_SETTINGS = {
     "marketScale": None, "rated": None, "ignorePlayers": None, "replacement": None, "core": None,
-    "fadeStart": None, "fadeEnd": None, "punt": [],
+    "fadeStart": None, "fadeEnd": None, "punt": [], "fitModel": None,
 }
+FIT_MODELS = ("wins", "fade")  # weekly win chances (default), or the simple 110-140 fade
 
 
 def load_settings(path: str) -> Dict[str, Any]:
@@ -78,6 +79,7 @@ class DraftBoard:
         self.auto_market_scale = 1.0
         self.fade = valuation.Fade(*DEFAULT_FADE)
         self.punt: List[str] = []
+        self.fit_model = FIT_MODELS[0]
         self.default_rated: List[str] = []
         self.default_ignore = 0
         self.state = self._empty_state()
@@ -155,6 +157,7 @@ class DraftBoard:
         end = room["fadeEnd"] if room["fadeEnd"] is not None else DEFAULT_FADE[1]
         self.fade = valuation.Fade(start=start, end=max(end, start + 1))
         self.punt = list(room["punt"])
+        self.fit_model = room["fitModel"] or FIT_MODELS[0]
         # The pool and its averages depend on which categories are rated.
         history = [p for p in self.players if not p.base_is_projection]
         self.baseline = valuation.compute_baseline(history, self.shape)
@@ -226,6 +229,8 @@ class DraftBoard:
                 room["fadeStart"] = max(80, min(200, int(round(float(saved["fadeStart"])))))
             if saved.get("fadeEnd") is not None:
                 room["fadeEnd"] = max(80, min(300, int(round(float(saved["fadeEnd"])))))
+            if saved.get("fitModel") in FIT_MODELS:
+                room["fitModel"] = saved["fitModel"]
             # Punting is always your choice: only categories you tick are punted.
             room["punt"] = [c for c in cats if c in set(saved.get("punt") or [])]
         except (TypeError, ValueError):
@@ -402,7 +407,8 @@ class DraftBoard:
         taken = [pid for pid, v in picks.items() if v["status"] == TAKEN]
         sim = valuation.simulate_league(rows, mine, taken, shape)
         fit_cats = self.fit_categories()
-        fits = valuation.team_fit(rows, mine, shape, sim, base, fit_cats, self.fade)
+        useful = valuation.fit_by_wins if self.fit_model == "wins" else valuation.fit_by_fade(self.fade)
+        fits = valuation.team_fit(rows, mine, shape, sim, base, fit_cats, useful)
         rate = valuation.pricing(rows, shape)
         # Fit rank among players I can still get (and my own).
         fit_order = sorted((pid for pid in fits if picks.get(pid, {}).get("status") != TAKEN), key=lambda pid: -fits[pid])
@@ -493,6 +499,8 @@ class DraftBoard:
             "autoMarketScale": round(self.auto_market_scale, 3),
             "pricedSize": shape.priced_size,
             "fade": [self.fade.start, self.fade.end],
+            "fitModel": self.fit_model,
+            "spreads": {c: valuation.spread(c) for c in shape.categories},
             "punt": self.punt,
             "fitCategories": self.fit_categories(),
             "replacement": shape.replacement,
@@ -554,6 +562,8 @@ class DraftBoard:
         cats = self.shape.categories
         n = len(sim.teams)
         averages = {c: sum(t[c] for t in sim.teams) / n for c in cats}
+        # Chance of beating the average team in each category in a given week.
+        chances = {c: valuation.win_chance(sim.ratings.get(c, 100.0), c) for c in cats}
         order = sorted(cats, key=lambda c: sim.ranks[c])
         strong = [c for c in order if sim.ranks[c] <= 4]
         weak = [c for c in reversed(order) if sim.ranks[c] >= n - 3 and c not in self.punt]
@@ -583,6 +593,7 @@ class DraftBoard:
                     "teams": [t[c] for t in sim.teams],
                     "reverse": c in self.shape.reverse,
                     "punt": c in self.punt,
+                    "win": round(chances[c], 3),
                     "inFit": c in self.fit_categories(),
                 }
                 for c in cats
@@ -590,7 +601,8 @@ class DraftBoard:
             "roto": sim.roto,
             "rotoMax": len(cats) * n,
             "overall": sim.overall,
-            "expectedWins": round(sim.expected_wins, 1),
+            "expectedWins": round(sum(chances.values()), 2),
+            "matchupWin": round(valuation.matchup_win(list(chances.values())), 3),
             "filled": sim.filled,
             "strong": strong,
             "weak": weak,

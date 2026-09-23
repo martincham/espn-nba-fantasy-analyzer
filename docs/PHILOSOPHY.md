@@ -86,17 +86,61 @@ In head-to-head you don't win on total rating. You win **categories**: each week
 
 A player's rating adds up all his categories, so it can't see this. A player who's great in blocks is worth a lot to a team that needs blocks and very little to a team that already has them.
 
+### How often a category wins
+
+The league's own 2025-26 results say how often a team category rating wins its category in a given week. They cover 22 weeks and 12 teams, about 2,300 category results.
+
+| Team rating in a category | Wins that category |
+|---|---|
+| 80 | about 21% of weeks |
+| 90 | 34% |
+| 100 | 50% |
+| 110 | 66% |
+| 120 | 79% |
+| 130 | 88% |
+
+**The curve is a smooth fit to the data, not the raw counts,** so one season doesn't overfit. It's a normal curve: chance = Φ((rating − 100) ÷ spread), with a spread of about 25 rating points.
+
+**Categories differ in how reliable an edge is.** The spread is how much a category swings from week to week:
+
+| Category | Spread | Character |
+|---|---|---|
+| PTS, FG%, FT% | 20 | Steady: a small edge wins most weeks |
+| REB | 21 | |
+| AST | 24.5 | |
+| 3PM | 26 | |
+| TO | 27.5 | |
+| BLK | 28 | Swingy: one big game flips the week |
+| STL | 29 | |
+
+These are last season's fitted spreads pulled halfway toward the overall 25, again so one season doesn't overfit.
+
+**What this means:**
+- A rating point is worth more in steady categories than in swingy ones.
+- The player rating counts every category the same, so it overrates swingy ones. That's part of why an extreme shot-blocker rates so high.
+
+**In the app:**
+- **Team row:** each category shows your win chance. The first box shows expected categories won per week, and the chance of winning the week: taking 5 or more of the 9, treating categories as independent.
+- **All of these are against the average team.** Real draft-day projections are less certain than last season's final numbers, so true win rates sit a bit closer to 50%.
+
 ### Fit: value to the team you have
 
 The **Fit** column rates each player by how much he'd help *your current team*. It's on the same scale as Value.
 
 - **Your team:** your players, plus average players in the open slots. Early in the draft your team sits near 100 everywhere, and Fit is close to Value.
-- **Fading:** each of your team's category ratings counts in full up to **110**. Above that, each point counts less, falling in a straight line to nothing at **140**. Past 140 more is useless. Both numbers are on the Settings tab ("Enough in a category").
-- **A player's Fit** is how much your team's faded category total goes up with him instead of an average player.
+- **Win chances (the default):** a player's Fit is how much he raises your weekly win chances across the categories, compared with an average player in his place.
+  - Strength fades on its own as a category nears a sure win.
+  - It fades faster in steady categories (PTS, FG%, FT%) than in swingy ones (BLK, STL).
+  - Fit is converted back to rating points, so it stays on the Value scale.
+- **Simple fade (the alternative on the Settings tab):**
+  - Each of your team's category ratings counts in full up to **110**.
+  - Above that, each point counts less, falling in a straight line to nothing at **140**.
 - **It works in both directions.** After drafting Wembanyama, Kessler and Sarr, your blocks are well past enough:
   - More big men like Mobley or Holmgren drop to about 99 Fit, no better than an average player.
   - Guards who fill your weak categories rise above their Value.
 - **Weak categories are never faded down on their own.** Only strength is faded.
+  - Below 100, a category keeps the value per point it has at 100.
+  - The raw win-chance curve would flatten for very weak categories, which amounts to punting them automatically. Punting is your choice.
 
 **Ours and Edge don't change with your team.** They price players against the market, and the room doesn't care what you've drafted. Fit is for choosing between players during the draft. **Fit $** converts Fit to dollars at the league's rate: roughly what that player is worth *to you*. **Fit edge = Fit $ − Avg paid**, the bargain for your team, where Edge is the bargain for anyone. Fit edge usually runs below Edge, because fading only ever takes value away.
 

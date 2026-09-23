@@ -5,7 +5,10 @@
 
 :root {
   /* Neutrals: concrete, a trace of warmth. Dark theme is warm charcoal, never blue-tinted. */
-  --ground: #F3F2F0;
+  /* Page ground: pastel Wilson Jet leather. Pebble grain is a greyscale tile soft-lit onto --ground. */
+  --ground: #F2B98C;
+  --pebble: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='p' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeDiffuseLighting surfaceScale='2.2' lighting-color='%23fff'%3E%3CfeDistantLight azimuth='225' elevation='52'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23p)'/%3E%3C/svg%3E");
+  --seams: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' preserveAspectRatio='xMidYMid slice'%3E%3Cg fill='none' stroke='%232A1810' stroke-opacity='.5' stroke-width='14' stroke-linecap='round'%3E%3Cpath d='M230 -60C560 260 560 740 230 1060'/%3E%3Cpath d='M1370 -60C1040 260 1040 740 1370 1060'/%3E%3Cpath d='M-60 560C500 610 1100 610 1660 560'/%3E%3Cpath d='M800 -60V1060'/%3E%3C/g%3E%3C/svg%3E");
   --surface: #FFFFFF;
   --sunk: #F8F7F5;
   --ink: #1D1B19;
@@ -67,7 +70,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --ground: #151311; --surface: #1E1B18; --sunk: #191714;
+    --ground: #5C2D14; --seams: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' preserveAspectRatio='xMidYMid slice'%3E%3Cg fill='none' stroke='%23080504' stroke-opacity='.7' stroke-width='14' stroke-linecap='round'%3E%3Cpath d='M230 -60C560 260 560 740 230 1060'/%3E%3Cpath d='M1370 -60C1040 260 1040 740 1370 1060'/%3E%3Cpath d='M-60 560C500 610 1100 610 1660 560'/%3E%3Cpath d='M800 -60V1060'/%3E%3C/g%3E%3C/svg%3E"); --surface: #1E1B18; --sunk: #191714;
     --ink: #F2EEE9; --ink-2: #D2CBC3; --muted: #A69D94; --faint: #756D65;
     --line: #322E2A; --line-strong: #47413B;
     --accent: #FF7A33; --accent-text: #FF8D4D; --accent-ink: #1A0D05; --accent-soft: #3A2114; --accent-line: #7A3E1C;
@@ -80,7 +83,7 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ground: #151311; --surface: #1E1B18; --sunk: #191714;
+  --ground: #5C2D14; --seams: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' preserveAspectRatio='xMidYMid slice'%3E%3Cg fill='none' stroke='%23080504' stroke-opacity='.7' stroke-width='14' stroke-linecap='round'%3E%3Cpath d='M230 -60C560 260 560 740 230 1060'/%3E%3Cpath d='M1370 -60C1040 260 1040 740 1370 1060'/%3E%3Cpath d='M-60 560C500 610 1100 610 1660 560'/%3E%3Cpath d='M800 -60V1060'/%3E%3C/g%3E%3C/svg%3E"); --surface: #1E1B18; --sunk: #191714;
   --ink: #F2EEE9; --ink-2: #D2CBC3; --muted: #A69D94; --faint: #756D65;
   --line: #322E2A; --line-strong: #47413B;
   --accent: #FF7A33; --accent-text: #FF8D4D; --accent-ink: #1A0D05; --accent-soft: #3A2114; --accent-line: #7A3E1C;

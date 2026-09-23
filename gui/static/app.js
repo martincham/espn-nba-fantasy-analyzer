@@ -168,17 +168,27 @@ function renderCatRow() {
   if (key !== catRowKey) {
     catRowKey = key; prevRatings = null;
     el.style.setProperty("--cats", t.categories.length);
-    el.innerHTML = `<div class="cr-head"><span class="lbl">My team</span><span class="v" id="crOverall"></span><span class="s" id="crSub"></span>
+    el.innerHTML = `<div class="cr-head"><span class="lbl" id="crLbl">My team</span><span class="v" id="crOverall"></span>
+        <span class="wl" id="crDots" aria-hidden="true">${t.categories.map((c, i) => `<i id="wl-${i}" title="${esc(c.cat)}"></i>`).join("")}</span>
+        <span class="s" id="crSub"></span>
         <button class="linkbtn" type="button" id="crOpen">Open My Team</button></div>` +
       t.categories.map((c, i) => `<div class="cc" id="cc-${i}">
         <span class="ctop"><span class="lbl">${esc(c.cat)}</span>
           <label class="punt" for="punt-${i}" title="Punt ${esc(c.cat)}: stop valuing it in Fit"><input type="checkbox" id="punt-${i}" data-punt="${esc(c.cat)}">Punt</label></span>
         <span class="col"><i></i></span>
-        <span class="nums"><span class="rv"></span><span class="rk"></span></span>
+        <span class="nums"><span class="rv"></span><span class="meta"><span class="rt"></span><span class="rk"></span></span></span>
         <span class="dchip"></span></div>`).join("");
   }
-  $("crOverall").textContent = `${ord(t.overall)} of ${n}`;
-  $("crSub").textContent = `100 = average team${t.filled < B.meta.rosterSize ? ` · ${B.meta.rosterSize - t.filled} empty slots at replacement` : ""}`;
+  // Winning a category = better than the average team in it (within half a point is even).
+  const outcome = (r) => (r >= 100.5 ? "w" : r <= 99.5 ? "l" : "e");
+  const wins = t.categories.filter((c) => outcome(c.rating) === "w").length;
+  const losses = t.categories.filter((c) => outcome(c.rating) === "l").length;
+  const even = t.categories.length - wins - losses;
+  $("crLbl").textContent = `My team · ${ord(t.overall)} of ${n}`;
+  $("crOverall").textContent = `Winning ${wins} of ${t.categories.length}`;
+  $("crOverall").title = `Better than the average team in ${wins} categories, worse in ${losses}${even ? `, even in ${even}` : ""}`;
+  t.categories.forEach((c, i) => { $(`wl-${i}`).className = outcome(c.rating); $(`wl-${i}`).title = `${c.cat}: ${signed(c.rating - 100)}`; });
+  $("crSub").textContent = `vs the average team${t.filled < B.meta.rosterSize ? ` · ${B.meta.rosterSize - t.filled} empty slots at replacement` : ""}`;
   const next = {};
   t.categories.forEach((c, i) => {
     const cell = $(`cc-${i}`), r = c.rating;
@@ -193,11 +203,13 @@ function renderCatRow() {
     cell.style.setProperty("--up", Math.min(Math.max((r - 100) / 20, 0), 1).toFixed(3));
     cell.style.setProperty("--down", Math.min(Math.max((100 - r) / 20, 0), 1).toFixed(3));
     bar.style.height = `${Math.min(Math.abs(r - 100), 40) / 40 * 50}%`;
-    cell.querySelector(".rv").textContent = Math.round(r);
+    // The margin over the average team is the headline; the rating and rank sit under it.
+    cell.querySelector(".rv").textContent = signed(r - 100);
+    cell.querySelector(".rt").textContent = Math.round(r);
     const rk = cell.querySelector(".rk");
     rk.textContent = ord(c.rank);
     rk.className = "rk " + (c.rank <= 3 ? "top" : c.rank >= n - 2 ? "low" : "mid");
-    cell.title = `${c.cat}: rating ${Math.round(r)}, ${ord(c.rank)} of ${n}${c.reverse ? " (lower totals are better)" : ""}${c.punt ? ". Punted: Fit ignores it" : ""}`;
+    cell.title = `${c.cat}: ${outcome(r) === "w" ? "winning" : outcome(r) === "l" ? "losing" : "even"} by ${Math.abs(Math.round(r - 100))} vs the average team (rating ${Math.round(r)}), ${ord(c.rank)} of ${n}${c.reverse ? " (lower totals are better)" : ""}${c.punt ? ". Punted: Fit ignores it" : ""}`;
     const prev = prevRatings && prevRatings[c.cat];
     const d = prev == null ? 0 : Math.round(r) - Math.round(prev);
     if (d) {

@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Dict, List
 from espn_api.basketball import League, Team, Player
 import library.config as c
+import library.valuation as valuation
 
 
 # Extra games is the number of games a team will play on days where you have space for an extra game.
@@ -110,51 +111,15 @@ def myTeamSchedule(playerList: List[Player]) -> Dict[date, int]:
     return teamSchedule
 
 
-# Duplicate rating code from rating.py. Needed here to sort players on the rosters by value, and to avoid circular imports.
+# Rating math lives in valuation.py (no imports of rating/globals, so no circular import).
 # Least X valued players can be dropped. X = "ignoredPlayers" in settings.txt
 
 
 def ratePercentStat(
     playerStats: Dict[str, float], averages: Dict[str, float], stat: str
 ) -> float:
-    rawStats = c.PERCENT_MAP.get(stat, None)
-    if rawStats is None:
-        return 0
-    attempts = playerStats.get(rawStats[1])
-    avgAttempts = averages.get(rawStats[1])
-    avgMakes = averages.get(rawStats[0])
-    percent = playerStats.get(stat)
-    # Percent diff will be > 1 if better than average, < 1 if worse
-    avgPercent = avgMakes / avgAttempts
-    percentDiff = percent / avgPercent
-    # Differential gets taken to the power of attempts over/under average
-    # E.G. League average % on any attempts will still be rated 100.
-    # And +5% percent on 10 attempts is better than +20% on 1 attempt.
-    attemptDiff = attempts / avgAttempts
-    # Adjust weighting ratio to get normal ranges from 0 to 200
-    weightingRatio = 2
-    statRating = pow(percentDiff, attemptDiff * weightingRatio)
-    return statRating
+    return valuation.rate_percent_stat(playerStats, averages, stat)
 
 
 def ratePlayer(playerStats: Dict[str, float], averages: Dict[str, float]) -> float:
-    totalRating = 0
-    statCount = 0
-    if playerStats is None:
-        return 0
-    for stat in averages:
-        if stat in c.IGNORE_STATS:
-            continue
-        if stat in c.PERCENT_STATS:
-            totalRating += ratePercentStat(playerStats, averages, stat)
-            statCount += 1
-        else:
-            playerStat = playerStats.get(stat)
-            averageStat = averages.get(stat)
-            statRating = playerStat / averageStat
-            if statRating != 0 and stat in c.NEGATIVE_STATS:
-                statRating = 2 - statRating
-            totalRating += statRating
-            statCount += 1
-    totalRating = (totalRating / statCount) * 100
-    return totalRating
+    return valuation.rate_player(playerStats, averages, c.IGNORE_STATS)

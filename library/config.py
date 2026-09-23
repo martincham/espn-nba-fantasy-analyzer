@@ -1,4 +1,5 @@
 import json
+from library.valuation import NEGATIVE_STATS, PERCENT_MAP, PERCENT_STATS  # noqa: F401 (re-exported)
 
 # config.py handles loading and intializing settings.txt.
 # Some settings can be changed within the program and reloaded with init(), so globals should be referenced from here.
@@ -6,20 +7,10 @@ import json
 ###################
 # Not Adjustable
 POSITION_HEIRARCHY = ["SG/SF", "SG/SF", "SG/SF", "PG", "F", "PF/C", "UT"]
-NEGATIVE_STATS = ["TO"]
 INJURY_MAP = {
     "ACTIVE": "H",
     "OUT": "OUT",
     "DAY_TO_DAY": "D2D",
-}
-PERCENT_MAP = {
-    "FG%": ["FGM", "FGA"],
-    "AFG%": ["FGM", "FGA"],
-    "FT%": ["FTM", "FTA"],
-    "3P%": ["3PM", "3PA"],
-    "A/TO": ["AST", "TO"],
-    "STR": ["STL", "TO"],
-    "FTR": ["FTA", "FGA"],
 }
 VALID_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 VALID_CATEGORIES = [
@@ -70,7 +61,6 @@ VALID_CATEGORIES = [
     "FTR",
 ]
 TIMEFRAMES = ["_total", "_last_30", "_last_15", "_last_7"]  # suffixes
-PERCENT_STATS = ["FG%", "AFG%", "FT%", "3P%", "A/TO", "STR", "FTR"]
 
 ####################
 # Perhaps Adjustable

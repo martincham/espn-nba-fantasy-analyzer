@@ -43,7 +43,8 @@ Per player (`players[].player`):
 - FastAPI was planned but not needed. The API is a handful of JSON endpoints, and `http.server` avoids a `pip install` for anyone running the tool.
 - **All math runs on the server** (`gui/board.py` → `library/valuation.py`). The browser only renders, so there's one implementation of the model and it's tested in Python.
   - A full recalculation takes about 15 ms. Slider drags send at most one request at a time.
-- Run with `python3 -m gui` (options: `--port`, `--settings`, `--refresh`, `--no-browser`). It listens on `127.0.0.1` only.
+- Run with `python3 -m gui` (options: `--port`, `--settings`, `--refresh`, `--no-browser`, `--reload`). It listens on `127.0.0.1` only.
+- `--reload` (`gui/reloader.py`) runs the server as a child process and restarts it when a `.py` file under `gui/` or `library/` changes. The page reloads itself on a restart or a static-file edit.
 
 ### API
 
@@ -58,6 +59,7 @@ Per player (`players[].player`):
 | `POST /api/clear-roster`, `/api/reset-adjustments` | Bulk clears |
 | `POST /api/state` | `{state}`. Restores a previous state (Undo) |
 | `POST /api/refresh` | Re-download the pool from ESPN |
+| `GET /api/version` | Server boot ID + `gui/static` fingerprint. With `--reload`, the page polls it and reloads on change |
 
 Every POST returns `{board, error}`. Errors are user-facing sentences, e.g. "Cooper Flagg can't play C."
 

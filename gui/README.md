@@ -65,6 +65,7 @@ Your browser opens to the app. Press **Ctrl+C** in the terminal to stop it.
 | `--settings path/to/settings.txt` | Read settings from somewhere else |
 | `--refresh` | Download a fresh player pool from ESPN before starting |
 | `--no-browser` | Don't open a browser tab |
+| `--reload` | For development: restart the server when a `.py` file in `gui/` or `library/` changes, and refresh the open page after a restart or an edit in `gui/static/` |
 
 ## Your data
 
@@ -129,6 +130,10 @@ ESPN averages prices across leagues of every size, so for the top players it add
   - `gui/static/` is the frontend, with no build step.
   - The math lives in `library/valuation.py` and `library/roster.py`, and ESPN access in `library/draft.py`.
   - The design and model are described in [`docs/GUI_PLAN.md`](../docs/GUI_PLAN.md), and colors and type in `gui/static/tokens.css` ([style reference](../docs/style-reference.html)).
+- **Live editing:** run `python3 -m gui --reload`.
+  - Saving a Python file restarts the server, and the page refreshes itself. Your data is kept, because it lives in `draftState.json`.
+  - If a change breaks the server (e.g. a syntax error), the terminal shows the error and restarts when you save a fix.
+  - Without `--reload`, CSS, JS and HTML edits only need a browser refresh, and Python edits need a restart.
 - **Tests:** these run offline against a saved ESPN fixture.
 
   ```

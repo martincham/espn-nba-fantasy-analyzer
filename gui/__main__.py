@@ -18,6 +18,7 @@ except ModuleNotFoundError:
     )
 
 from library import draft  # noqa: E402
+from gui import reloader  # noqa: E402
 from gui.board import DraftBoard  # noqa: E402
 from gui.server import serve  # noqa: E402
 
@@ -30,7 +31,14 @@ def main() -> int:
     parser.add_argument("--settings", default=os.path.join(ROOT, "settings.txt"), help="path to settings.txt")
     parser.add_argument("--refresh", action="store_true", help="re-download the player pool from ESPN")
     parser.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
+    parser.add_argument("--reload", action="store_true", help="restart when Python files change and refresh the page (for development)")
     args = parser.parse_args()
+
+    if args.reload and not reloader.is_child():
+        child_args = ["--port", str(args.port), "--settings", args.settings, "--no-browser", "--reload"]
+        if args.refresh:
+            child_args.append("--refresh")
+        return reloader.supervise(ROOT, child_args, f"http://127.0.0.1:{args.port}", not args.no_browser)
 
     board = DraftBoard(
         settings_path=args.settings,
@@ -47,7 +55,7 @@ def main() -> int:
         print(f"Note: {warning}", flush=True)
 
     try:
-        server = serve(board, port=args.port)
+        server = serve(board, port=args.port, reload=args.reload)
     except OSError as ex:
         print(f"Couldn't start on port {args.port}: {ex.strerror}. Try --port {args.port + 1}.", file=sys.stderr)
         return 1

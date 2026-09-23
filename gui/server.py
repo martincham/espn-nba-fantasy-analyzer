@@ -3,6 +3,7 @@
 GET  /                 the app
 GET  /static/<file>    CSS / JS
 GET  /api/board        full snapshot
+GET  /api/version      restart/static-file fingerprint (auto-reload)
 POST /api/<action>     apply an edit, then return {"board": snapshot, "error": msg|null}
 """
 
@@ -12,6 +13,7 @@ import json
 import mimetypes
 import os
 import socketserver
+import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Dict, Optional
@@ -23,6 +25,19 @@ from gui.board import DraftBoard
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_ROOT = os.path.realpath(STATIC_DIR)
 MAX_BODY = 1_000_000
+BOOT_ID = f"{os.getpid()}-{time.time():.0f}"  # changes on every (re)start
+
+
+def static_fingerprint() -> int:
+    """Newest modification time in gui/static, so edits there trigger a page reload."""
+    newest = 0
+    for folder, _, files in os.walk(STATIC_ROOT):
+        for name in files:
+            try:
+                newest = max(newest, os.stat(os.path.join(folder, name)).st_mtime_ns)
+            except OSError:
+                pass
+    return newest
 
 
 def _actions(board: DraftBoard) -> Dict[str, Callable[[Dict[str, Any]], Optional[str]]]:
@@ -45,7 +60,7 @@ def _actions(board: DraftBoard) -> Dict[str, Callable[[Dict[str, Any]], Optional
     }
 
 
-def make_handler(board: DraftBoard):
+def make_handler(board: DraftBoard, reload: bool = False):
     actions = _actions(board)
 
     class Handler(BaseHTTPRequestHandler):
@@ -69,6 +84,8 @@ def make_handler(board: DraftBoard):
             path = urlparse(self.path).path
             if path == "/api/board":
                 return self._json(200, board.snapshot())
+            if path == "/api/version":
+                return self._json(200, {"reload": reload, "boot": BOOT_ID, "static": static_fingerprint() if reload else 0})
             if path in ("/", "/index.html"):
                 path = "/static/index.html"
             if path.startswith("/static/"):
@@ -117,5 +134,5 @@ class DraftServer(ThreadingHTTPServer):
         self.server_name, self.server_port = self.server_address[:2]
 
 
-def serve(board: DraftBoard, host: str = "127.0.0.1", port: int = 8000) -> DraftServer:
-    return DraftServer((host, port), make_handler(board))
+def serve(board: DraftBoard, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> DraftServer:
+    return DraftServer((host, port), make_handler(board, reload))

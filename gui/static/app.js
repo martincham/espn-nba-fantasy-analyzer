@@ -771,6 +771,18 @@ let savedTheme = "system";
 try { savedTheme = localStorage.getItem("draftroom-theme") || "system"; } catch (e) { /* storage blocked */ }
 setTheme(savedTheme);
 
+// With `python3 -m gui --reload`, reload the page after a server restart or a static-file edit.
+async function watchForReload() {
+  const version = async () => { try { return await (await fetch("/api/version", { cache: "no-store" })).json(); } catch (e) { return null; } };
+  const first = await version();
+  if (!first || !first.reload) return;
+  setInterval(async () => {
+    const now = await version(); // null while the server restarts: keep waiting
+    if (now && (now.boot !== first.boot || now.static !== first.static)) location.reload();
+  }, 1000);
+}
+watchForReload();
+
 if (location.hash === "#team") setView("team");
 (async () => {
   const b = await api("/api/board");

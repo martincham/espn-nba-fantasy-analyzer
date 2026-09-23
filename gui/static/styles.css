@@ -65,10 +65,11 @@ p{margin:0}
 .cc.punted .lbl{text-decoration:line-through}
 .col{position:relative;width:18px;height:50px;background:var(--sunk);border:1px solid var(--line);border-radius:3px;overflow:hidden;grid-row:2}
 .col::after{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--line-strong)}
-.col i{position:absolute;left:0;right:0;bottom:50%;height:0;background:var(--accent);transition:height .35s var(--ease)}
-.col i.below{bottom:auto;top:50%;background:var(--bad)}
+/* --up / --down (0 to 1, set per category) fade from neutral at 100 to green at 120 or red at 80 */
+.col i{position:absolute;left:0;right:0;bottom:50%;height:0;background:color-mix(in srgb,var(--good) calc(var(--up,0) * 100%),var(--line-strong));transition:height .35s var(--ease),background-color .35s var(--ease)}
+.col i.below{bottom:auto;top:50%;background:color-mix(in srgb,var(--bad) calc(var(--down,0) * 100%),var(--line-strong))}
 .cc .nums{display:flex;flex-direction:column;align-items:flex-start;gap:1px;grid-row:2;min-width:0}
-.cc .rv{font-family:var(--font-data);font-size:17px;font-weight:500;line-height:1}
+.cc .rv{font-family:var(--font-data);font-size:17px;font-weight:500;line-height:1;color:color-mix(in srgb,var(--good) calc(var(--up,0) * 100%),color-mix(in srgb,var(--bad) calc(var(--down,0) * 100%),var(--ink)));transition:color .35s var(--ease)}
 .cc .rk{font-family:var(--font-data);font-size:10.5px;padding:0 4px;border-radius:3px;line-height:15px}
 .cc .rk.top{background:var(--good-soft);color:var(--good)}
 .cc .rk.mid{color:var(--muted)}

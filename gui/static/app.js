@@ -189,6 +189,9 @@ function renderCatRow() {
     const bar = cell.querySelector(".col i");
     // Diverging from the 100 midline: up = better than the average team, down = worse. ±40 fills a half.
     bar.classList.toggle("below", r < 100);
+    // Color strength: neutral at 100, full green by 120, full red by 80.
+    cell.style.setProperty("--up", Math.min(Math.max((r - 100) / 20, 0), 1).toFixed(3));
+    cell.style.setProperty("--down", Math.min(Math.max((100 - r) / 20, 0), 1).toFixed(3));
     bar.style.height = `${Math.min(Math.abs(r - 100), 40) / 40 * 50}%`;
     cell.querySelector(".rv").textContent = Math.round(r);
     const rk = cell.querySelector(".rk");

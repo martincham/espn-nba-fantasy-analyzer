@@ -31,15 +31,16 @@
   <div class="scoreline" aria-live="polite">
     <div class="score"><span class="lbl">Budget left</span><span class="val" id="sBudget">—</span><span class="sub" id="sMax"></span></div>
     <div class="score"><span class="lbl">My roster</span><span class="val" id="sRoster">—</span><span class="sub" id="sRosterSub"></span></div>
-    <div class="score"><span class="lbl">Inflation</span><span class="val" id="sInfl">—</span><span class="sub" id="sInflSub"></span></div>
+    <div class="score"><span class="lbl">Pool left</span><span class="val" id="sPool">—</span><span class="sub" id="sPoolSub"></span></div>
     <div class="score"><span class="lbl">Best edge left</span><span class="val" id="sEdge">—</span><span class="sub" id="sEdgeSub"></span></div>
   </div>
 
-  <div class="catrow" id="catrow" role="button" tabindex="0" title="Open My Team" aria-label="Team category ratings. Open My Team for details."></div>
+  <div class="catrow" id="catrow" role="group" aria-label="Team category ratings"></div>
 
   <div class="tabs" role="tablist" aria-label="Views">
     <button class="tab" role="tab" id="tab-board" aria-selected="true" aria-controls="view-board" type="button">Board</button>
     <button class="tab" role="tab" id="tab-team" aria-selected="false" aria-controls="view-team" type="button">My Team<span class="count" id="teamCount"></span></button>
+    <button class="tab" role="tab" id="tab-settings" aria-selected="false" aria-controls="view-settings" type="button">Settings</button>
   </div>
 
   <div id="view-board" role="tabpanel" aria-labelledby="tab-board">
@@ -51,9 +52,6 @@
       <div class="chips" role="group" aria-label="Filter by position" id="chips"></div>
       <label class="check" for="hideGone"><input type="checkbox" id="hideGone"> Hide drafted</label>
       <label class="check" for="onlyAdj"><input type="checkbox" id="onlyAdj"> Only adjusted</label>
-      <label class="slider" for="weight" title="How value blends per-game quality with full-season production (which counts games played)">Value weighs
-        <input type="range" id="weight" min="0" max="100" step="5" value="50">
-        <output id="wOut" for="weight"></output></label>
       <div class="teams" role="radiogroup" aria-label="Filter by NBA team" id="teams"></div>
     </div>
     <div class="strip" id="strip" aria-label="My roster slots. Drag players here."></div>
@@ -73,6 +71,10 @@
       <div class="slots" id="slots"></div>
       <div class="ranks" id="ranks"></div>
     </div>
+  </div>
+
+  <div id="view-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+    <div class="settings" id="settingsPanel"></div>
   </div>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>

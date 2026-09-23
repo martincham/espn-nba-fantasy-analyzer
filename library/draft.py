@@ -200,10 +200,8 @@ class DraftPlayer:
 
     @property
     def default_exp_gp(self) -> int:
-        """Two-thirds ESPN's projected games, one-third last season's."""
-        if self.last_gp > 0 and self.proj_gp > 0:
-            return min(MAX_GP, round((self.last_gp + 2 * self.proj_gp) / 3))
-        return min(MAX_GP, self.last_gp or self.proj_gp)
+        """ESPN's projected games, or last season's when ESPN has no projection."""
+        return min(MAX_GP, self.proj_gp or self.last_gp)
 
 
 def _stat_dict(raw: dict) -> Dict[str, float]:

@@ -7,7 +7,7 @@ Branch: `gui` · Worktree: `../espn-nba-fantasy-analyzer-gui`
 A local web GUI, starting with a **Draft Board** for the 2026-27 season (ESPN `seasonId` 2027):
 
 1. Search for any player.
-2. See each player's **last-season ratings**, both **per game** and **full season**, from the existing `rating.ratePlayer` formula.
+2. See each player's **last-season per-game rating** (from the existing `rating.ratePlayer` formula) and value (per-game rating × games).
 3. Enter one **Δ adjustment** (how much we expect them to improve or decline) and **expected games played**. These update the projected ratings, rank, and our dollar value.
 4. Compare with **ESPN auction cost**: ESPN's suggested value and the average price paid in real ESPN auction drafts.
 
@@ -50,13 +50,14 @@ Per player (`players[].player`):
 
 | Route | Does |
 |---|---|
-| `GET /api/board` | Full snapshot: league meta, every player row, market, my team, category ranks |
-| `POST /api/adjust` | `{id, delta?, expGp?, note?}`. `expGp: null` resets to the default |
-| `POST /api/weight` | `{weight}` from 0 to 1 (per game ↔ season) |
-| `POST /api/pick` | `{id, status: "mine" or "taken" or null, price?}`. "mine" auto-slots the player |
+| `GET /api/board` | Full snapshot: league meta, every player row, pool left, my team, category ranks |
+| `POST /api/adjust` | `{id, delta?, gpDelta?, expMin?, note?}`. `gpDelta` is games over ESPN's projection; `expMin: null` resets to ESPN's |
+| `POST /api/pick` | `{id, status: "mine" or "taken" or null, price?}`. "mine" auto-slots the player; "taken" has no price |
 | `POST /api/move` | `{id, slot, price?}`. Drag and drop, with swaps and bumps |
 | `POST /api/price` | `{id, price}` |
 | `POST /api/clear-roster`, `/api/reset-adjustments` | Bulk clears |
+| `POST /api/reset-draft` | Unmark every pick and empty my roster |
+| `POST /api/settings` | `{marketScale?, rated?, ignorePlayers?, replacement?, core?, fadeStart?, fadeEnd?, punt?}`. `null` goes back to the default |
 | `POST /api/state` | `{state}`. Restores a previous state (Undo) |
 | `POST /api/refresh` | Re-download the pool from ESPN |
 | `GET /api/version` | Server boot ID + `gui/static` fingerprint. With `--reload`, the page polls it and reloads on change |
@@ -68,7 +69,7 @@ Every POST returns `{board, error}`. Errors are user-facing sentences, e.g. "Coo
 ```
 library/
   valuation.py      pure math: rating (shared with the CLI), Δ scaling, pool averages,
-                    auction $, inflation, simulated-league category ranks
+                    auction $, simulated-league category ranks
   roster.py         slot eligibility (ESPN eligibleSlots), add / move / swap / remove
   draft.py          ESPN fetch + parse (league settings, player pool), JSON cache
   rating.py, schedule.py, config.py   now import the shared math and constants from valuation.py
@@ -80,7 +81,7 @@ gui/
 tests/
   valuation_test.py, roster_test.py, draft_test.py (+ fixtures/)  offline, 34 tests
 draftPool.json      gitignored: cached ESPN pull
-draftState.json     gitignored: {weight, adjustments, picks, filled}
+draftState.json     gitignored: {adjustments, picks, filled, settings}
 ```
 
 ### Refactor (done)
@@ -106,10 +107,9 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
 1. **Pool averages.** Pre-draft there are no rosters, so average over the *draftable pool*: the top `numTeams × teamSize` players.
    - **Per-game averages** are Σ totals ÷ Σ GP, the same way `averages.py` computes `avg`.
    - **Season averages** are Σ totals ÷ player count, the same way `averages.py` computes `total`.
-2. **Two last-season ratings per player**, both from `ratePlayer`:
+2. **Last-season rating per player** from `ratePlayer`:
    - **Per game** rates the player's per-game stats. This is how good they are when they play.
-   - **Season** rates the season totals. Missed games pull it down, so health is built in.
-   - Example: Walker Kessler is 131 per game but 34 for the season on 5 GP.
+   - **Value** uses the same season formula as the projection (item 7), with last season's games.
 3. **Expected minutes (Exp MIN): per player and editable. This is role.**
    - Defaults to ESPN's projected minutes (`stats[id="102027"].MIN`).
    - The projection keeps the player's per-minute production from `rate_line` and scales it to Exp MIN: `stats × ExpMIN / rateMIN`.
@@ -123,28 +123,34 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
    - FG%/FT% ratings move more for good or bad shooters, because more volume amplifies efficiency in the existing `pow(pctDiff, attemptDiff × 2)` formula.
    - The detail panel shows each category before and after.
    - Later (optional): per-category tilts on top of the overall Δ.
-5. **Expected games (Exp GP): per player and editable. This is health.**
-   - The default is `round((last GP + 2 × ESPN projected GP) / 3)`, leaning on ESPN's projection, which (`stats[id="102027"]`) includes GP. It was halfway at first, but that priced players who missed time (Giannis, Tatum) far below the market.
-   - Later: use a 3-season GP history for a better default, from the player card view, which returns earlier seasons.
-   - Override it when you believe in a player's health.
+5. **Expected games: ESPN's projection + GP Δ. This is health.**
+   - ESPN's projection (`stats[id="102027"]`) includes GP. It's used as is, or last season's GP when ESPN has none.
+   - **GP Δ** is games more or fewer than ESPN projects (`-10`, `+5`), editable per player. Exp GP stays between 0 and 82.
+   - Older saves stored an absolute Exp GP; they load as the difference from ESPN's projection.
 6. **Projected ratings.**
    - `role = rateLine × ExpMIN / rateMIN`
    - `s = scale_for_rating(role, rate(role) + Δ)`
    - `projPerGame = rate(role × s, pgAvg)` (= role rating + Δ)
-   - `projSeason = rate(role × s × ExpGP, seasonAvg)`
-7. **Value** = `w × projPerGame + (1 − w) × projSeason`. `w` is one global slider, default 50/50, that sets how much per-game quality counts against availability.
+7. **Value** = `(projPerGame × ExpGP + R × (82 − ExpGP)) ÷ 82` (`valuation.season_value`).
+   - `R` is the **replacement rating** (Settings, default 95): the free agent who fills a hurt player's games, via IR or the bench. `R = 0` makes it plain per game × games.
+   - The team simulation fills missed games the same way: the replacement players' average line, scaled to `R`.
+   - This replaced an earlier blend of per-game and season ratings with a global weight slider: one formula, no slider.
 8. **Ours $.**
-   - `repl` is the value of player #144.
-   - `$/pt = (12 × $200 − 144) / Σ surplus of the top 144`.
+   - Only each team's **core** shares the money (Settings, default 7 → the top 84). The rest of the roster are $1 players.
+   - `repl` is the value of player #84.
+   - `$/pt = (12 × $200 − 144) / Σ surplus of the top 84`.
    - `Ours = $1 + max(0, value − repl) × $/pt`.
    - Recomputed across the whole pool on every edit.
 9. **Edge** = `Ours − Avg paid`. This shows who's underpriced in the market.
    - Avg paid is ESPN's `auctionValueAverage` × a market scale. ESPN averages across leagues of all sizes, so its top-N prices add up to less than this league's budget: $1,827 vs $2,400 at the time of writing.
    - The scale (`teams × budget / Σ top-N avg`, about ×1.31) puts both sides on the same dollars.
    - After scaling, mid-tier Edge averages about +1 to +3. The top 12 average about −21, the market's star premium over a linear dollar curve.
-10. **Inflation** (during the draft) = `(money left in league − roster spots left × $1) / Σ(Ours − 1) of undrafted players`.
-   - **Bid to** = `1 + (Ours − 1) × inflation`.
-   - Bid to is shown for reference. Prices default to Avg paid.
+10. **Fit** (`valuation.team_fit`): value to my current team, on the player scale.
+   - My team = my players + average players in open slots (a full roster swaps out my weakest player).
+   - Each team category rating passes through `Fade(start=110, end=140)`: full weight up to 110, weight falling linearly to 0 at 140, so the useful rating tops out at 125.
+   - Fit = 100 + (useful total with the player − useful total with an average player) × counted ÷ categories. Punted categories (team-row checkboxes, never automatic) are left out.
+   - **Fit $** converts Fit at the league's $/point (`valuation.pricing`). **Fit edge** = Fit $ − Avg paid, a board column. **Fit rank** ranks Fit among players not taken.
+11. **During the draft** other teams' picks are marked taken with no price: only that a player is gone matters. There's no inflation tracking. Your own picks keep a price (default Avg paid) for your budget.
 
 ## Screens
 
@@ -152,20 +158,20 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
 
 - **Top bar:** league name, season, pool fetched time, **Refresh from ESPN** button.
 - **Controls:** player search (name, case- and accent-insensitive), position chips (PG/SG/SF/PF/C), and toggles for *Hide drafted* and *Only adjusted*.
-- **Global control:** a *Value weighs* slider, from per game to season.
 - **Table** (grouped headers):
   - Rk · Player (team, position, injury, low-GP badge)
-  - *2025-26:* GP · Per game · Season
-  - *2026-27 outlook:* **Exp GP** · **Exp MIN** · **Δ** (all editable by typing or click-and-drag scrubbing) · Proj per game · Value
-  - *Auction $:* ESPN · Avg paid · **Ours** · **Edge** · **Bid to**
+  - *2025-26:* GP · Per game · Value
+  - *2026-27 outlook:* **GP Δ** · Exp GP · **Exp MIN** · **Δ** (the bold ones are editable by typing or click-and-drag scrubbing) · Proj per game · Value
+  - *2026-27 outlook* also ends with **Fit**: value to my current team.
+  - *Auction $:* Avg paid · **Ours** · **Edge** · **Fit edge**. ESPN's own price is in the player panel.
   - Edge uses green/red. Edited cells are highlighted amber.
 - **Player detail** (on row select):
-  - A ratings table: per game and season, for 2025-26 and 2026-27.
+  - A ratings table: per game, games and value, for 2025-26 and 2026-27.
   - Before/after category bars that show how Δ spreads.
-  - Δ and Exp GP sliders.
+  - Δ, Exp MIN and GP Δ sliders.
   - ESPN's implied Δ and GP, with a *Use ESPN's* button.
   - Note field, and Mark mine/taken with a price.
-- Δ, Exp GP and notes save on edit to `draftAdjustments.json` (`{playerId: {delta, expGp, note}}`), so they survive restarts.
+- Δ, GP Δ, Exp MIN and notes save on edit to `draftState.json` (`adjustments: {playerId: {delta, gpDelta, expMin, note}}`), so they survive restarts.
 
 ### My Team
 
@@ -201,7 +207,8 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
 
 ### Draft Tracker
 
-- Mark a player as *Taken* with the price paid. The scoreline shows budget left, max bid, inflation, and the best edge still available.
+- Mark a player as *Taken* with the switch at the left of their row. The scoreline shows budget left, max bid, how much of the top-144 pool is left, and the best edge still available.
+- A **Settings** tab (saved in `draftState.json`) overrides the Avg paid scale, the categories in player value, how many players count toward team totals, and the default expected-games blend, and can reset the draft.
 - **Live sync:** poll the league draft endpoint (`get_league_draft`, `mDraftDetail`) every ~10 s during the draft to mark picks automatically, both mine (into slots) and other teams'.
 
 ### Later
@@ -225,10 +232,10 @@ Status as of 2026-09-23: milestones 1–4 are built, and 5 is next.
 
 - **Auction** league. Edge is in dollars, and ADP is dropped from the board.
 - **Δ** is one overall % per player, spread by scaling volume. Per-category tilts can come later.
-- Each player has **both per-game and season ratings**, blended by a global weight.
-- **Health** is handled by the per-player Exp GP, whose default weighs last season's games.
+- **Value = per-game rating × expected games.** No global weight.
+- **Health** is handled by the per-player GP Δ on top of ESPN's projected games.
+- See [`PHILOSOPHY.md`](PHILOSOPHY.md) for the reasoning behind the model and the draft strategy.
 
 ## Open questions
 
-- Exp GP default: is a midpoint with ESPN's projection right, or should it lean more on history, like a 3-season average?
 - Worktree setup: `settings.txt` and the pickles are gitignored, so they aren't in this worktree. Symlink or copy `settings.txt` over before running.

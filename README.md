@@ -112,11 +112,13 @@ SWID and espn_s2 required for private leagues, ([finding SWID and espn_s2](https
 A local web app for draft day. It reads your league settings and every player's last-season stats and ESPN auction prices, then lets you:
 
 - search and filter the player pool
-- set **expected minutes** (defaults to ESPN's projection), a **Δ** (improvement or decline, in rating points) and **expected games** per player, by typing or dragging
-- weigh per-game quality against full-season production (health)
-- compare **our $ value** with ESPN's suggested price and the **average price paid** in ESPN auctions
+- set **expected minutes** (defaults to ESPN's projection), a **Δ** (improvement or decline, in rating points) and a **games Δ** (more or fewer games than ESPN projects) per player, by typing or dragging
+- value players as per-game rating × expected games
+- compare **our $ value** with the **average price paid** in ESPN auctions, and see each player's **Fit** for the team you're building
 - drag players into your roster slots and see your **category ranks** against a simulated league
-- track your budget, max bid and inflation during the draft
+- track your budget and who's gone during the draft
+
+The ideas behind the model and the draft strategy are in [`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md).
 
 From the repo folder:
 

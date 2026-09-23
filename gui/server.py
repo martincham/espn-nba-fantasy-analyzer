@@ -48,13 +48,14 @@ def _actions(board: DraftBoard) -> Dict[str, Callable[[Dict[str, Any]], Optional
         return None if body.get(key) is None else float(body[key])
 
     return {
-        "weight": lambda b: board.set_weight(float(b["weight"])),
-        "adjust": lambda b: board.adjust(pid(b), **{k: b[k] for k in ("delta", "expGp", "expMin", "note") if k in b}),
+        "adjust": lambda b: board.adjust(pid(b), **{k: b[k] for k in ("delta", "gpDelta", "expMin", "note") if k in b}),
         "reset-adjustments": lambda b: board.reset_adjustments(),
         "pick": lambda b: board.pick(pid(b), b.get("status"), opt(b, "price")),
         "price": lambda b: board.set_price(pid(b), float(b["price"])),
         "move": lambda b: board.move(pid(b), int(b["slot"]), opt(b, "price")),
         "clear-roster": lambda b: board.clear_roster(),
+        "reset-draft": lambda b: board.reset_draft(),
+        "settings": lambda b: board.update_settings(**{k: b[k] for k in ("marketScale", "rated", "ignorePlayers", "replacement", "core", "fadeStart", "fadeEnd", "punt") if k in b}),
         "state": lambda b: board.replace_state(b["state"]),
         "refresh": lambda b: board.load(refresh=True),
     }

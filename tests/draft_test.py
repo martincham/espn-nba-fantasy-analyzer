@@ -30,7 +30,7 @@ class ParseTest(unittest.TestCase):
         k = self.players["Walker Kessler"]
         self.assertEqual(k.last_gp, 5)
         self.assertGreater(k.proj_gp, 50)
-        self.assertEqual(k.default_exp_gp, round((k.last_gp + 2 * k.proj_gp) / 3))  # leans on ESPN
+        self.assertEqual(k.default_exp_gp, k.proj_gp)  # ESPN's projected games
         self.assertIn("C", k.eligible_slots)
         self.assertGreater(k.base_pg["BLK"], 1.5)
         self.assertFalse(k.base_is_projection)
@@ -117,7 +117,8 @@ class BoardTest(unittest.TestCase):
         snap = b.snapshot()
         self.assertEqual(snap["me"]["spent"], 49)
         self.assertEqual(snap["me"]["count"], 2)
-        self.assertEqual(snap["market"]["drafted"], 3)
+        self.assertEqual(snap["pool"]["taken"], 1)
+        self.assertNotIn("price", b.state["picks"][str(ids["Nikola Jokic"])])  # taken players have no price
 
         before = json.loads(json.dumps(b.state))
         b.clear_roster()
@@ -131,8 +132,6 @@ class BoardTest(unittest.TestCase):
         avg = next(r["avg"] for r in b.snapshot()["rows"] if r["id"] == white)  # already league-scaled
         self.assertEqual(b.state["picks"][str(white)]["price"], max(1, round(avg)))
         b.pick(white, None)
-        self.assertIsNone(b.pick(white, "taken"))
-        self.assertEqual(b.state["picks"][str(white)]["price"], max(1, round(avg)))
         b.pick(white, None)
 
         # A new board reading the same files gets the same state back.
@@ -153,20 +152,101 @@ class BoardTest(unittest.TestCase):
         self.assertAlmostEqual(jokic["avg"], round(jokic["avgRaw"] * k, 1), places=1)
         self.assertAlmostEqual(jokic["edge"], round(jokic["ours"] - jokic["avgRaw"] * k, 2), places=1)
         # Default prices use the scaled market price.
-        self.assertIsNone(b.pick(self.ids["Nikola Jokic"], "taken"))
+        self.assertIsNone(b.pick(self.ids["Nikola Jokic"], "mine"))
         self.assertEqual(b.state["picks"][str(self.ids["Nikola Jokic"])]["price"], round(jokic["avgRaw"] * k))
+
+    def test_settings(self):
+        b, ids = self.board, self.ids
+        row = lambda name: next(r for r in b.snapshot()["rows"] if r["name"] == name)
+        auto = b.market_scale
+        # A custom price scale changes Avg paid and Edge; None goes back to automatic.
+        b.update_settings(marketScale=2.0)
+        jokic = row("Nikola Jokic")
+        self.assertAlmostEqual(jokic["avg"], round(jokic["avgRaw"] * 2, 1), places=1)
+        self.assertEqual(b.snapshot()["meta"]["autoMarketScale"], round(auto, 3))
+        b.update_settings(marketScale=None)
+        self.assertAlmostEqual(b.market_scale, auto)
+        # Counting a category changes values; an empty list keeps the default.
+        before = row("Nikola Jokic")["lastPg"]
+        b.update_settings(rated=b.shape.categories)
+        self.assertIn("TO", b.snapshot()["meta"]["rated"])
+        self.assertNotEqual(row("Nikola Jokic")["lastPg"], before)
+        b.update_settings(rated=[])
+        self.assertNotIn("TO", b.snapshot()["meta"]["rated"])
+        # Bench players not counted, and the expected-games blend.
+        b.update_settings(ignorePlayers=5)
+        self.assertEqual(b.snapshot()["meta"]["counted"], 7)
+        # Settings persist with the draft state.
+        from gui.board import DraftBoard
+
+        again = DraftBoard(b.settings_path, b.pool_path, b.state_path)
+        again.load()
+        self.assertEqual(again.shape.ignore_players, 5)
+
+    def test_replacement_and_core_settings(self):
+        b = self.board
+        self.assertEqual((b.shape.replacement, b.shape.core), (95, 7))  # defaults
+        self.assertEqual(b.snapshot()["pool"]["size"], min(len(b.players), b.shape.teams * 7))
+        b.update_settings(replacement=0, core=12)
+        meta = b.snapshot()["meta"]
+        self.assertEqual((meta["replacement"], meta["core"], meta["pricedSize"]), (0, 12, b.shape.teams * 12))
+        b.update_settings(replacement=None, core=None)
+        self.assertEqual((b.shape.replacement, b.shape.core), (95, 7))
+
+    def test_old_expected_games_become_a_delta(self):
+        b, kid = self.board, self.ids["Walker Kessler"]
+        espn_gp = b.by_id[kid].default_exp_gp
+        b.replace_state({"adjustments": {str(kid): {"expGp": espn_gp - 7}}, "picks": {}, "filled": []})
+        self.assertEqual(b.state["adjustments"][str(kid)], {"gpDelta": -7})
+
+    def test_fit_and_punt(self):
+        b, ids = self.board, self.ids
+        snap = b.snapshot()
+        self.assertTrue(all(r["fit"] is not None for r in snap["rows"]))
+        for r in snap["rows"]:
+            self.assertAlmostEqual(r["fitEdge"], r["fitDollars"] - r["avg"], places=0)  # Fit $ − Avg paid
+        self.assertEqual(snap["meta"]["punt"], [])  # never punts on its own
+        # Punting a category takes it out of Fit only.
+        before = {r["id"]: r["value"] for r in snap["rows"]}
+        b.update_settings(punt=["BLK", "NOT_A_CAT"])
+        snap = b.snapshot()
+        self.assertEqual(snap["meta"]["punt"], ["BLK"])
+        self.assertNotIn("BLK", snap["meta"]["fitCategories"])
+        self.assertTrue(next(c for c in snap["team"]["categories"] if c["cat"] == "BLK")["punt"])
+        self.assertEqual({r["id"]: r["value"] for r in snap["rows"]}, before)
+        b.update_settings(punt=[])
+        # With every category already "enough", nobody adds much.
+        spread = lambda: (lambda f: max(f) - min(f))([r["fit"] for r in b.snapshot()["rows"]])
+        normal = spread()
+        b.update_settings(fadeStart=80, fadeEnd=81)
+        self.assertLess(spread(), normal / 2)
+
+    def test_reset_draft(self):
+        b, ids = self.board, self.ids
+        b.pick(ids["Nikola Jokic"], "taken")
+        b.pick(ids["Cooper Flagg"], "mine", 30)
+        b.reset_draft()
+        snap = b.snapshot()
+        self.assertEqual((snap["me"]["count"], snap["pool"]["taken"]), (0, 0))
+        self.assertTrue(all(r["status"] is None for r in snap["rows"]))
 
     def test_adjustments(self):
         b, kid = self.board, self.ids["Walker Kessler"]
         row = lambda: next(r for r in b.snapshot()["rows"] if r["id"] == kid)
-        default_gp = row()["expGp"]
+        espn_gp = row()["espnGp"]
+        self.assertEqual(row()["expGp"], espn_gp)
         before = row()["projPg"]
-        b.adjust(kid, delta=5, expGp=62, note="healthy")
+        b.adjust(kid, delta=5, gpDelta=-10, note="healthy")
         r = row()
-        self.assertEqual((r["delta"], r["expGp"], r["gpSet"], r["note"]), (5, 62, True, "healthy"))
+        self.assertEqual((r["delta"], r["gpDelta"], r["expGp"], r["note"]), (5, -10, espn_gp - 10, "healthy"))
         self.assertAlmostEqual(r["projPg"], before + 5, places=0)  # Δ is rating points
-        b.adjust(kid, expGp=None)
-        self.assertEqual(row()["expGp"], default_gp)
+        # Value is per-game rating × games, with missed games filled at the replacement rating.
+        rep = b.shape.replacement
+        self.assertAlmostEqual(r["value"], (r["projPg"] * r["expGp"] + rep * (82 - r["expGp"])) / 82, places=0)
+        b.adjust(kid, gpDelta=200)
+        self.assertEqual(row()["expGp"], 82)  # capped at a full season
+        b.adjust(kid, gpDelta=0)
+        self.assertEqual(row()["expGp"], espn_gp)
         b.adjust(kid, expMin=34.3)
         r = row()
         self.assertEqual((r["expMin"], r["minSet"]), (34.5, True))  # rounded to half minutes

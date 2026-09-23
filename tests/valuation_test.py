@@ -86,8 +86,8 @@ class DraftValueTest(unittest.TestCase):
         self.players = [Player(i, line(pts=30 - 2 * i, reb=10 - 0.5 * i), 70, exp_gp=70) for i in range(1, 11)]
         self.baseline = v.compute_baseline(self.players, self.shape)
 
-    def value(self, adjustments=None, weight=0.5):
-        return {r.id: r for r in v.value_players(self.players, self.baseline, self.shape, adjustments or {}, weight)}
+    def value(self, adjustments=None):
+        return {r.id: r for r in v.value_players(self.players, self.baseline, self.shape, adjustments or {})}
 
     def test_values_sum_to_league_budget(self):
         rows = self.value()
@@ -131,22 +131,47 @@ class DraftValueTest(unittest.TestCase):
         s = v.scale_for_rating(line(), avg, CATS, 300)
         self.assertAlmostEqual(v.rate(v.scale(line(), s), avg, CATS), 300, places=3)
 
-    def test_expected_games_only_moves_season_rating(self):
-        plain = self.value()
-        hurt = self.value({3: v.Adjustment(exp_gp=20)})
-        self.assertAlmostEqual(hurt[3].proj_pg, plain[3].proj_pg)
-        self.assertLess(hurt[3].proj_season, plain[3].proj_season)
-        # All per-game: games played no longer matter.
-        per_game = self.value({3: v.Adjustment(exp_gp=20)}, weight=1.0)
-        self.assertAlmostEqual(per_game[3].value, per_game[3].proj_pg)
+    def test_fade(self):
+        fade = v.Fade(110, 140)
+        self.assertEqual(fade.useful(90), 90)
+        self.assertEqual(fade.useful(110), 110)
+        self.assertAlmostEqual(fade.useful(125), 110 + 15 - 15 * 15 / 60)  # each point above 110 counts less
+        self.assertAlmostEqual(fade.useful(140), 125)
+        self.assertAlmostEqual(fade.useful(500), 125)  # past the end, more is worth nothing
 
-    def test_inflation_when_stars_go_cheap(self):
-        rows = list(self.value().values())
-        cheap = {1: 5.0}  # best player went for $5
-        market = v.apply_inflation(rows, self.shape, cheap)
-        self.assertGreater(market.inflation, 1.0)
-        self.assertEqual(market.spots_left, self.shape.pool_size - 1)
-        self.assertAlmostEqual(v.apply_inflation(rows, self.shape, {}).inflation, 1.0)
+    def test_season_value(self):
+        self.assertAlmostEqual(v.season_value(100, 82), 100)
+        self.assertAlmostEqual(v.season_value(140, 41), 70)  # no replacement: rating × games / 82
+        # Missed games are filled at the replacement rating.
+        self.assertAlmostEqual(v.season_value(140, 41, 90), 115)
+        self.assertAlmostEqual(v.season_value(90, 10, 90), 90)  # a replacement player is worth replacement
+        self.assertAlmostEqual(v.season_value(100, 120), 100)  # games capped at a season
+
+    def test_value_is_per_game_rating_times_games(self):
+        plain = self.value()
+        self.assertAlmostEqual(plain[3].value, plain[3].proj_pg * 70 / 82)
+        hurt = self.value({3: v.Adjustment(gp_delta=-35)})
+        self.assertEqual(hurt[3].exp_gp, 35)
+        self.assertAlmostEqual(hurt[3].proj_pg, plain[3].proj_pg)
+        self.assertAlmostEqual(hurt[3].value, plain[3].proj_pg * 35 / 82)
+        self.assertLess(hurt[3].ours, plain[3].ours)
+        self.assertEqual(self.value({3: v.Adjustment(gp_delta=50)})[3].exp_gp, 82)  # capped
+
+    def test_replacement_softens_missed_games(self):
+        plain_loss = self.value()[3].value - self.value({3: v.Adjustment(gp_delta=-35)})[3].value
+        self.shape.replacement = 90.0
+        filled_loss = self.value()[3].value - self.value({3: v.Adjustment(gp_delta=-35)})[3].value
+        self.assertGreater(filled_loss, 0)
+        self.assertLess(filled_loss, plain_loss / 2)
+
+    def test_core_players_share_the_money(self):
+        self.shape.core = 2  # 2 teams × 2 core players are priced; the other 2 roster spots cost $1
+        rows = sorted(self.value().values(), key=lambda r: r.rank)
+        self.assertEqual([round(r.ours, 6) for r in rows[3:]], [1.0] * (len(rows) - 3))
+        self.assertAlmostEqual(sum(r.ours for r in rows[: self.shape.pool_size]), self.shape.teams * self.shape.budget)
+        self.shape.core = None
+        spread = sorted(self.value().values(), key=lambda r: r.rank)
+        self.assertGreater(rows[0].ours, spread[0].ours)  # stars get more when fewer players share
 
     def test_team_ratings(self):
         avg = line()

@@ -67,8 +67,8 @@ function liveSender(action) {
     }
   };
 }
-const sendWeight = liveSender("weight");
 const sendAdjust = liveSender("adjust");
+const sendSettings = liveSender("settings");
 
 // Snapshot state so destructive actions can be undone.
 const snapshotState = () => JSON.parse(JSON.stringify(B.state));
@@ -108,7 +108,7 @@ function render() {
     UI.sel = first ? first.id : null;
   }
   if (!$("teams").childElementCount) renderTeams();
-  renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam();
+  renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam(); renderSettings();
 }
 function renderLive() { // while dragging a slider: leave the panel being dragged alone
   byId = new Map(B.rows.map((r) => [r.id, r]));
@@ -137,24 +137,17 @@ function renderMeta() {
   const w = $("warnings");
   w.hidden = !m.warnings.length;
   w.innerHTML = m.warnings.map((x) => `<div class="warn">${esc(x)}</div>`).join("");
-  $("weight").value = Math.round(B.state.weight * 100);
-  weightLabel();
 }
 
-function weightLabel() {
-  const p = +$("weight").value;
-  $("wOut").textContent = `${p}/${100 - p}`;
-  $("wOut").title = `${p}% per game, ${100 - p}% full season`;
-}
 
 function renderScore() {
-  const me = B.me, m = B.market;
+  const me = B.me, pool = B.pool;
   $("sBudget").textContent = money(me.budgetLeft);
   $("sMax").textContent = `max bid ${money(me.maxBid)}`;
   $("sRoster").textContent = `${me.count} / ${B.meta.rosterSize}`;
   $("sRosterSub").textContent = me.count ? me.names.map(lastName).join(", ") : "No picks yet";
-  $("sInfl").textContent = m.inflation.toFixed(2) + "×";
-  $("sInflSub").textContent = `${m.drafted} drafted · $${m.moneyLeft.toLocaleString()} left in league`;
+  $("sPool").textContent = `${pool.left} / ${pool.size}`;
+  $("sPoolSub").textContent = `core players left (${B.meta.core} per team) · ${pool.taken} taken by others`;
   const best = B.rows.filter((r) => !r.status).sort((a, b) => b.edge - a.edge)[0];
   $("sEdge").textContent = best ? signed(best.edge) : "—";
   $("sEdge").className = "val" + (best && best.edge >= 3 ? " up" : "");
@@ -175,9 +168,11 @@ function renderCatRow() {
   if (key !== catRowKey) {
     catRowKey = key; prevRatings = null;
     el.style.setProperty("--cats", t.categories.length);
-    el.innerHTML = `<div class="cr-head"><span class="lbl">My team</span><span class="v" id="crOverall"></span><span class="s" id="crSub"></span></div>` +
+    el.innerHTML = `<div class="cr-head"><span class="lbl">My team</span><span class="v" id="crOverall"></span><span class="s" id="crSub"></span>
+        <button class="linkbtn" type="button" id="crOpen">Open My Team</button></div>` +
       t.categories.map((c, i) => `<div class="cc" id="cc-${i}">
-        <span class="lbl">${esc(c.cat)}</span>
+        <span class="ctop"><span class="lbl">${esc(c.cat)}</span>
+          <label class="punt" for="punt-${i}" title="Punt ${esc(c.cat)}: stop valuing it in Fit"><input type="checkbox" id="punt-${i}" data-punt="${esc(c.cat)}">Punt</label></span>
         <span class="col"><i></i></span>
         <span class="nums"><span class="rv"></span><span class="rk"></span></span>
         <span class="dchip"></span></div>`).join("");
@@ -188,6 +183,9 @@ function renderCatRow() {
   t.categories.forEach((c, i) => {
     const cell = $(`cc-${i}`), r = c.rating;
     next[c.cat] = r;
+    cell.classList.toggle("punted", !!c.punt);
+    const box = cell.querySelector("[data-punt]");
+    if (box) box.checked = !!c.punt;
     const bar = cell.querySelector(".col i");
     // Diverging from the 100 midline: up = better than the average team, down = worse. ±40 fills a half.
     bar.classList.toggle("below", r < 100);
@@ -196,7 +194,7 @@ function renderCatRow() {
     const rk = cell.querySelector(".rk");
     rk.textContent = ord(c.rank);
     rk.className = "rk " + (c.rank <= 3 ? "top" : c.rank >= n - 2 ? "low" : "mid");
-    cell.title = `${c.cat}: rating ${Math.round(r)}, ${ord(c.rank)} of ${n}${c.reverse ? " (lower totals are better)" : ""}`;
+    cell.title = `${c.cat}: rating ${Math.round(r)}, ${ord(c.rank)} of ${n}${c.reverse ? " (lower totals are better)" : ""}${c.punt ? ". Punted: Fit ignores it" : ""}`;
     const prev = prevRatings && prevRatings[c.cat];
     const d = prev == null ? 0 : Math.round(r) - Math.round(prev);
     if (d) {
@@ -209,40 +207,48 @@ function renderCatRow() {
   });
   prevRatings = next;
 }
-$("catrow").addEventListener("click", () => { setView("team"); render(); });
-$("catrow").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setView("team"); render(); }
+$("catrow").addEventListener("click", (e) => {
+  if (e.target.id === "crOpen") { setView("team"); render(); }
+});
+$("catrow").addEventListener("change", (e) => {
+  const box = e.target.closest("[data-punt]");
+  if (!box) return;
+  const punt = [...$("catrow").querySelectorAll("[data-punt]")].filter((b) => b.checked).map((b) => b.dataset.punt);
+  act("settings", { punt });
 });
 
 // ------------------------------------------------------------------ board table
 
 const GROUPS = () => [
-  { label: "", span: 2 },
+  { label: "", span: 3 },
   { label: B.meta.statsLabel, span: 3 },
-  { label: `${B.meta.seasonLabel} outlook`, span: 5, cls: "g-out" },
-  { label: "Auction $", span: 5, cls: "g-ours" },
+  { label: `${B.meta.seasonLabel} outlook`, span: 7, cls: "g-out" },
+  { label: "Auction $", span: 4, cls: "g-ours" },
 ];
 const COLS = [
+  { key: "taken", label: "", sr: "Taken", nosort: true, cls: "tk-h", title: "Drafted by another team" },
   { key: "rank", label: "Rk", title: "Rank by value" },
   { key: "name", label: "Player", cls: "l" },
   { key: "gp", label: "GP", title: "Games played last season" },
   { key: "lastPg", label: "Per gm", title: "Per-game rating (100 = pool average)" },
-  { key: "lastSeason", label: "Season", title: "Full-season rating. Missed games pull it down." },
-  { key: "expGp", label: "Exp GP", title: "Expected games. Default: ⅔ ESPN's projection + ⅓ last season. Clear to reset." },
+  { key: "lastValue", label: "Value", title: "Per-game rating over the season, with missed games filled by a replacement free agent" },
+  { key: "gpDelta", label: "GP Δ", title: "Games more or fewer than ESPN projects, e.g. -10. Drag or type; clear to reset." },
+  { key: "expGp", label: "Exp GP", title: "Expected games: ESPN's projection + GP Δ" },
   { key: "expMin", label: "Exp MIN", title: "Expected minutes per game. Default: ESPN's projection. Production scales with minutes. Drag or type; clear to reset." },
   { key: "delta", label: "Δ", title: "Change in per-game rating points (100 = average player), e.g. +10. Spread across categories by scaling every counting stat and shot attempt." },
   { key: "projPg", label: "Per gm", title: "Projected per-game rating" },
-  { key: "value", label: "Value", title: "Blend of projected per-game and full-season ratings" },
-  { key: "espn", label: "ESPN", title: "ESPN's suggested auction value for this league" },
+  { key: "value", label: "Value", title: "Projected per-game rating over 82 games: Exp GP at his rating, the games he misses at the replacement rating (Settings)" },
+  { key: "fit", label: "Fit", title: "Value to your current team: categories you're already winning count less (fading from the Settings range), punted ones not at all. 100 = an average player." },
   { key: "avg", label: "Avg paid", title: "Average price in ESPN auction drafts, scaled to this league's budget" },
   { key: "ours", label: "Ours", cls: "ours-h", title: "Our value before the draft" },
   { key: "edge", label: "Edge", cls: "ours-h", title: "Ours − Avg paid" },
-  { key: "bid", label: "Bid to", cls: "ours-h", title: "Ours adjusted for inflation" },
+  { key: "fitEdge", label: "Fit edge", cls: "ours-h", title: "Fit $ − Avg paid: the bargain for your current team. Fit $ converts Fit to dollars at the league's rate." },
 ];
 
 function renderHead() {
   const g = `<tr class="grp">${GROUPS().map((g) => `<th colspan="${g.span}" class="${g.cls || ""}">${g.label ? `<span>${esc(g.label)}</span>` : ""}</th>`).join("")}</tr>`;
   const c = `<tr>${COLS.map((c) => {
+    if (c.nosort) return `<th class="${c.cls || ""}" scope="col" title="${esc(c.title)}"><span class="sr">${c.sr}</span></th>`;
     const s = UI.sort.key === c.key ? ` aria-sort="${UI.sort.dir < 0 ? "descending" : "ascending"}"` : "";
     const title = c.key === "avg" ? `${c.title} (ESPN average × ${B.meta.marketScale.toFixed(2)})` : c.title || "";
     return `<th class="${c.cls || ""}"${s} scope="col"><button type="button" data-sort="${c.key}" title="${esc(title)}">${c.label}</button></th>`;
@@ -257,7 +263,7 @@ function visibleRows() {
     (UI.pos === "ALL" || r.elig.includes(UI.pos)) &&
     (UI.team === "ALL" || r.team === UI.team) &&
     (!UI.hideGone || !r.status) &&
-    (!UI.onlyAdj || r.delta || r.gpSet || r.minSet || r.note));
+    (!UI.onlyAdj || r.delta || r.gpDelta || r.minSet || r.note));
   const { key, dir } = UI.sort;
   rows.sort((a, b) => {
     const x = a[key], y = b[key];
@@ -275,7 +281,7 @@ function injuryPill(inj, long = false) {
 }
 function statusPill(r) {
   if (!r.status) return "";
-  return `<span class="pill ${r.status}">${r.status === "mine" ? "Mine" : "Taken"} $${r.price}</span>`;
+  return `<span class="pill ${r.status}">${r.status === "mine" ? `Mine $${r.price}` : "Taken"}</span>`;
 }
 function badges(r) {
   let s = injuryPill(r.inj);
@@ -284,25 +290,36 @@ function badges(r) {
   return s;
 }
 
+function takenToggle(r) {
+  if (r.status === "mine") return `<span class="mine-dot" title="On your team"></span>`;
+  const on = r.status === "taken";
+  return `<button class="tswitch" type="button" role="switch" aria-checked="${on}" data-taken="${r.id}"` +
+    ` aria-label="${esc(r.name)} drafted by another team" title="${on ? "Taken by another team. Click to undo." : "Mark drafted by another team"}"></button>`;
+}
+
+const edgeCls = (e) => (e >= 3 ? "pos" : e <= -3 ? "neg" : "");
+
 function rowHTML(r) {
-  const e = r.edge, ecls = e >= 3 ? "pos" : e <= -3 ? "neg" : "";
+  const e = r.edge, ecls = edgeCls(e);
   const drag = r.status === "taken" ? "" : ` draggable="true" data-drag="${r.id}" title="Drag onto a roster slot"`;
   return `<tr data-id="${r.id}" class="${UI.sel === r.id ? "sel" : ""} ${r.status ? "gone" : ""}">
+    <td class="tk">${takenToggle(r)}</td>
     <td class="rk">${r.rank}</td>
     <td class="l"><div class="pcell"${drag}><span class="pname">${esc(r.name)}${statusPill(r)}</span><span class="psub">${esc(r.team)} · ${esc(r.pos)}${badges(r)}</span></div></td>
     <td>${r.fromProj ? "—" : r.gp}</td>
     <td>${fmt(r.lastPg)}</td>
-    <td>${r.fromProj ? "—" : fmt(r.lastSeason)}</td>
-    <td><input class="cell ${r.gpSet ? "edited" : ""}" type="text" inputmode="numeric" autocomplete="off" value="${r.expGp}" aria-label="Expected games for ${esc(r.name)}" data-gp="${r.id}" id="g-${r.id}"></td>
+    <td>${r.fromProj ? "—" : fmt(r.lastValue)}</td>
+    <td><input class="cell ${r.gpDelta ? "edited" : ""}" type="text" inputmode="text" autocomplete="off" value="${signedInput(r.gpDelta)}" placeholder="0" title="ESPN projects ${r.espnGp} games" aria-label="Games more or fewer than ESPN projects for ${esc(r.name)}" data-gp="${r.id}" id="g-${r.id}"></td>
+    <td class="${r.gpDelta ? "edited-v" : ""}">${r.expGp}</td>
     <td><input class="cell ${r.minSet ? "edited" : ""}" type="text" inputmode="decimal" autocomplete="off" value="${fmt(r.expMin)}" title="Last season ${r.lastMin ?? "—"} min · ESPN projects ${r.projMin ?? "—"}" aria-label="Expected minutes for ${esc(r.name)}" data-min="${r.id}" id="m-${r.id}"></td>
     <td><input class="cell ${r.delta ? "edited" : ""}" type="text" inputmode="text" autocomplete="off" value="${signedInput(r.delta)}" placeholder="0" aria-label="Δ rating points for ${esc(r.name)}" data-delta="${r.id}" id="d-${r.id}"></td>
     <td>${fmt(r.projPg)}</td>
     <td class="val">${fmt(r.value)}</td>
-    <td>${money(r.espn)}</td>
+    <td class="fit">${r.status === "taken" ? "—" : fmt(r.fit)}</td>
     <td>${money(r.avg)}</td>
     <td class="ours">${money(r.ours)}</td>
     <td class="ours"><span class="edge ${ecls}">${signed(e)}</span></td>
-    <td class="ours">${r.status ? "—" : money(r.bid)}</td>
+    <td class="ours">${r.status === "taken" || r.fitEdge == null ? "—" : `<span class="edge ${edgeCls(r.fitEdge)}">${signed(r.fitEdge)}</span>`}</td>
   </tr>`;
 }
 
@@ -333,6 +350,8 @@ function bars(before, after, cats) {
   return s + "</svg>";
 }
 
+const gpOut = (r, d) => `${signed(d)} → ${r.espnGp + d} GP`;
+
 function renderDetail() {
   const el = $("detail"), r = byId.get(UI.sel);
   if (!r) { el.innerHTML = `<p class="muted">Select a player to see their category breakdown.</p>`; return; }
@@ -345,18 +364,21 @@ function renderDetail() {
       <div class="dsub"><span>${esc(r.team)} · ${esc(r.pos)}</span><span class="num">${r.line.map((v) => fmt(v)).join(" / ")} pts/reb/ast</span>${injuryPill(r.inj, true)}</div></div>
     <div class="kv">
       <div><span class="lbl">Value rank</span><span class="v">#${r.rank}</span></div>
-      <div><span class="lbl">ESPN rank</span><span class="v">#${r.espnRank ?? "—"}</span></div>
-      <div title="ESPN average $${fmt(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)} to fit this league's budget"><span class="lbl">Avg paid</span><span class="v">${money(r.avg)}</span></div>
       <div><span class="lbl">Ours</span><span class="v">${money(r.ours)}</span></div>
-      <div><span class="lbl">Edge</span><span class="v ${r.edge >= 3 ? "up" : r.edge <= -3 ? "down" : ""}">${signed(r.edge)}</span></div>
-      <div><span class="lbl">Bid to</span><span class="v">${r.status ? "—" : money(r.bid)}</span></div>
+      <div title="Ours − Avg paid"><span class="lbl">Edge</span><span class="v ${r.edge >= 3 ? "up" : r.edge <= -3 ? "down" : ""}">${signed(r.edge)}</span></div>
+      <div title="Rank by Fit among players still available"><span class="lbl">Fit rank</span><span class="v">${r.fitRank ? "#" + r.fitRank : "—"}</span></div>
+      <div title="Fit ${fmt(r.fit)} converted at the league's $/point"><span class="lbl">Fit $</span><span class="v">${r.fitDollars == null ? "—" : money(r.fitDollars)}</span></div>
+      <div title="Fit $ − Avg paid"><span class="lbl">Fit edge</span><span class="v ${r.fitEdge >= 3 ? "up" : r.fitEdge <= -3 ? "down" : ""}">${r.fitEdge == null ? "—" : signed(r.fitEdge)}</span></div>
+      <div><span class="lbl">ESPN rank</span><span class="v">#${r.espnRank ?? "—"}</span></div>
+      <div><span class="lbl">ESPN $</span><span class="v">${money(r.espn)}</span></div>
+      <div title="ESPN average $${fmt(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)} to fit this league's budget"><span class="lbl">Avg paid</span><span class="v">${money(r.avg)}</span></div>
     </div>
     <table class="rtab" aria-label="Ratings">
       <thead><tr><th scope="col">Rating</th><th scope="col">${B.meta.statsLabel}</th><th scope="col">${B.meta.seasonLabel}</th></tr></thead>
       <tbody>
         <tr><th scope="row">Per game</th><td>${fmt(r.lastPg)}</td><td>${fmt(r.projPg)}</td></tr>
-        <tr><th scope="row">Season</th><td>${r.fromProj ? "—" : `${fmt(r.lastSeason)} <span class="g">${r.gp}g</span>`}</td><td>${fmt(r.projSeason)} <span class="g">${r.expGp}g</span></td></tr>
-        <tr><th scope="row">Value</th><td></td><td><b>${fmt(r.value)}</b></td></tr>
+        <tr><th scope="row">Games</th><td>${r.fromProj ? "—" : r.gp}</td><td>${r.expGp}${r.gpDelta ? ` <span class="g">ESPN ${r.espnGp} ${signed(r.gpDelta)}</span>` : ""}</td></tr>
+        <tr><th scope="row" title="(per game × games + ${B.meta.replacement} × missed games) ÷ ${B.meta.gamesInSeason}">Value</th><td>${r.fromProj ? "—" : fmt(r.lastValue)}</td><td><b>${fmt(r.value)}</b></td></tr>
       </tbody>
     </table>
     <div class="bars"><span class="lbl sec-t">Δ ${signed(r.delta)} rating across categories · per game</span>${bars(r.catLast, r.catProj, B.meta.rated)}
@@ -364,16 +386,16 @@ function renderDetail() {
     <div><span class="lbl sec-t">Adjust</span>
       <div class="adj"><span>Δ</span><input type="range" id="dRange" min="${-B.meta.maxDelta}" max="${B.meta.maxDelta}" step="1" value="${r.delta}" aria-label="Δ rating points"><output id="dOut">${signed(r.delta)}</output></div>
       <div class="adj"><span>Exp MIN</span><input type="range" id="mRange" min="0" max="${B.meta.maxMin}" step="0.5" value="${r.expMin}" aria-label="Expected minutes"><output id="mOut">${fmt(r.expMin)}</output></div>
-      <div class="adj"><span>Exp GP</span><input type="range" id="gRange" min="0" max="82" step="1" value="${r.expGp}" aria-label="Expected games"><output id="gOut">${r.expGp}</output></div>
+      <div class="adj"><span>GP Δ</span><input type="range" id="gRange" min="${-r.espnGp}" max="${82 - r.espnGp}" step="1" value="${r.gpDelta}" aria-label="Games more or fewer than ESPN projects"><output id="gOut">${gpOut(r, r.gpDelta)}</output></div>
       <p class="hint">${espnHint}
         ${r.projMin || r.projGp ? `<button class="linkbtn" type="button" id="useEspn">Use ESPN's</button>` : ""}
         ${r.minSet ? ` · <button class="linkbtn" type="button" id="resetMin">Reset minutes</button>` : ""}
-        ${r.gpSet ? ` · <button class="linkbtn" type="button" id="resetGp">Reset games</button>` : ""}</p></div>
+        ${r.gpDelta ? ` · <button class="linkbtn" type="button" id="resetGp">Reset games</button>` : ""}</p></div>
     <div><label class="lbl sec-t" for="noteBox">Note</label>
       <textarea id="noteBox" placeholder="Why the adjustment?">${esc(r.note || "")}</textarea></div>
     <div><span class="lbl sec-t">Draft</span>
       ${r.status
-        ? `<div class="draftrow">${r.status === "mine" ? `<span class="pill mine">Mine · ${esc(slotName || "?")} $${r.price}</span>` : `<span class="pill taken">Taken $${r.price}</span>`}
+        ? `<div class="draftrow">${r.status === "mine" ? `<span class="pill mine">Mine · ${esc(slotName || "?")} $${r.price}</span>` : `<span class="pill taken">Taken</span>`}
            <button class="btn" type="button" id="undoPick">${r.status === "mine" ? "Remove from team" : "Undo"}</button></div>`
         : `<div class="draftrow"><label for="priceIn" title="Defaults to the average paid in ESPN auctions">Price</label><input id="priceIn" type="text" inputmode="numeric" autocomplete="off" value="${Math.round(Math.max(1, r.avg))}">
            <button class="btn primary" type="button" data-pick="mine">Add to my team</button><button class="btn" type="button" data-pick="taken">Mark taken</button></div>`}
@@ -431,7 +453,7 @@ function renderTeam() {
   const val = (c, v) => (isPct(c) ? v.toFixed(3).replace(/^0/, "") : Math.round(v).toLocaleString());
   const diff = (c, v, a) => (isPct(c) ? signed((v - a) * 100, 1) + " pts" : a ? signed((v / a - 1) * 100) + "%" : "—");
   const targets = t.targets.length
-    ? ` Best-value help in <b>${esc(t.targets[0].cat)}</b>: ${t.targets.map((x) => `<button class="linkbtn" type="button" data-goto="${x.id}">${esc(x.name)}</button> (${x.rating}, bid to $${x.bid})`).join(" and ")}.`
+    ? ` Best-value help in <b>${esc(t.targets[0].cat)}</b>: ${t.targets.map((x) => `<button class="linkbtn" type="button" data-goto="${x.id}">${esc(x.name)}</button> (${x.rating}, worth ${money(x.ours)})`).join(" and ")}.`
     : "";
   $("ranks").innerHTML = `
     <div><h3>Category ranks</h3><p class="sub">Projected ${m.seasonLabel} season totals from your best ${m.counted} of ${m.rosterSize}, against ${n - 1} simulated opponents who get the Taken players and the best remaining by value.${t.filled < m.rosterSize ? ` Your ${m.rosterSize - t.filled} empty slots count as replacement-level players.` : ""}</p></div>
@@ -624,7 +646,6 @@ $("teams").addEventListener("keydown", (e) => {
 });
 $("q").addEventListener("input", (e) => { UI.q = e.target.value; renderBody(); });
 ["hideGone", "onlyAdj"].forEach((k) => $(k).addEventListener("change", (e) => { UI[k] = e.target.checked; renderBody(); }));
-$("weight").addEventListener("input", (e) => { weightLabel(); sendWeight({ weight: +e.target.value / 100 }); });
 $("thead").addEventListener("click", (e) => {
   const b = e.target.closest("[data-sort]");
   if (!b) return;
@@ -639,6 +660,14 @@ document.addEventListener("keydown", (e) => {
 const tb = $("tbody");
 tb.addEventListener("click", (e) => {
   if (e.target.closest("input")) return;
+  const sw = e.target.closest("[data-taken]");
+  if (sw) {
+    const r = byId.get(+sw.dataset.taken);
+    UI.sel = r.id;
+    if (r.status === "taken") act("pick", { id: r.id, status: null });
+    else act("pick", { id: r.id, status: "taken" });
+    return;
+  }
   const tr = e.target.closest("tr[data-id]");
   if (!tr) return;
   UI.sel = +tr.dataset.id;
@@ -671,8 +700,8 @@ function saveCell(input) {
     if (Number.isNaN(v) || (v != null && v < 0)) { toast(`Expected minutes needs a number from 0 to ${B.meta.maxMin}.`); return renderKeepFocus(); }
     act("adjust", { id: +input.dataset.min, expMin: v }); // empty box resets to ESPN's projection
   } else if (input.dataset.gp) {
-    if (Number.isNaN(v) || (v != null && v < 0)) { toast("Expected games needs a number from 0 to 82."); return renderKeepFocus(); }
-    act("adjust", { id: +input.dataset.gp, expGp: v == null ? null : Math.round(v) }); // empty box resets to default
+    if (Number.isNaN(v)) { toast("GP Δ needs a number of games, like -10 or +5."); return renderKeepFocus(); }
+    act("adjust", { id: +input.dataset.gp, gpDelta: Math.round(v ?? 0) }); // empty box goes back to ESPN's games
   }
 }
 tb.addEventListener("change", (e) => {
@@ -687,14 +716,14 @@ tb.addEventListener("keydown", (e) => {
   const v = parseNum(e.target.value);
   const step = SCRUB[cellKind(e.target)].step * (e.shiftKey ? 5 : 1) * (e.key === "ArrowUp" ? 1 : -1);
   const next = (Number.isNaN(v) || v == null ? 0 : v) + step;
-  e.target.value = e.target.dataset.delta ? signedInput(next) : String(Math.max(0, next));
+  e.target.value = e.target.dataset.min ? String(Math.max(0, next)) : signedInput(next);
   saveCell(e.target);
 });
 
 // Click-and-drag scrubbing on the Exp GP, Exp MIN and Δ cells: drag sideways
 // to change the value (Shift for bigger steps); a plain click still types.
 const SCRUB = {
-  gp: { key: "expGp", px: 4, step: 1, min: 0, max: 82 },
+  gp: { key: "gpDelta", px: 4, step: 1, min: -82, max: 82 },
   min: { key: "expMin", px: 6, step: 0.5, min: 0, max: 48 },
   delta: { key: "delta", px: 4, step: 1, min: -60, max: 60 },
 };
@@ -750,12 +779,14 @@ document.addEventListener("pointermove", (e) => {
     try { scrub.cell.setPointerCapture(e.pointerId); } catch (err) { /* capture is best-effort */ }
   }
   e.preventDefault();
-  const c = SCRUB[scrub.kind];
-  const v = Math.max(c.min, Math.min(c.max, scrub.start + Math.round(dx / c.px) * c.step * (e.shiftKey ? 5 : 1)));
+  const c = SCRUB[scrub.kind], r = byId.get(scrub.id);
+  // Games: keep ESPN's projection + Δ between 0 and 82.
+  const [lo, hi] = scrub.kind === "gp" && r ? [-r.espnGp, 82 - r.espnGp] : [c.min, c.max];
+  const v = Math.max(lo, Math.min(hi, scrub.start + Math.round(dx / c.px) * c.step * (e.shiftKey ? 5 : 1)));
   if (v === scrub.last) return;
   scrub.last = v;
-  scrub.cell.value = scrub.kind === "delta" ? signedInput(v) : scrub.kind === "min" ? v.toFixed(1) : String(v);
-  scrub.cell.classList.toggle("edited", scrub.kind !== "delta" || v !== 0);
+  scrub.cell.value = scrub.kind === "min" ? v.toFixed(1) : signedInput(v);
+  scrub.cell.classList.toggle("edited", scrub.kind === "min" || v !== 0);
   sendScrub({ id: scrub.id, [c.key]: v });
 });
 function endScrub(e) {
@@ -772,7 +803,7 @@ document.addEventListener("pointercancel", endScrub);
 const det = $("detail");
 det.addEventListener("input", (e) => {
   if (e.target.id === "dRange") { $("dOut").textContent = signed(+e.target.value); sendAdjust({ id: UI.sel, delta: +e.target.value }); }
-  if (e.target.id === "gRange") { $("gOut").textContent = e.target.value; sendAdjust({ id: UI.sel, expGp: +e.target.value }); }
+  if (e.target.id === "gRange") { $("gOut").textContent = gpOut(byId.get(UI.sel), +e.target.value); sendAdjust({ id: UI.sel, gpDelta: +e.target.value }); }
   if (e.target.id === "mRange") { $("mOut").textContent = fmt(+e.target.value); sendAdjust({ id: UI.sel, expMin: +e.target.value }); }
 });
 det.addEventListener("change", (e) => {
@@ -783,9 +814,10 @@ det.addEventListener("click", (e) => {
   const b = e.target.closest("[data-pick]");
   const r = byId.get(UI.sel);
   if (b && r) {
+    if (b.dataset.pick === "taken") return act("pick", { id: r.id, status: "taken" });
     const price = readPrice($("priceIn").value);
     if (price == null) return;
-    act("pick", { id: r.id, status: b.dataset.pick, price });
+    act("pick", { id: r.id, status: "mine", price });
     return;
   }
   if (!r) return;
@@ -793,12 +825,12 @@ det.addEventListener("click", (e) => {
     if (r.status === "mine") removeMine(r.id);
     else act("pick", { id: r.id, status: null });
   } else if (e.target.id === "useEspn") {
-    // Minutes default to ESPN's already; set games and the skill change to ESPN's too.
-    act("adjust", { id: r.id, expMin: null, expGp: r.projGp || null, delta: r.espnDelta || 0 });
+    // Minutes and games default to ESPN's already; set the skill change to ESPN's too.
+    act("adjust", { id: r.id, expMin: null, gpDelta: 0, delta: r.espnDelta || 0 });
   } else if (e.target.id === "resetMin") {
     act("adjust", { id: r.id, expMin: null });
   } else if (e.target.id === "resetGp") {
-    act("adjust", { id: r.id, expGp: null });
+    act("adjust", { id: r.id, gpDelta: 0 });
   }
 });
 
@@ -814,18 +846,153 @@ $("refreshBtn").addEventListener("click", async () => {
   if (ok) toast("Player pool refreshed from ESPN.");
 });
 
+// ------------------------------------------------------------------ settings
+
+function renderSettings() {
+  const el = $("settingsPanel"), m = B.meta, room = B.state.settings, d = m.defaults;
+  const scaleCustom = room.marketScale != null;
+  const samples = [...B.rows].sort((a, b) => b.avgRaw - a.avgRaw).slice(0, 3);
+  const counted = m.rosterSize - (room.ignorePlayers ?? d.ignorePlayers);
+  const bench = m.slots.filter((x) => x === "BE").length;
+  const scoring = { H2H_CATEGORY: "H2H categories", H2H_MOST_CATEGORIES: "H2H most categories", ROTO: "Roto", H2H_POINTS: "H2H points" }[m.scoringType] || (m.scoringType || "").replace(/_/g, " ").toLowerCase();
+  const rep = m.replacement, core = m.core, streamers = m.rosterSize - core;
+  el.innerHTML = `
+    <section class="set">
+      <div class="set-t"><h3>Replacement player</h3>
+        <p>The per-game rating of the free agent you pick up when a player is hurt or on IR. His games fill the ones your player misses, so a missed game only costs the gap between them. Set 0 to count missed games as lost.</p></div>
+      <div class="set-c">
+        <div class="range-row"><input type="range" id="setRep" min="0" max="${m.maxReplacement}" step="1" value="${rep}" aria-label="Replacement player rating">
+          <output id="setRepOut">${rep}</output></div>
+        <p class="hint">${room.replacement != null ? `<button class="linkbtn" type="button" id="setRepReset">Use default (${d.replacement})</button>` : `Default: a top free agent. The average one is about 86.`}</p>
+        <p class="hint" id="setRepEx">${repExample(rep)}</p>
+      </div>
+    </section>
+    <section class="set">
+      <div class="set-t"><h3>Core players</h3>
+        <p>How many players per team are worth paying for. They share the league's money; the rest of the roster are $1 players you stream. Ours and Edge are priced this way.</p></div>
+      <div class="set-c">
+        <label class="inline" for="setCore">Pay for the best <select id="setCore">${Array.from({ length: m.rosterSize }, (_, i) => m.rosterSize - i)
+          .map((n) => `<option value="${n}" ${n === core ? "selected" : ""}>${n}</option>`).join("")}</select> of ${m.rosterSize}</label>
+        <p class="hint">${m.pricedSize} players are priced above $1${streamers ? `; ${streamers} per team are $1 streamers` : ""}.${room.core != null ? ` <button class="linkbtn" type="button" id="setCoreReset">Use default (${d.core})</button>` : ""}</p>
+      </div>
+    </section>
+    <section class="set">
+      <div class="set-t"><h3>Enough in a category</h3>
+        <p>In head-to-head you win a category or you don't, so strength past winning it is wasted. For the Fit column, your team's rating in a category counts in full up to the first number, less and less above it, and not at all past the second.</p></div>
+      <div class="set-c">
+        <label class="inline" for="setFadeStart">Start fading at <input class="numin" type="text" inputmode="numeric" id="setFadeStart" value="${m.fade[0]}" aria-label="Start fading at"></label>
+        <label class="inline" for="setFadeEnd">Worth nothing past <input class="numin" type="text" inputmode="numeric" id="setFadeEnd" value="${m.fade[1]}" aria-label="Worth nothing past"></label>
+        <p class="hint">${room.fadeStart != null || room.fadeEnd != null ? `<button class="linkbtn" type="button" id="setFadeReset">Use default (${d.fade[0]} to ${d.fade[1]})</button>` : `Default. 100 is the average team.`} Punt a category with its checkbox in the team row: Fit then ignores it.${m.punt.length ? ` Punted now: ${m.punt.map(esc).join(", ")}.` : ""}</p>
+      </div>
+    </section>
+    <section class="set">
+      <div class="set-t"><h3>Avg paid scale</h3>
+        <p>ESPN's average prices come from leagues of every size. They're multiplied by this to fit your league. Auto makes the top ${m.poolSize} prices add up to ${m.teams} × $${m.budget} = $${(m.teams * m.budget).toLocaleString()}.</p></div>
+      <div class="set-c">
+        <div class="range-row"><input type="range" id="setScale" min="0.5" max="2.5" step="0.01" value="${m.marketScale}" aria-label="Avg paid scale">
+          <output id="setScaleOut">×${m.marketScale.toFixed(2)}</output></div>
+        <p class="hint">${scaleCustom ? `Custom. <button class="linkbtn" type="button" id="setScaleAuto">Use auto (×${m.autoMarketScale.toFixed(2)})</button>` : "Auto"}</p>
+        <p class="hint" id="setScaleEx">${scaleSamples(samples, m.marketScale)}</p>
+      </div>
+    </section>
+    <section class="set">
+      <div class="set-t"><h3>Categories in player value</h3>
+        <p>Which categories count toward each player's rating, Ours and Edge. Team ranks always show every league category.</p></div>
+      <div class="set-c"><div class="catpick" role="group" aria-label="Categories in player value">${m.categories.map((c) => `
+        <label class="cp" for="cat-${esc(c)}"><input type="checkbox" id="cat-${esc(c)}" data-cat="${esc(c)}" ${m.rated.includes(c) ? "checked" : ""}>${esc(c)}</label>`).join("")}</div>
+        <p class="hint">${room.rated != null ? `Changed from settings.txt. <button class="linkbtn" type="button" id="setCatsReset">Use settings.txt (${d.rated.map(esc).join(", ")})</button>` : "From settings.txt"}</p>
+      </div>
+    </section>
+    <section class="set">
+      <div class="set-t"><h3>Players who count</h3>
+        <p>Team totals use your best players and drop the rest, as bench players rarely all play.</p></div>
+      <div class="set-c">
+        <label class="inline" for="setCounted">Best <select id="setCounted">${Array.from({ length: m.rosterSize }, (_, i) => m.rosterSize - i)
+          .map((n) => `<option value="${n}" ${n === counted ? "selected" : ""}>${n}</option>`).join("")}</select> of ${m.rosterSize} count</label>
+        <p class="hint">${room.ignorePlayers != null ? `<button class="linkbtn" type="button" id="setCountedReset">Use settings.txt (best ${m.rosterSize - d.ignorePlayers})</button>` : "From settings.txt"}</p>
+      </div>
+    </section>
+    <section class="set">
+      <div class="set-t"><h3>Reset draft</h3>
+        <p>Unmark every taken player and empty your roster. Adjustments, notes and settings stay.</p></div>
+      <div class="set-c"><button class="btn danger" type="button" id="resetDraft" ${B.pool.taken || B.me.count ? "" : "disabled"}>Reset draft</button>
+        <p class="hint">${B.pool.taken} taken · ${B.me.count} on your team</p></div>
+    </section>
+    <section class="set">
+      <div class="set-t"><h3>League</h3><p>From ESPN. Change these on ESPN, then click Refresh from ESPN.</p></div>
+      <div class="set-c"><dl class="facts">
+        <dt>League</dt><dd>${esc(m.leagueName)}${m.leagueId ? ` <span class="muted">#${m.leagueId}</span>` : ""}</dd>
+        <dt>Format</dt><dd>${m.teams} teams · $${m.budget} ${esc((m.draftType || "").toLowerCase())} · ${esc(scoring)}</dd>
+        <dt>Roster</dt><dd>${m.slots.filter((x) => x !== "BE").map(esc).join(", ")}${bench ? `, ${bench} bench` : ""}</dd>
+        <dt>Categories</dt><dd>${m.categories.map((c) => esc(c) + (m.reverse.includes(c) ? " (lower is better)" : "")).join(", ")}</dd>
+      </dl></div>
+    </section>`;
+}
+// A 140-rated star who plays 50 games, valued at a given replacement rating.
+function repExample(rep) {
+  const g = B.meta.gamesInSeason, v = (140 * 50 + rep * (g - 50)) / g;
+  return `A 140-rated player who plays 50 games is worth <b>${fmt(v)}</b>. Each missed game costs ${fmt((140 - rep) / g, 2)}.`;
+}
+function scaleSamples(rows, k) {
+  return rows.map((r) => `${esc(lastName(r.name))} $${Math.round(r.avgRaw)} → <b>$${Math.round(r.avgRaw * k)}</b>`).join(" · ");
+}
+
+const setEl = $("settingsPanel");
+setEl.addEventListener("input", (e) => {
+  if (e.target.id === "setScale") {
+    const k = +e.target.value;
+    $("setScaleOut").textContent = "×" + k.toFixed(2);
+    $("setScaleEx").innerHTML = scaleSamples([...B.rows].sort((a, b) => b.avgRaw - a.avgRaw).slice(0, 3), k);
+    sendSettings({ marketScale: k });
+  } else if (e.target.id === "setRep") {
+    $("setRepOut").textContent = e.target.value;
+    $("setRepEx").innerHTML = repExample(+e.target.value);
+    sendSettings({ replacement: +e.target.value });
+  }
+});
+setEl.addEventListener("change", (e) => {
+  const t = e.target;
+  if (t.id === "setScale" || t.id === "setRep") return renderKeepFocus(); // full redraw once the drag ends
+  if (t.dataset.cat) {
+    const rated = [...setEl.querySelectorAll("[data-cat]")].filter((c) => c.checked).map((c) => c.dataset.cat);
+    if (!rated.length) { t.checked = true; return toast("At least one category has to count."); }
+    act("settings", { rated });
+  } else if (t.id === "setFadeStart" || t.id === "setFadeEnd") {
+    const v = parseNum(t.value);
+    if (v == null || Number.isNaN(v)) { toast("Use a team rating, like 110."); return renderKeepFocus(); }
+    act("settings", { [t.id === "setFadeStart" ? "fadeStart" : "fadeEnd"]: Math.round(v) });
+  } else if (t.id === "setCore") {
+    act("settings", { core: +t.value });
+  } else if (t.id === "setCounted") {
+    act("settings", { ignorePlayers: B.meta.rosterSize - +t.value });
+  }
+});
+setEl.addEventListener("click", (e) => {
+  const id = e.target.id;
+  if (id === "setScaleAuto") act("settings", { marketScale: null });
+  else if (id === "setCatsReset") act("settings", { rated: null });
+  else if (id === "setCountedReset") act("settings", { ignorePlayers: null });
+  else if (id === "setRepReset") act("settings", { replacement: null });
+  else if (id === "setCoreReset") act("settings", { core: null });
+  else if (id === "setFadeReset") act("settings", { fadeStart: null, fadeEnd: null });
+  else if (id === "resetDraft") {
+    const prev = snapshotState(), n = B.pool.taken + B.me.count;
+    act("reset-draft").then((ok) => ok && toast(`Reset the draft: ${n} player${n === 1 ? "" : "s"} back in the pool.`, undoTo(prev)));
+  }
+});
+
 // ------------------------------------------------------------------ tabs + theme
 
 function setView(v) {
   UI.view = v; UI.pickSlot = null;
-  history.replaceState(null, "", v === "team" ? "#team" : location.pathname);
-  $("view-board").hidden = v !== "board";
-  $("view-team").hidden = v !== "team";
-  $("tab-board").setAttribute("aria-selected", v === "board");
-  $("tab-team").setAttribute("aria-selected", v === "team");
+  history.replaceState(null, "", v === "board" ? location.pathname : "#" + v);
+  VIEWS.forEach((k) => {
+    $("view-" + k).hidden = v !== k;
+    $("tab-" + k).setAttribute("aria-selected", v === k);
+  });
 }
-$("tab-board").addEventListener("click", () => { setView("board"); render(); });
-$("tab-team").addEventListener("click", () => { setView("team"); render(); });
+const VIEWS = ["board", "team", "settings"];
+VIEWS.forEach((k) => $("tab-" + k).addEventListener("click", () => { setView(k); render(); }));
 
 function setTheme(t) {
   if (t === "system") delete document.documentElement.dataset.theme;
@@ -850,7 +1017,7 @@ async function watchForReload() {
 }
 watchForReload();
 
-if (location.hash === "#team") setView("team");
+if (VIEWS.includes(location.hash.slice(1))) setView(location.hash.slice(1));
 (async () => {
   const b = await api("/api/board");
   if (b) { B = b; render(); }

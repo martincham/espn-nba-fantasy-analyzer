@@ -31,6 +31,7 @@ VOLUME_STATS = [
 ]
 
 Stats = Dict[str, float]
+GAMES_IN_SEASON = 82
 
 
 # --------------------------------------------------------------------------
@@ -182,10 +183,18 @@ class LeagueShape:
     categories: List[str] = field(default_factory=list)  # league scoring categories
     reverse: List[str] = field(default_factory=lambda: ["TO"])  # lower is better
     rated: List[str] = field(default_factory=list)  # categories counted in ratings
+    core: Optional[int] = None  # players per team worth paying for; the rest cost $1 (None = whole roster)
+    replacement: float = 0.0  # per-game rating of the free agent who fills a missed game
 
     @property
     def pool_size(self) -> int:
         return self.teams * self.roster_size
+
+    @property
+    def priced_size(self) -> int:
+        """How many players share the money above $1: every team's core."""
+        core = min(self.core or self.roster_size, self.roster_size)
+        return self.teams * core
 
     @property
     def counted(self) -> int:
@@ -195,7 +204,7 @@ class LeagueShape:
 @dataclass
 class Adjustment:
     delta: float = 0.0  # change in per-game rating points (100 = average player)
-    exp_gp: Optional[int] = None
+    gp_delta: int = 0  # games added to (or taken from) the default expected games
     exp_min: Optional[float] = None  # minutes per game
     note: str = ""
 
@@ -204,20 +213,18 @@ class Adjustment:
 class Valued:
     id: int
     delta: float
+    gp_delta: int
     exp_gp: int
-    gp_set: bool
     exp_min: float
     min_set: bool
     last_pg: float
-    last_season: float
+    last_value: float
     proj_pg: float
-    proj_season: float
     value: float
     proj_stats: Stats
     rank: int = 0
     ours: float = 1.0
     edge: float = 0.0
-    bid: float = 1.0
 
 
 @dataclass
@@ -227,29 +234,37 @@ class Baseline:
     per_game: Stats
     season: Stats
     pool_ids: List[int]
+    avg_gp: float = 1.0  # average games played in the pool
 
 
-def compute_baseline(players: Sequence, shape: LeagueShape, weight: float = 0.5) -> Baseline:
+def season_value(rating: float, games: float, replacement: float = 0.0) -> float:
+    """A roster spot's average per-game rating over a full season.
+
+    The player's games count at his rating, and the games he misses at the
+    replacement rating (the free agent picked up while he's out or on IR).
+    With replacement 0 this is simply rating × games / 82.
+    """
+    games = max(0.0, min(float(GAMES_IN_SEASON), games))
+    return (rating * games + replacement * (GAMES_IN_SEASON - games)) / GAMES_IN_SEASON
+
+
+def compute_baseline(players: Sequence, shape: LeagueShape) -> Baseline:
     """Pick the draftable pool and compute its averages.
 
     `players` need .id, .base_pg (per-game stats), .base_gp and .espn_rank.
     Starts from ESPN's top N, then re-picks the top N by our own last-season
-    value so the pool isn't defined by ESPN's ranking.
+    value (per-game rating × games) so the pool isn't defined by ESPN's ranking.
     """
     rated = [p for p in players if p.base_pg and p.base_gp > 0]
     n = min(shape.pool_size, len(rated))
     pool = sorted(rated, key=lambda p: p.espn_rank or 10**6)[:n]
     for _ in range(2):
-        per_game, season = pool_averages([(p.base_pg, p.base_gp) for p in pool])
-
-        def last_value(p):
-            pg = rate(p.base_pg, per_game, shape.rated)
-            ssn = rate(scale(p.base_pg, p.base_gp), season, shape.rated)
-            return weight * pg + (1 - weight) * ssn
-
-        pool = sorted(rated, key=last_value, reverse=True)[:n]
+        per_game, _season = pool_averages([(p.base_pg, p.base_gp) for p in pool])
+        avg_gp = sum(p.base_gp for p in pool) / len(pool) if pool else 1.0
+        pool = sorted(rated, key=lambda p: rate(p.base_pg, per_game, shape.rated) * p.base_gp / avg_gp, reverse=True)[:n]
     per_game, season = pool_averages([(p.base_pg, p.base_gp) for p in pool])
-    return Baseline(per_game=per_game, season=season, pool_ids=[p.id for p in pool])
+    avg_gp = sum(p.base_gp for p in pool) / len(pool) if pool else 1.0
+    return Baseline(per_game=per_game, season=season, pool_ids=[p.id for p in pool], avg_gp=avg_gp)
 
 
 def value_players(
@@ -257,9 +272,12 @@ def value_players(
     baseline: Baseline,
     shape: LeagueShape,
     adjustments: Dict[int, Adjustment],
-    weight: float,
 ) -> List[Valued]:
-    """Rate every player, apply minutes, Δ and expected games, and price the pool.
+    """Rate every player, apply minutes, Δ and games, and price the pool.
+
+    Value = projected per-game rating × expected games, with missed games
+    filled at shape.replacement (see season_value). Expected games = the
+    player's .default_exp_gp (ESPN's projection) + the games Δ.
 
     `players` need .id, .base_pg, .base_gp and .default_exp_gp. Optionally
     .rate_line / .rate_min / .default_exp_min: the projection keeps rate_line's
@@ -271,7 +289,7 @@ def value_players(
         if not p.base_pg:
             continue
         adj = adjustments.get(p.id) or Adjustment()
-        exp_gp = adj.exp_gp if adj.exp_gp is not None else p.default_exp_gp
+        exp_gp = max(0, min(GAMES_IN_SEASON, p.default_exp_gp + adj.gp_delta))
         line = getattr(p, "rate_line", None) or p.base_pg
         line_min = getattr(p, "rate_min", 0) or 0
         default_min = getattr(p, "default_exp_min", None) or line_min
@@ -283,22 +301,19 @@ def value_players(
         if adj.delta:
             role_rating = rate(proj, baseline.per_game, shape.rated)
             proj = scale(proj, scale_for_rating(proj, baseline.per_game, shape.rated, role_rating + adj.delta))
-        last_season = rate(scale(p.base_pg, p.base_gp), baseline.season, shape.rated) if p.base_gp else 0.0
         proj_pg = rate(proj, baseline.per_game, shape.rated)
-        proj_season = rate(scale(proj, exp_gp), baseline.season, shape.rated)
         rows.append(
             Valued(
                 id=p.id,
                 delta=adj.delta,
+                gp_delta=adj.gp_delta,
                 exp_gp=exp_gp,
-                gp_set=adj.exp_gp is not None,
                 exp_min=exp_min,
                 min_set=adj.exp_min is not None,
                 last_pg=last_pg,
-                last_season=last_season,
+                last_value=season_value(last_pg, p.base_gp, shape.replacement),
                 proj_pg=proj_pg,
-                proj_season=proj_season,
-                value=weight * proj_pg + (1 - weight) * proj_season,
+                value=season_value(proj_pg, exp_gp, shape.replacement),
                 proj_stats=proj,
             )
         )
@@ -307,40 +322,44 @@ def value_players(
 
 
 def price(rows: List[Valued], shape: LeagueShape) -> None:
-    """Rank by value and convert surplus over replacement into dollars."""
+    """Rank by value and convert surplus over replacement into dollars.
+
+    Every roster spot costs $1. The rest of the league's money is shared by
+    the top `priced_size` players (each team's core) in proportion to their
+    value above the last of them; everyone else is a $1 player.
+    """
     ordered = sorted(rows, key=lambda r: r.value, reverse=True)
     for i, r in enumerate(ordered):
         r.rank = i + 1
-    if not ordered:
-        return
-    n = min(shape.pool_size, len(ordered))
-    replacement = ordered[n - 1].value
-    surplus = sum(max(0.0, r.value - replacement) for r in ordered[:n])
-    per_point = (shape.teams * shape.budget - n) / surplus if surplus > 0 else 0.0
+    rate = pricing(rows, shape)
     for r in rows:
-        r.ours = 1 + max(0.0, r.value - replacement) * per_point
+        r.ours = rate.dollars(r.value)
 
 
 @dataclass
-class Market:
-    inflation: float
-    money_left: float
-    spots_left: int
-    drafted: int
+class Pricing:
+    replacement: float  # value of the last core player: what $1 gets you
+    per_point: float  # dollars per point of value above replacement
+
+    def dollars(self, value: float) -> float:
+        return 1 + max(0.0, value - self.replacement) * self.per_point
 
 
-def apply_inflation(rows: List[Valued], shape: LeagueShape, prices: Dict[int, float]) -> Market:
-    """Money left vs value left among undrafted players; sets each row's bid.
+def pricing(rows: Sequence[Valued], shape: LeagueShape) -> Pricing:
+    """The league's exchange rate between value points and dollars.
 
-    `prices` maps every drafted player (mine or taken) to the price paid.
+    Every roster spot costs $1; the rest of the money goes to the top
+    `priced_size` players in proportion to their value above the last of them.
     """
-    money_left = shape.teams * shape.budget - sum(prices.values())
-    spots_left = max(0, shape.pool_size - len(prices))
-    value_left = sum(r.ours - 1 for r in rows if r.id not in prices)
-    inflation = (money_left - spots_left) / value_left if value_left > 0 else 1.0
-    for r in rows:
-        r.bid = 1 + (r.ours - 1) * inflation
-    return Market(inflation=inflation, money_left=money_left, spots_left=spots_left, drafted=len(prices))
+    ordered = sorted((r.value for r in rows), reverse=True)
+    if not ordered:
+        return Pricing(0.0, 0.0)
+    n = min(shape.priced_size, len(ordered))
+    replacement = ordered[n - 1]
+    surplus = sum(max(0.0, v - replacement) for v in ordered[:n])
+    spots = min(shape.pool_size, len(ordered))
+    per_point = (shape.teams * shape.budget - spots) / surplus if surplus > 0 else 0.0
+    return Pricing(replacement, per_point)
 
 
 # --------------------------------------------------------------------------
@@ -350,6 +369,42 @@ def apply_inflation(rows: List[Valued], shape: LeagueShape, prices: Dict[int, fl
 
 def season_totals(row: Valued) -> Stats:
     return scale(row.proj_stats, row.exp_gp)
+
+
+def replacement_fill(rows: Sequence[Valued], shape: LeagueShape) -> Stats:
+    """The per-game line of the free agent who fills a player's missed games.
+
+    The average line of the players ranked just above replacement, scaled to
+    shape.replacement. Empty when missed games aren't filled (replacement 0).
+    """
+    ordered = sorted(rows, key=lambda r: r.value, reverse=True)
+    n = min(shape.pool_size, len(ordered))
+    reps = ordered[max(0, n - shape.roster_size):n] or ordered[-1:]
+    rep_rating = sum(r.proj_pg for r in reps) / len(reps) if reps else 0.0
+    if shape.replacement <= 0 or rep_rating <= 0:
+        return {}
+    line: Stats = {}
+    for r in reps:
+        for k, v in r.proj_stats.items():
+            if k in VOLUME_STATS:
+                line[k] = line.get(k, 0.0) + v / len(reps)
+    return scale(line, shape.replacement / rep_rating)
+
+
+def with_fill(totals: Stats, games: float, fill: Stats) -> Stats:
+    """Season totals plus `fill` for the games missed out of a full season."""
+    missed = GAMES_IN_SEASON - games
+    if not fill or missed <= 0:
+        return totals
+    out = dict(totals)
+    for k, v in fill.items():
+        out[k] = out.get(k, 0.0) + v * missed
+    return with_percentages(out)
+
+
+def member_totals(row: Valued, fill: Stats) -> Stats:
+    """A player's season totals, with his missed games filled by a free agent."""
+    return with_fill(season_totals(row), row.exp_gp, fill)
 
 
 def team_totals(members: Sequence["tuple[Stats, float]"], counted: int) -> Stats:
@@ -393,6 +448,8 @@ def team_ratings(team: Stats, average_team: Stats, categories: Sequence[str], re
 
 @dataclass
 class LeagueSim:
+    average_team: Stats  # the average simulated team's season totals
+    fill: Stats  # per-game line that fills a player's missed games (empty: not filled)
     teams: List[Stats]  # category values per team; index 0 is my team
     ranks: Dict[str, int]
     ratings: Dict[str, float]  # my team vs the average team, 100 = average
@@ -425,8 +482,13 @@ def simulate_league(
                 rep_totals[k] = rep_totals.get(k, 0.0) + v / len(reps)
     rep_member = (with_percentages(rep_totals), sum(r.proj_pg for r in reps) / len(reps))
 
+    fill = replacement_fill(rows, shape)
+
+    def member(r: Valued) -> "tuple[Stats, float]":
+        return member_totals(r, fill), r.proj_pg
+
     my_rows = [by_id[i] for i in mine if i in by_id]
-    me = [(season_totals(r), r.proj_pg) for r in my_rows]
+    me = [member(r) for r in my_rows]
     me += [rep_member] * max(0, shape.roster_size - len(me))
 
     mine_set = set(mine)
@@ -438,7 +500,7 @@ def simulate_league(
     opp: List[list] = [[] for _ in range(opponents)]
     for k, r in enumerate(deal):
         rnd, pos = divmod(k, opponents)
-        opp[opponents - 1 - pos if rnd % 2 else pos].append((season_totals(r), r.proj_pg))
+        opp[opponents - 1 - pos if rnd % 2 else pos].append(member(r))
 
     cats = shape.categories
     totals = [team_totals(me, shape.counted)] + [team_totals(t, shape.counted) for t in opp]
@@ -457,6 +519,8 @@ def simulate_league(
     overall = 1 + sum(1 for x in roto if x > roto[0])
     expected = sum((len(teams) - rk) / (len(teams) - 1) for rk in all_ranks[0].values()) if len(teams) > 1 else 0.0
     return LeagueSim(
+        average_team=average_team,
+        fill=fill,
         teams=teams,
         ranks=all_ranks[0],
         ratings=team_ratings(totals[0], average_team, cats, shape.reverse),
@@ -465,3 +529,92 @@ def simulate_league(
         expected_wins=expected,
         filled=len(my_rows),
     )
+
+
+# --------------------------------------------------------------------------
+# Team fit: how much a player helps the team I have
+# --------------------------------------------------------------------------
+
+
+@dataclass
+class Fade:
+    """Where extra category strength stops helping.
+
+    A team category rating counts in full up to `start`, each point above it
+    counts less (linearly down to nothing at `end`), and points past `end`
+    don't count. In H2H, a category you already win can't be won twice.
+    """
+
+    start: float = 110.0
+    end: float = 140.0
+
+    def useful(self, rating: float) -> float:
+        """The part of a team category rating that still wins matchups."""
+        a, b = self.start, max(self.end, self.start + 1e-9)
+        if rating <= a:
+            return rating
+        x = min(rating, b) - a
+        return a + x - x * x / (2 * (b - a))
+
+
+def team_fit(
+    rows: Sequence[Valued],
+    mine: Sequence[int],
+    shape: LeagueShape,
+    sim: LeagueSim,
+    baseline: Baseline,
+    categories: Sequence[str],
+    fade: Fade,
+) -> Dict[int, float]:
+    """Each player's value to my current team, on the player rating scale.
+
+    My team is my players plus average players (rating 100) in the open slots.
+    A player's fit compares my team with him against my team with an average
+    player in his place, category by category, counting only the useful part
+    of each team category rating (see Fade). It's scaled so that on a team
+    with nothing faded, fit ≈ the player's value. Players already on my team
+    are compared with an average player in their place.
+    """
+    cats = [c for c in categories if c in shape.categories]
+    if not cats or not rows:
+        return {}
+    by_id = {r.id: r for r in rows}
+    fill = sim.fill
+    avg_gp = baseline.avg_gp or GAMES_IN_SEASON
+    average = (with_fill(scale(baseline.per_game, avg_gp), avg_gp, fill), 100.0)
+    my = [(member_totals(by_id[i], fill), by_id[i].proj_pg) for i in mine if i in by_id]
+    my = my[: shape.roster_size]
+    open_slots = shape.roster_size - len(my)
+
+    def useful_total(members) -> float:
+        totals = team_totals(members, shape.counted)
+        ratings = team_ratings(totals, sim.average_team, cats, shape.reverse)
+        return sum(fade.useful(ratings.get(c, 100.0)) for c in cats)
+
+    scale_to_player = shape.counted / len(cats)
+    fits: Dict[int, float] = {}
+    mine_set = set(mine)
+    if open_slots > 0:
+        base_team = my + [average] * open_slots
+        base = useful_total(base_team)
+        for r in rows:
+            if r.id in mine_set:
+                continue
+            with_him = my + [(member_totals(r, fill), r.proj_pg)] + [average] * (open_slots - 1)
+            fits[r.id] = 100 + (useful_total(with_him) - base) * scale_to_player
+    else:
+        # A full roster: a new player would take the place of my weakest one.
+        weakest = min(range(len(my)), key=lambda k: my[k][1])
+        rest = my[:weakest] + my[weakest + 1:]
+        base = useful_total(rest + [average])
+        for r in rows:
+            if r.id in mine_set:
+                continue
+            fits[r.id] = 100 + (useful_total(rest + [(member_totals(r, fill), r.proj_pg)]) - base) * scale_to_player
+    for k, i in enumerate(i for i in mine if i in by_id):
+        if k >= len(my):
+            break
+        others = my[:k] + my[k + 1:]
+        pad = [average] * (shape.roster_size - len(my))
+        fits[i] = 100 + (useful_total(others + [my[k]] + pad) - useful_total(others + [average] + pad)) * scale_to_player
+    return fits

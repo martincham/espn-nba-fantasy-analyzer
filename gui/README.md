@@ -79,7 +79,8 @@ To start over, stop the app and delete `draftState.json`.
 
 - **Search:** press **/** to jump to the search box. It matches player names and NBA team abbreviations, ignoring accents.
 - **Edit a player:** type in the **Exp GP** or **Δ %** cells, or select a row and use the sliders in the side panel.
-  - Edited values are highlighted in marigold.
+  - Type Δ however is natural: `+5`, `5%`, `-10` and `−10` all work. Press ↑/↓ to step by 1, or hold Shift to step by 5.
+  - Edited values are highlighted in marigold. They save the moment you press Enter or leave the box.
   - Clear the Exp GP cell to reset it to the default.
   - **Use ESPN's** copies ESPN's projection.
 - **Value weighs:** slide toward per game to judge players on how good they are when they play. Slide toward season to penalize missed games.

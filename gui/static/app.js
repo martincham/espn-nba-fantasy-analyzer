@@ -19,6 +19,14 @@ const signed = (n, d = 0) => {
 const ord = (n) => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const norm = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+// Forgiving number parser for typed values: "+5", "5%", "−5", "$34", " 12 ".
+// Returns null for an empty box and NaN for anything unreadable.
+function parseNum(s) {
+  const clean = String(s).trim().replace(/[−–]/g, "-").replace(/[%$\s]/g, "").replace(/^\+/, "");
+  if (clean === "") return null;
+  return /^-?\d+(\.\d+)?$/.test(clean) ? Number(clean) : NaN;
+}
+const signedInput = (n) => (n > 0 ? "+" + n : n ? String(n) : "");
 const lastName = (n) => { const w = n.split(" "); return /^(Jr\.|Sr\.|II|III|IV)$/.test(w[w.length - 1]) ? w[w.length - 2] : w[w.length - 1]; };
 
 // ------------------------------------------------------------------ api
@@ -281,8 +289,8 @@ function rowHTML(r) {
     <td>${r.fromProj ? "—" : r.gp}</td>
     <td>${fmt(r.lastPg)}</td>
     <td>${r.fromProj ? "—" : fmt(r.lastSeason)}</td>
-    <td><input class="cell ${r.gpSet ? "edited" : ""}" type="number" min="0" max="82" step="1" value="${r.expGp}" aria-label="Expected games for ${esc(r.name)}" data-gp="${r.id}" id="g-${r.id}"></td>
-    <td><input class="cell ${r.delta ? "edited" : ""}" type="number" min="-50" max="50" step="1" value="${r.delta || ""}" placeholder="0" aria-label="Δ percent for ${esc(r.name)}" data-delta="${r.id}" id="d-${r.id}"></td>
+    <td><input class="cell ${r.gpSet ? "edited" : ""}" type="text" inputmode="numeric" autocomplete="off" value="${r.expGp}" aria-label="Expected games for ${esc(r.name)}" data-gp="${r.id}" id="g-${r.id}"></td>
+    <td><input class="cell ${r.delta ? "edited" : ""}" type="text" inputmode="text" autocomplete="off" value="${signedInput(r.delta)}" placeholder="0" aria-label="Δ percent for ${esc(r.name)}" data-delta="${r.id}" id="d-${r.id}"></td>
     <td>${fmt(r.projPg)}</td>
     <td class="val">${fmt(r.value)}</td>
     <td>${money(r.espn)}</td>
@@ -360,7 +368,7 @@ function renderDetail() {
       ${r.status
         ? `<div class="draftrow">${r.status === "mine" ? `<span class="pill mine">Mine · ${esc(slotName || "?")} $${r.price}</span>` : `<span class="pill taken">Taken $${r.price}</span>`}
            <button class="btn" type="button" id="undoPick">${r.status === "mine" ? "Remove from team" : "Undo"}</button></div>`
-        : `<div class="draftrow"><label for="priceIn" title="Defaults to the average paid in ESPN auctions">Price</label><input id="priceIn" type="number" min="1" max="${B.meta.budget}" value="${Math.round(Math.max(1, r.avg))}">
+        : `<div class="draftrow"><label for="priceIn" title="Defaults to the average paid in ESPN auctions">Price</label><input id="priceIn" type="text" inputmode="numeric" autocomplete="off" value="${Math.round(Math.max(1, r.avg))}">
            <button class="btn primary" type="button" data-pick="mine">Add to my team</button><button class="btn" type="button" data-pick="taken">Mark taken</button></div>`}
     </div>`;
 }
@@ -403,7 +411,7 @@ function renderTeam() {
     h += `<div class="srow ${r ? "" : "empty"} ${s === "BE" ? "bench" : ""} ${UI.pickSlot === i ? "pick" : ""}" data-slot="${i}" ${r ? `draggable="true" data-drag="${r.id}"` : ""} tabindex="0" role="button" aria-label="${s} slot${r ? `: ${esc(r.name)}` : ", empty"}">
       <span class="pos">${s}</span>
       <span class="nm">${r ? `<b>${esc(r.name)}</b><span>${esc(r.team)} · ${esc(r.pos)} · ${r.expGp} GP</span>` : `<span class="ph">Empty: counts as replacement</span>`}</span>
-      ${r ? `<input type="number" min="1" max="${m.budget}" value="${r.price}" aria-label="Price paid for ${esc(r.name)}" data-price="${r.id}" id="pr-${r.id}">` : "<span></span>"}
+      ${r ? `<input type="text" inputmode="numeric" autocomplete="off" value="${r.price}" aria-label="Price paid for ${esc(r.name)}" data-price="${r.id}" id="pr-${r.id}">` : "<span></span>"}
       <span class="v" title="Our value">${r ? money(r.ours) : ""}</span>
       ${r ? `<button class="x" type="button" data-remove="${r.id}" aria-label="Remove ${esc(r.name)}" title="Remove from team">×</button>` : "<span></span>"}
     </div>`;
@@ -525,7 +533,10 @@ slotContainerHandlers($("slots"));
 slotContainerHandlers($("ranks"));
 $("slots").addEventListener("change", (e) => {
   const i = e.target.closest("[data-price]");
-  if (i) act("price", { id: +i.dataset.price, price: Math.max(1, Math.round(+i.value || 1)) });
+  if (!i) return;
+  const price = readPrice(i.value);
+  if (price == null) return renderKeepFocus(); // revert
+  act("price", { id: +i.dataset.price, price });
 });
 
 // ------------------------------------------------------------------ controls
@@ -573,13 +584,35 @@ tb.addEventListener("focusin", (e) => {
   i.closest("tr").classList.add("sel");
   renderDetail();
 });
+function readPrice(s) {
+  const v = parseNum(s);
+  if (v == null || Number.isNaN(v) || v < 1) { toast("Prices are whole dollars, like 34 or $34."); return null; }
+  return Math.round(v);
+}
+function saveCell(input) {
+  const v = parseNum(input.value);
+  if (input.dataset.delta) {
+    if (Number.isNaN(v)) { toast("Δ needs a number, like +5, -10 or 5%."); return renderKeepFocus(); }
+    act("adjust", { id: +input.dataset.delta, delta: Math.round(v ?? 0) }); // empty box clears Δ
+  } else if (input.dataset.gp) {
+    if (Number.isNaN(v) || (v != null && v < 0)) { toast("Expected games needs a number from 0 to 82."); return renderKeepFocus(); }
+    act("adjust", { id: +input.dataset.gp, expGp: v == null ? null : Math.round(v) }); // empty box resets to default
+  }
+}
 tb.addEventListener("change", (e) => {
-  const d = e.target.closest("[data-delta]"), g = e.target.closest("[data-gp]");
-  if (d) act("adjust", { id: +d.dataset.delta, delta: Math.round(+d.value || 0) });
-  if (g) act("adjust", { id: +g.dataset.gp, expGp: g.value === "" ? null : Math.round(+g.value) });
+  const cell = e.target.closest("[data-delta],[data-gp]");
+  if (cell) saveCell(cell);
 });
 tb.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && e.target.matches(".cell")) e.target.blur();
+  if (!e.target.matches(".cell")) return;
+  if (e.key === "Enter") { e.target.blur(); return; }
+  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+  e.preventDefault();
+  const v = parseNum(e.target.value);
+  const step = (e.shiftKey ? 5 : 1) * (e.key === "ArrowUp" ? 1 : -1);
+  const next = (Number.isNaN(v) || v == null ? 0 : v) + step;
+  e.target.value = e.target.dataset.delta ? signedInput(next) : String(Math.max(0, next));
+  saveCell(e.target);
 });
 
 const det = $("detail");
@@ -595,7 +628,8 @@ det.addEventListener("click", (e) => {
   const b = e.target.closest("[data-pick]");
   const r = byId.get(UI.sel);
   if (b && r) {
-    const price = Math.max(1, Math.round(+$("priceIn").value || 1));
+    const price = readPrice($("priceIn").value);
+    if (price == null) return;
     act("pick", { id: r.id, status: b.dataset.pick, price });
     return;
   }

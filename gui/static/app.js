@@ -218,7 +218,7 @@ $("catrow").addEventListener("keydown", (e) => {
 const GROUPS = () => [
   { label: "", span: 2 },
   { label: B.meta.statsLabel, span: 3 },
-  { label: `${B.meta.seasonLabel} outlook`, span: 4, cls: "g-out" },
+  { label: `${B.meta.seasonLabel} outlook`, span: 5, cls: "g-out" },
   { label: "Auction $", span: 5, cls: "g-ours" },
 ];
 const COLS = [
@@ -227,12 +227,13 @@ const COLS = [
   { key: "gp", label: "GP", title: "Games played last season" },
   { key: "lastPg", label: "Per gm", title: "Per-game rating (100 = pool average)" },
   { key: "lastSeason", label: "Season", title: "Full-season rating. Missed games pull it down." },
-  { key: "expGp", label: "Exp GP", title: "Expected games. Default: halfway between last season and ESPN's projection. Clear to reset." },
-  { key: "delta", label: "Δ %", title: "Overall change. Scales every counting stat and shot attempt." },
+  { key: "expGp", label: "Exp GP", title: "Expected games. Default: ⅔ ESPN's projection + ⅓ last season. Clear to reset." },
+  { key: "expMin", label: "Exp MIN", title: "Expected minutes per game. Default: ESPN's projection. Production scales with minutes. Drag or type; clear to reset." },
+  { key: "delta", label: "Δ", title: "Change in per-game rating points (100 = average player), e.g. +10. Spread across categories by scaling every counting stat and shot attempt." },
   { key: "projPg", label: "Per gm", title: "Projected per-game rating" },
   { key: "value", label: "Value", title: "Blend of projected per-game and full-season ratings" },
   { key: "espn", label: "ESPN", title: "ESPN's suggested auction value for this league" },
-  { key: "avg", label: "Avg paid", title: "Average price in ESPN auction drafts" },
+  { key: "avg", label: "Avg paid", title: "Average price in ESPN auction drafts, scaled to this league's budget" },
   { key: "ours", label: "Ours", cls: "ours-h", title: "Our value before the draft" },
   { key: "edge", label: "Edge", cls: "ours-h", title: "Ours − Avg paid" },
   { key: "bid", label: "Bid to", cls: "ours-h", title: "Ours adjusted for inflation" },
@@ -242,7 +243,8 @@ function renderHead() {
   const g = `<tr class="grp">${GROUPS().map((g) => `<th colspan="${g.span}" class="${g.cls || ""}">${g.label ? `<span>${esc(g.label)}</span>` : ""}</th>`).join("")}</tr>`;
   const c = `<tr>${COLS.map((c) => {
     const s = UI.sort.key === c.key ? ` aria-sort="${UI.sort.dir < 0 ? "descending" : "ascending"}"` : "";
-    return `<th class="${c.cls || ""}"${s} scope="col"><button type="button" data-sort="${c.key}" title="${esc(c.title || "")}">${c.label}</button></th>`;
+    const title = c.key === "avg" ? `${c.title} (ESPN average × ${B.meta.marketScale.toFixed(2)})` : c.title || "";
+    return `<th class="${c.cls || ""}"${s} scope="col"><button type="button" data-sort="${c.key}" title="${esc(title)}">${c.label}</button></th>`;
   }).join("")}</tr>`;
   $("thead").innerHTML = g + c;
 }
@@ -253,7 +255,7 @@ function visibleRows() {
     (!q || norm(r.name).includes(q) || norm(r.team).includes(q)) &&
     (UI.pos === "ALL" || r.elig.includes(UI.pos)) &&
     (!UI.hideGone || !r.status) &&
-    (!UI.onlyAdj || r.delta || r.gpSet || r.note));
+    (!UI.onlyAdj || r.delta || r.gpSet || r.minSet || r.note));
   const { key, dir } = UI.sort;
   rows.sort((a, b) => {
     const x = a[key], y = b[key];
@@ -290,7 +292,8 @@ function rowHTML(r) {
     <td>${fmt(r.lastPg)}</td>
     <td>${r.fromProj ? "—" : fmt(r.lastSeason)}</td>
     <td><input class="cell ${r.gpSet ? "edited" : ""}" type="text" inputmode="numeric" autocomplete="off" value="${r.expGp}" aria-label="Expected games for ${esc(r.name)}" data-gp="${r.id}" id="g-${r.id}"></td>
-    <td><input class="cell ${r.delta ? "edited" : ""}" type="text" inputmode="text" autocomplete="off" value="${signedInput(r.delta)}" placeholder="0" aria-label="Δ percent for ${esc(r.name)}" data-delta="${r.id}" id="d-${r.id}"></td>
+    <td><input class="cell ${r.minSet ? "edited" : ""}" type="text" inputmode="decimal" autocomplete="off" value="${fmt(r.expMin)}" title="Last season ${r.lastMin ?? "—"} min · ESPN projects ${r.projMin ?? "—"}" aria-label="Expected minutes for ${esc(r.name)}" data-min="${r.id}" id="m-${r.id}"></td>
+    <td><input class="cell ${r.delta ? "edited" : ""}" type="text" inputmode="text" autocomplete="off" value="${signedInput(r.delta)}" placeholder="0" aria-label="Δ rating points for ${esc(r.name)}" data-delta="${r.id}" id="d-${r.id}"></td>
     <td>${fmt(r.projPg)}</td>
     <td class="val">${fmt(r.value)}</td>
     <td>${money(r.espn)}</td>
@@ -310,7 +313,7 @@ function renderBody() {
 // ------------------------------------------------------------------ detail panel
 
 function bars(before, after, cats) {
-  const MAX = 250, x0 = 44, w = 206, rh = 24;
+  const MAX = 250, x0 = 44, w = 172, rh = 24; // leaves room for labels like "281+ (+53)"
   const x = (v) => x0 + Math.min(Math.max(v, 0), MAX) / MAX * w;
   const h = cats.length * rh + 22;
   let s = `<svg viewBox="0 0 300 ${h}" role="img" aria-label="Per-game category ratings, last season and projected">`;
@@ -334,14 +337,14 @@ function renderDetail() {
   const slotName = r.status === "mine" ? B.meta.slots[B.state.filled.indexOf(r.id)] : null;
   const espnHint = r.fromProj
     ? `No ${B.meta.statsLabel} games, so this uses ESPN's projection (${r.projGp} GP).`
-    : `Last season ${r.gp} GP · ESPN projects ${r.projGp || "—"} GP${r.espnDelta != null ? ` and ${signed(r.espnDelta)}% volume` : ""}.`;
+    : `Last season ${r.gp} GP, ${r.lastMin ?? "—"} min · ESPN projects ${r.projGp || "—"} GP, ${r.projMin ?? "—"} min${r.espnDelta ? `, ${signed(r.espnDelta)} rating beyond minutes` : ""}.${r.rateSource === "espn" ? " Small sample, so production uses ESPN's line." : ""}`;
   el.innerHTML = `
     <div><h2>${esc(r.name)}</h2>
       <div class="dsub"><span>${esc(r.team)} · ${esc(r.pos)}</span><span class="num">${r.line.map((v) => fmt(v)).join(" / ")} pts/reb/ast</span>${injuryPill(r.inj, true)}</div></div>
     <div class="kv">
       <div><span class="lbl">Value rank</span><span class="v">#${r.rank}</span></div>
       <div><span class="lbl">ESPN rank</span><span class="v">#${r.espnRank ?? "—"}</span></div>
-      <div><span class="lbl">Avg paid</span><span class="v">${money(r.avg)}</span></div>
+      <div title="ESPN average $${fmt(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)} to fit this league's budget"><span class="lbl">Avg paid</span><span class="v">${money(r.avg)}</span></div>
       <div><span class="lbl">Ours</span><span class="v">${money(r.ours)}</span></div>
       <div><span class="lbl">Edge</span><span class="v ${r.edge >= 3 ? "up" : r.edge <= -3 ? "down" : ""}">${signed(r.edge)}</span></div>
       <div><span class="lbl">Bid to</span><span class="v">${r.status ? "—" : money(r.bid)}</span></div>
@@ -354,13 +357,15 @@ function renderDetail() {
         <tr><th scope="row">Value</th><td></td><td><b>${fmt(r.value)}</b></td></tr>
       </tbody>
     </table>
-    <div class="bars"><span class="lbl sec-t">Δ ${signed(r.delta)}% across categories · per game</span>${bars(r.catLast, r.catProj, B.meta.rated)}
+    <div class="bars"><span class="lbl sec-t">Δ ${signed(r.delta)} rating across categories · per game</span>${bars(r.catLast, r.catProj, B.meta.rated)}
       <div class="legend"><span><i style="background:var(--line-strong)"></i>${B.meta.statsLabel}</span><span><i style="background:var(--accent)"></i>${B.meta.seasonLabel}</span><span>100 = pool avg</span></div></div>
     <div><span class="lbl sec-t">Adjust</span>
-      <div class="adj"><span>Δ</span><input type="range" id="dRange" min="-50" max="50" step="1" value="${r.delta}" aria-label="Δ percent"><output id="dOut">${signed(r.delta)}%</output></div>
+      <div class="adj"><span>Δ</span><input type="range" id="dRange" min="${-B.meta.maxDelta}" max="${B.meta.maxDelta}" step="1" value="${r.delta}" aria-label="Δ rating points"><output id="dOut">${signed(r.delta)}</output></div>
+      <div class="adj"><span>Exp MIN</span><input type="range" id="mRange" min="0" max="${B.meta.maxMin}" step="0.5" value="${r.expMin}" aria-label="Expected minutes"><output id="mOut">${fmt(r.expMin)}</output></div>
       <div class="adj"><span>Exp GP</span><input type="range" id="gRange" min="0" max="82" step="1" value="${r.expGp}" aria-label="Expected games"><output id="gOut">${r.expGp}</output></div>
       <p class="hint">${espnHint}
-        ${r.espnDelta != null || r.projGp ? `<button class="linkbtn" type="button" id="useEspn">Use ESPN's</button>` : ""}
+        ${r.projMin || r.projGp ? `<button class="linkbtn" type="button" id="useEspn">Use ESPN's</button>` : ""}
+        ${r.minSet ? ` · <button class="linkbtn" type="button" id="resetMin">Reset minutes</button>` : ""}
         ${r.gpSet ? ` · <button class="linkbtn" type="button" id="resetGp">Reset games</button>` : ""}</p></div>
     <div><label class="lbl sec-t" for="noteBox">Note</label>
       <textarea id="noteBox" placeholder="Why the adjustment?">${esc(r.note || "")}</textarea></div>
@@ -575,9 +580,10 @@ tb.addEventListener("click", (e) => {
   renderDetail();
 });
 tb.addEventListener("focusin", (e) => {
-  const i = e.target.closest("[data-delta],[data-gp]");
+  const i = e.target.closest("[data-delta],[data-gp],[data-min]");
   if (!i) return;
-  const id = +(i.dataset.delta || i.dataset.gp);
+  i.select();
+  const id = +(i.dataset.delta || i.dataset.gp || i.dataset.min);
   if (UI.sel === id) return;
   UI.sel = id;
   tb.querySelectorAll("tr.sel").forEach((t) => t.classList.remove("sel"));
@@ -592,15 +598,18 @@ function readPrice(s) {
 function saveCell(input) {
   const v = parseNum(input.value);
   if (input.dataset.delta) {
-    if (Number.isNaN(v)) { toast("Δ needs a number, like +5, -10 or 5%."); return renderKeepFocus(); }
+    if (Number.isNaN(v)) { toast("Δ needs a number of rating points, like +10 or -5."); return renderKeepFocus(); }
     act("adjust", { id: +input.dataset.delta, delta: Math.round(v ?? 0) }); // empty box clears Δ
+  } else if (input.dataset.min) {
+    if (Number.isNaN(v) || (v != null && v < 0)) { toast(`Expected minutes needs a number from 0 to ${B.meta.maxMin}.`); return renderKeepFocus(); }
+    act("adjust", { id: +input.dataset.min, expMin: v }); // empty box resets to ESPN's projection
   } else if (input.dataset.gp) {
     if (Number.isNaN(v) || (v != null && v < 0)) { toast("Expected games needs a number from 0 to 82."); return renderKeepFocus(); }
     act("adjust", { id: +input.dataset.gp, expGp: v == null ? null : Math.round(v) }); // empty box resets to default
   }
 }
 tb.addEventListener("change", (e) => {
-  const cell = e.target.closest("[data-delta],[data-gp]");
+  const cell = e.target.closest("[data-delta],[data-gp],[data-min]");
   if (cell) saveCell(cell);
 });
 tb.addEventListener("keydown", (e) => {
@@ -609,19 +618,98 @@ tb.addEventListener("keydown", (e) => {
   if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
   e.preventDefault();
   const v = parseNum(e.target.value);
-  const step = (e.shiftKey ? 5 : 1) * (e.key === "ArrowUp" ? 1 : -1);
+  const step = SCRUB[cellKind(e.target)].step * (e.shiftKey ? 5 : 1) * (e.key === "ArrowUp" ? 1 : -1);
   const next = (Number.isNaN(v) || v == null ? 0 : v) + step;
   e.target.value = e.target.dataset.delta ? signedInput(next) : String(Math.max(0, next));
   saveCell(e.target);
 });
 
+// Click-and-drag scrubbing on the Exp GP, Exp MIN and Δ cells: drag sideways
+// to change the value (Shift for bigger steps); a plain click still types.
+const SCRUB = {
+  gp: { key: "expGp", px: 4, step: 1, min: 0, max: 82 },
+  min: { key: "expMin", px: 6, step: 0.5, min: 0, max: 48 },
+  delta: { key: "delta", px: 4, step: 1, min: -60, max: 60 },
+};
+const cellKind = (el) => (el.dataset.delta ? "delta" : el.dataset.min ? "min" : "gp");
+const cellId = (el) => +(el.dataset.delta || el.dataset.min || el.dataset.gp);
+let scrub = null;
+
+// Update one row's numbers in place, leaving the input being dragged alone.
+function patchRow(id, keep) {
+  const tr = tb.querySelector(`tr[data-id="${id}"]`), r = byId.get(id);
+  if (!tr || !r) return;
+  const tmp = document.createElement("tbody");
+  tmp.innerHTML = rowHTML(r);
+  const fresh = tmp.firstElementChild.children;
+  [...tr.children].forEach((td, i) => { if (!td.contains(keep) && fresh[i]) td.innerHTML = fresh[i].innerHTML; });
+}
+function renderScrub() {
+  byId = new Map(B.rows.map((r) => [r.id, r]));
+  renderScore(); renderCatRow(); renderStrip(); renderTeam();
+  if (scrub) patchRow(scrub.id, scrub.cell);
+  if (scrub && UI.sel === scrub.id) renderDetail();
+}
+const sendScrub = (() => {
+  let inflight = false, pending = null;
+  return async (body) => {
+    pending = body;
+    if (inflight) return;
+    while (pending) {
+      const b = pending; pending = null; inflight = true;
+      const data = await api("/api/adjust", b);
+      if (data && data.board) { B = data.board; renderScrub(); }
+      inflight = false;
+    }
+  };
+})();
+
+tb.addEventListener("pointerdown", (e) => {
+  const cell = e.target.closest(".cell");
+  if (!cell || e.button !== 0 || document.activeElement === cell) return; // already typing: select text normally
+  const v = parseNum(cell.value);
+  scrub = { cell, kind: cellKind(cell), id: cellId(cell), pointer: e.pointerId, x: e.clientX,
+    start: v == null || Number.isNaN(v) ? 0 : v, moved: false, last: null };
+});
+document.addEventListener("pointermove", (e) => {
+  if (!scrub || e.pointerId !== scrub.pointer) return;
+  const dx = e.clientX - scrub.x;
+  if (!scrub.moved) {
+    if (Math.abs(dx) < 4) return;
+    scrub.moved = true;
+    scrub.cell.blur();
+    window.getSelection()?.removeAllRanges();
+    document.body.classList.add("scrubbing");
+    try { scrub.cell.setPointerCapture(e.pointerId); } catch (err) { /* capture is best-effort */ }
+  }
+  e.preventDefault();
+  const c = SCRUB[scrub.kind];
+  const v = Math.max(c.min, Math.min(c.max, scrub.start + Math.round(dx / c.px) * c.step * (e.shiftKey ? 5 : 1)));
+  if (v === scrub.last) return;
+  scrub.last = v;
+  scrub.cell.value = scrub.kind === "delta" ? signedInput(v) : scrub.kind === "min" ? v.toFixed(1) : String(v);
+  scrub.cell.classList.toggle("edited", scrub.kind !== "delta" || v !== 0);
+  sendScrub({ id: scrub.id, [c.key]: v });
+});
+function endScrub(e) {
+  if (!scrub || (e && e.pointerId !== scrub.pointer)) return;
+  const s = scrub;
+  scrub = null;
+  document.body.classList.remove("scrubbing");
+  if (!s.moved) return; // a plain click: let the input take focus for typing
+  if (s.last != null) act("adjust", { id: s.id, [SCRUB[s.kind].key]: s.last }); // final value, then full redraw
+}
+document.addEventListener("pointerup", endScrub);
+document.addEventListener("pointercancel", endScrub);
+
 const det = $("detail");
 det.addEventListener("input", (e) => {
-  if (e.target.id === "dRange") { $("dOut").textContent = signed(+e.target.value) + "%"; sendAdjust({ id: UI.sel, delta: +e.target.value }); }
+  if (e.target.id === "dRange") { $("dOut").textContent = signed(+e.target.value); sendAdjust({ id: UI.sel, delta: +e.target.value }); }
   if (e.target.id === "gRange") { $("gOut").textContent = e.target.value; sendAdjust({ id: UI.sel, expGp: +e.target.value }); }
+  if (e.target.id === "mRange") { $("mOut").textContent = fmt(+e.target.value); sendAdjust({ id: UI.sel, expMin: +e.target.value }); }
 });
 det.addEventListener("change", (e) => {
-  if (e.target.id === "dRange" || e.target.id === "gRange") renderKeepFocus(); // redraw bars once the drag ends
+  if (["dRange", "gRange", "mRange"].includes(e.target.id)) renderKeepFocus(); // redraw bars once the drag ends
   if (e.target.id === "noteBox") act("adjust", { id: UI.sel, note: e.target.value });
 });
 det.addEventListener("click", (e) => {
@@ -638,10 +726,10 @@ det.addEventListener("click", (e) => {
     if (r.status === "mine") removeMine(r.id);
     else act("pick", { id: r.id, status: null });
   } else if (e.target.id === "useEspn") {
-    const body = { id: r.id };
-    if (r.espnDelta != null) body.delta = r.espnDelta;
-    if (r.projGp) body.expGp = r.projGp;
-    act("adjust", body);
+    // Minutes default to ESPN's already; set games and the skill change to ESPN's too.
+    act("adjust", { id: r.id, expMin: null, expGp: r.projGp || null, delta: r.espnDelta || 0 });
+  } else if (e.target.id === "resetMin") {
+    act("adjust", { id: r.id, expMin: null });
   } else if (e.target.id === "resetGp") {
     act("adjust", { id: r.id, expGp: null });
   }

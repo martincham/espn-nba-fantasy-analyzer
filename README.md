@@ -112,7 +112,7 @@ SWID and espn_s2 required for private leagues, ([finding SWID and espn_s2](https
 A local web app for draft day. It reads your league settings and every player's last-season stats and ESPN auction prices, then lets you:
 
 - search and filter the player pool
-- set a **Δ %** (expected improvement or decline) and **expected games** per player
+- set **expected minutes** (defaults to ESPN's projection), a **Δ** (improvement or decline, in rating points) and **expected games** per player, by typing or dragging
 - weigh per-game quality against full-season production (health)
 - compare **our $ value** with ESPN's suggested price and the **average price paid** in ESPN auctions
 - drag players into your roster slots and see your **category ranks** against a simulated league

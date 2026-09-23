@@ -108,27 +108,39 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
    - **Per game** rates the player's per-game stats. This is how good they are when they play.
    - **Season** rates the season totals. Missed games pull it down, so health is built in.
    - Example: Walker Kessler is 131 per game but 34 for the season on 5 GP.
-3. **Δ: one number, spread across categories.**
-   - Δ is a production change. Every counting stat *and* shot attempts (FGM/FGA/FTM/FTA) are multiplied by `(1 + Δ)`, and shooting percentages stay the same.
+3. **Expected minutes (Exp MIN): per player and editable. This is role.**
+   - Defaults to ESPN's projected minutes (`stats[id="102027"].MIN`).
+   - The projection keeps the player's per-minute production from `rate_line` and scales it to Exp MIN: `stats × ExpMIN / rateMIN`.
+   - `rate_line` is last season, or ESPN's projected line when there were fewer than 20 games last season (e.g. Kessler's 5).
+   - ESPN builds its own projections the same way: per-36 rates are unchanged and the minutes change. So the default matches ESPN for most players.
+   - "Use ESPN's" sets minutes and games to ESPN's and Δ to ESPN's projected rating change *beyond* minutes (about 0 for most players).
+4. **Δ: one number, spread across categories. This is skill, applied on top of minutes.**
+   - Δ is entered in **rating points** on the per-game scale (100 = average player): `+10` turns a 133 into a 143.
+   - `valuation.scale_for_rating` solves, by bisection, for the single multiplier on every counting stat *and* shot attempt (FGM/FGA/FTM/FTA) that reaches the target rating. Shooting percentages stay the same.
    - Each category moves in proportion to what the player already produces: a shot-blocker gains the most in BLK.
    - FG%/FT% ratings move more for good or bad shooters, because more volume amplifies efficiency in the existing `pow(pctDiff, attemptDiff × 2)` formula.
    - The detail panel shows each category before and after.
    - Later (optional): per-category tilts on top of the overall Δ.
-4. **Expected games (Exp GP): per player and editable.**
-   - The default is `round((last GP + ESPN projected GP) / 2)`. ESPN's projection (`stats[id="102027"]`) includes GP.
+5. **Expected games (Exp GP): per player and editable. This is health.**
+   - The default is `round((last GP + 2 × ESPN projected GP) / 3)`, leaning on ESPN's projection, which (`stats[id="102027"]`) includes GP. It was halfway at first, but that priced players who missed time (Giannis, Tatum) far below the market.
    - Later: use a 3-season GP history for a better default, from the player card view, which returns earlier seasons.
-   - Override it when you believe in a player's health, e.g. Kessler at 62.
-5. **Projected ratings.**
-   - `projPerGame = rate(stats × (1+Δ), pgAvg)`
-   - `projSeason = rate(stats × (1+Δ) × ExpGP, seasonAvg)`
-6. **Value** = `w × projPerGame + (1 − w) × projSeason`. `w` is one global slider, default 50/50, that sets how much per-game quality counts against availability.
-7. **Ours $.**
+   - Override it when you believe in a player's health.
+6. **Projected ratings.**
+   - `role = rateLine × ExpMIN / rateMIN`
+   - `s = scale_for_rating(role, rate(role) + Δ)`
+   - `projPerGame = rate(role × s, pgAvg)` (= role rating + Δ)
+   - `projSeason = rate(role × s × ExpGP, seasonAvg)`
+7. **Value** = `w × projPerGame + (1 − w) × projSeason`. `w` is one global slider, default 50/50, that sets how much per-game quality counts against availability.
+8. **Ours $.**
    - `repl` is the value of player #144.
    - `$/pt = (12 × $200 − 144) / Σ surplus of the top 144`.
    - `Ours = $1 + max(0, value − repl) × $/pt`.
    - Recomputed across the whole pool on every edit.
-8. **Edge** = `Ours − Avg paid` (ESPN `auctionValueAverage`). This shows who's underpriced in the market.
-9. **Inflation** (during the draft) = `(money left in league − roster spots left × $1) / Σ(Ours − 1) of undrafted players`.
+9. **Edge** = `Ours − Avg paid`. This shows who's underpriced in the market.
+   - Avg paid is ESPN's `auctionValueAverage` × a market scale. ESPN averages across leagues of all sizes, so its top-N prices add up to less than this league's budget: $1,827 vs $2,400 at the time of writing.
+   - The scale (`teams × budget / Σ top-N avg`, about ×1.31) puts both sides on the same dollars.
+   - After scaling, mid-tier Edge averages about +1 to +3. The top 12 average about −21, the market's star premium over a linear dollar curve.
+10. **Inflation** (during the draft) = `(money left in league − roster spots left × $1) / Σ(Ours − 1) of undrafted players`.
    - **Bid to** = `1 + (Ours − 1) × inflation`.
    - Bid to is shown for reference. Prices default to Avg paid.
 
@@ -142,7 +154,7 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
 - **Table** (grouped headers):
   - Rk · Player (team, position, injury, low-GP badge)
   - *2025-26:* GP · Per game · Season
-  - *2026-27 outlook:* **Exp GP (editable)** · **Δ % (editable)** · Proj per game · Value
+  - *2026-27 outlook:* **Exp GP** · **Exp MIN** · **Δ** (all editable by typing or click-and-drag scrubbing) · Proj per game · Value
   - *Auction $:* ESPN · Avg paid · **Ours** · **Edge** · **Bid to**
   - Edge uses green/red. Edited cells are highlighted amber.
 - **Player detail** (on row select):
@@ -171,7 +183,7 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
   - **Clear roster** (on both) empties every slot.
   - Neither asks for confirmation. Both show a message with an **Undo** button for 6 seconds, which restores the players to their slots and prices.
 - **Category ranks:**
-  - My team's projected season totals (`stats × (1+Δ) × ExpGP`) are compared with 11 simulated opponents.
+  - My team's projected season totals (`stats × s × ExpGP`) are compared with 11 simulated opponents.
   - Opponents are dealt Taken players first, then the best remaining players by value, in snake order.
   - Only each team's best `teamSize − ignorePlayers` (9) players count, ranked by per-game rating like `schedule.py`. Empty slots count as the average of players ranked #133–144 by value.
 - **The view shows:**

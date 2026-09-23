@@ -2,7 +2,7 @@
 
 A local web app for your fantasy basketball auction draft. It pulls your league's settings plus every player's last-season stats and ESPN auction prices, then lets you plan and track your draft in the browser.
 
-- **Board:** search and filter the player pool. Each player gets two ratings, per game and full season, and you can set your own **Δ %** (expected improvement or decline) and **expected games**. Compare **Ours** (our dollar value) with **Avg paid** (the average price in ESPN auctions) to find bargains.
+- **Board:** search and filter the player pool. Each player gets two ratings, per game and full season, and you can set your own **expected minutes** (role), **Δ** (skill change, in rating points) and **expected games** (health). Compare **Ours** (our dollar value) with **Avg paid** (the average price in ESPN auctions, scaled to your league's budget) to find bargains.
 - **My Team:** drag players into your roster slots and see how your team ranks in each category against a simulated 12-team league.
 - **During the draft:** mark players as yours or taken at the price paid, and follow your budget, max bid and inflation.
 
@@ -78,8 +78,11 @@ To start over, stop the app and delete `draftState.json`.
 ## Using it
 
 - **Search:** press **/** to jump to the search box. It matches player names and NBA team abbreviations, ignoring accents.
-- **Edit a player:** type in the **Exp GP** or **Δ %** cells, or select a row and use the sliders in the side panel.
-  - Type Δ however is natural: `+5`, `5%`, `-10` and `−10` all work. Press ↑/↓ to step by 1, or hold Shift to step by 5.
+- **Edit a player:** drag sideways on an **Exp GP**, **Exp MIN** or **Δ** cell to change it (hold Shift for bigger steps), or click the cell to type. You can also select a row and use the sliders in the side panel.
+  - **Exp MIN defaults to ESPN's projected minutes.** Production scales with minutes, keeping the player's per-minute rates from last season. With fewer than 20 games last season, ESPN's projected line is used instead. Clear the cell to go back to ESPN's minutes.
+  - **Δ is in rating points** on the per-game scale where 100 is the average player: `+10` turns a 133 into a 143. It's applied on top of the minutes change, so use it for real improvement or decline, not role. The change spreads across categories in proportion to what the player already produces.
+  - **Exp GP defaults** to ⅔ ESPN's projected games plus ⅓ last season's.
+  - Type Δ however is natural: `+5`, `-10` and `−10` all work. Press ↑/↓ to step by 1, or hold Shift to step by 5.
   - Edited values are highlighted in marigold. They save the moment you press Enter or leave the box.
   - Clear the Exp GP cell to reset it to the default.
   - **Use ESPN's** copies ESPN's projection.
@@ -114,6 +117,9 @@ The terminal running `python3 -m gui` was stopped or closed. Start it again. You
 
 **Prices look out of date**
 Click **Refresh from ESPN**. The Avg paid column moves as more ESPN auction drafts happen.
+
+**Why Avg paid is higher than on ESPN**
+ESPN averages prices across leagues of every size, so for the top players it adds up to less than a 12-team, $200 league spends. The app scales it to your league's budget. The factor (about ×1.31) is in the column's tooltip, and the raw ESPN price is in the player panel's tooltip.
 
 ## For developers
 

@@ -26,6 +26,7 @@ DEFAULT_SETTINGS = {
     "ignorePlayers": 3,
 }
 MINE, TAKEN = "mine", "taken"
+MAX_DELTA = 60  # rating points
 
 
 def load_settings(path: str) -> Dict[str, Any]:
@@ -62,6 +63,7 @@ class DraftBoard:
         self.slots: List[str] = []
         self.baseline: Optional[valuation.Baseline] = None
         self.warnings: List[str] = []
+        self.market_scale = 1.0
         self.state = self._empty_state()
 
     # ------------------------------------------------------------------ load
@@ -118,6 +120,10 @@ class DraftBoard:
             self.warnings.append(f"This league's draft type is {league.draft_type.lower()}; values are still shown in auction dollars.")
         history = [p for p in self.players if not p.base_is_projection]
         self.baseline = valuation.compute_baseline(history, self.shape)
+        # ESPN's average prices come from leagues of every size, so they add up
+        # to less than this league spends. Scale them to this league's budget.
+        top_market = sum(sorted((p.avg_paid for p in self.players), reverse=True)[: self.shape.pool_size])
+        self.market_scale = (self.shape.teams * self.shape.budget) / top_market if top_market > 0 else 1.0
 
     # ----------------------------------------------------------------- state
 
@@ -165,7 +171,9 @@ class DraftBoard:
 
     def _adjustments(self) -> Dict[int, Adjustment]:
         return {
-            int(k): Adjustment(delta=float(v.get("delta") or 0), exp_gp=v.get("expGp"), note=v.get("note") or "")
+            int(k): Adjustment(
+                delta=float(v.get("delta") or 0), exp_gp=v.get("expGp"), exp_min=v.get("expMin"), note=v.get("note") or ""
+            )
             for k, v in self.state["adjustments"].items()
         }
 
@@ -177,19 +185,22 @@ class DraftBoard:
             self._save()
 
     def adjust(self, player_id: int, **fields: Any) -> None:
-        """Set delta, expGp (None resets to the default) and/or note."""
+        """Set delta, expGp, expMin (None resets either to its default) and/or note."""
         with self.lock:
             if player_id not in self.by_id:
                 raise ValueError("Unknown player.")
             adj = dict(self.state["adjustments"].get(str(player_id), {}))
             if "delta" in fields:
-                adj["delta"] = max(-50.0, min(50.0, round(float(fields["delta"] or 0))))
+                adj["delta"] = max(-MAX_DELTA, min(MAX_DELTA, round(float(fields["delta"] or 0))))
             if "expGp" in fields:
                 gp = fields["expGp"]
                 adj["expGp"] = None if gp is None else max(0, min(draft.MAX_GP, int(round(float(gp)))))
+            if "expMin" in fields:
+                mins = fields["expMin"]
+                adj["expMin"] = None if mins is None else max(0.0, min(float(draft.MAX_MIN), round(float(mins) * 2) / 2))
             if "note" in fields:
                 adj["note"] = str(fields["note"] or "")[:1000]
-            if not adj.get("delta") and adj.get("expGp") is None and not adj.get("note"):
+            if not adj.get("delta") and adj.get("expGp") is None and adj.get("expMin") is None and not adj.get("note"):
                 self.state["adjustments"].pop(str(player_id), None)
             else:
                 self.state["adjustments"][str(player_id)] = adj
@@ -197,7 +208,7 @@ class DraftBoard:
 
     def reset_adjustments(self) -> None:
         with self.lock:
-            # Notes are kept; only Δ and expected games are cleared.
+            # Notes are kept; Δ, expected games and expected minutes are cleared.
             self.state["adjustments"] = {
                 k: {"note": v["note"]} for k, v in self.state["adjustments"].items() if v.get("note")
             }
@@ -238,7 +249,11 @@ class DraftBoard:
     def _default_price(self, player_id: int) -> int:
         """A player's cost when no price is given: the average paid in ESPN auctions."""
         player = self.by_id.get(player_id)
-        return max(1, int(round(player.avg_paid))) if player else 1
+        return max(1, int(round(self._market(player)))) if player else 1
+
+    def _market(self, player: draft.DraftPlayer) -> float:
+        """ESPN's average price, scaled to this league's budget."""
+        return player.avg_paid * self.market_scale
 
     @staticmethod
     def _price(price: Optional[float], fallback: Optional[float]) -> int:
@@ -323,6 +338,11 @@ class DraftBoard:
                 "lastSeason": _r(r.last_season),
                 "expGp": r.exp_gp,
                 "gpSet": r.gp_set,
+                "expMin": round(r.exp_min, 1),
+                "minSet": r.min_set,
+                "lastMin": _r(p.last_pg.get("MIN")),
+                "projMin": _r(p.proj_pg.get("MIN")),
+                "rateSource": p.rate_source,
                 "delta": r.delta,
                 "projPg": _r(r.proj_pg),
                 "projSeason": _r(r.proj_season),
@@ -330,10 +350,11 @@ class DraftBoard:
                 "rank": r.rank,
                 "espnRank": p.espn_rank,
                 "espn": _r(p.espn_value, 0),
-                "avg": _r(p.avg_paid),
+                "avg": _r(self._market(p)),
+                "avgRaw": _r(p.avg_paid),
                 "adp": _r(p.adp),
                 "ours": _r(r.ours, 2),
-                "edge": _r(r.ours - p.avg_paid, 2),
+                "edge": _r(r.ours - self._market(p), 2),
                 "bid": _r(r.bid, 2),
                 "status": pick["status"] if pick else None,
                 "price": pick["price"] if pick else None,
@@ -376,6 +397,9 @@ class DraftBoard:
             "rated": shape.rated,
             "slots": self.slots,
             "fetchedAt": self.fetched_at,
+            "marketScale": round(self.market_scale, 3),
+            "maxDelta": MAX_DELTA,
+            "maxMin": draft.MAX_MIN,
             "warnings": self.warnings,
         }
 
@@ -392,14 +416,18 @@ class DraftBoard:
         }
 
     def _espn_delta(self, p: draft.DraftPlayer) -> Optional[int]:
-        """ESPN's projection as a volume change vs last season, in %."""
-        if p.base_is_projection or not p.proj_pg or not p.last_pg:
+        """ESPN's skill change: its projected rating minus our line at ESPN's minutes.
+
+        Minutes are handled by Exp MIN, so this is what ESPN projects beyond
+        playing time. It's about 0 for most players, since ESPN mostly keeps
+        per-minute rates.
+        """
+        if not p.proj_pg or not p.rate_min or not p.proj_pg.get("MIN"):
             return None
-        avg = self.baseline.per_game
-        keys = [k for k in ("PTS", "REB", "AST", "STL", "BLK", "3PM", "FGA", "FTA") if avg.get(k)]
-        before = sum(p.last_pg.get(k, 0) / avg[k] for k in keys)
-        after = sum(p.proj_pg.get(k, 0) / avg[k] for k in keys)
-        return round((after / before - 1) * 100) if before else None
+        avg, cats = self.baseline.per_game, self.shape.rated
+        at_espn_minutes = valuation.scale(p.rate_line, p.proj_pg["MIN"] / p.rate_min)
+        change = valuation.rate(p.proj_pg, avg, cats) - valuation.rate(at_espn_minutes, avg, cats)
+        return max(-MAX_DELTA, min(MAX_DELTA, round(change)))
 
     def _team(self, sim: valuation.LeagueSim, rows, picks) -> Dict[str, Any]:
         cats = self.shape.categories
@@ -416,7 +444,7 @@ class DraftBoard:
             candidates = [
                 (valuation.category_rating(r.proj_stats, base, cat) or 0, r)
                 for r in rows
-                if r.id not in picks and r.ours - self.by_id[r.id].avg_paid > 0
+                if r.id not in picks and r.ours - self._market(self.by_id[r.id]) > 0
             ]
             candidates.sort(key=lambda x: x[0], reverse=True)
             targets = [

@@ -30,10 +30,20 @@ class ParseTest(unittest.TestCase):
         k = self.players["Walker Kessler"]
         self.assertEqual(k.last_gp, 5)
         self.assertGreater(k.proj_gp, 50)
-        self.assertEqual(k.default_exp_gp, round((k.last_gp + k.proj_gp) / 2))
+        self.assertEqual(k.default_exp_gp, round((k.last_gp + 2 * k.proj_gp) / 3))  # leans on ESPN
         self.assertIn("C", k.eligible_slots)
         self.assertGreater(k.base_pg["BLK"], 1.5)
         self.assertFalse(k.base_is_projection)
+
+    def test_minutes_defaults(self):
+        flagg = self.players["Cooper Flagg"]
+        self.assertEqual(flagg.rate_source, "last")  # a full season: his own per-minute rates
+        self.assertEqual(flagg.rate_min, flagg.last_pg["MIN"])
+        self.assertEqual(flagg.default_exp_min, round(flagg.proj_pg["MIN"], 1))  # ESPN's minutes
+        kessler = self.players["Walker Kessler"]
+        self.assertLess(kessler.last_gp, draft.MIN_SAMPLE_GP)
+        self.assertEqual(kessler.rate_source, "espn")  # 5 games is too small a sample
+        self.assertIs(kessler.rate_line, kessler.proj_pg)
 
     def test_draft_costs(self):
         j = self.players["Nikola Jokic"]
@@ -118,7 +128,7 @@ class BoardTest(unittest.TestCase):
         # Without a price, a player costs the average paid in ESPN auctions.
         white = ids["Derrick White"]
         self.assertIsNone(b.move(white, 0))
-        avg = next(r["avg"] for r in b.snapshot()["rows"] if r["id"] == white)
+        avg = next(r["avg"] for r in b.snapshot()["rows"] if r["id"] == white)  # already league-scaled
         self.assertEqual(b.state["picks"][str(white)]["price"], max(1, round(avg)))
         b.pick(white, None)
         self.assertIsNone(b.pick(white, "taken"))
@@ -132,15 +142,36 @@ class BoardTest(unittest.TestCase):
         again.load()
         self.assertEqual(again.state["filled"], b.state["filled"])
 
+    def test_market_prices_scaled_to_league_budget(self):
+        b = self.board
+        snap = b.snapshot()
+        k = b.market_scale  # the snapshot shows it rounded
+        self.assertAlmostEqual(snap["meta"]["marketScale"], k, places=3)
+        top = sorted((p.avg_paid for p in b.players), reverse=True)[: b.shape.pool_size]
+        self.assertAlmostEqual(sum(top) * k, b.shape.teams * b.shape.budget, places=6)
+        jokic = next(r for r in snap["rows"] if r["name"] == "Nikola Jokic")
+        self.assertAlmostEqual(jokic["avg"], round(jokic["avgRaw"] * k, 1), places=1)
+        self.assertAlmostEqual(jokic["edge"], round(jokic["ours"] - jokic["avgRaw"] * k, 2), places=1)
+        # Default prices use the scaled market price.
+        self.assertIsNone(b.pick(self.ids["Nikola Jokic"], "taken"))
+        self.assertEqual(b.state["picks"][str(self.ids["Nikola Jokic"])]["price"], round(jokic["avgRaw"] * k))
+
     def test_adjustments(self):
         b, kid = self.board, self.ids["Walker Kessler"]
         row = lambda: next(r for r in b.snapshot()["rows"] if r["id"] == kid)
         default_gp = row()["expGp"]
+        before = row()["projPg"]
         b.adjust(kid, delta=5, expGp=62, note="healthy")
         r = row()
         self.assertEqual((r["delta"], r["expGp"], r["gpSet"], r["note"]), (5, 62, True, "healthy"))
+        self.assertAlmostEqual(r["projPg"], before + 5, places=0)  # Δ is rating points
         b.adjust(kid, expGp=None)
         self.assertEqual(row()["expGp"], default_gp)
+        b.adjust(kid, expMin=34.3)
+        r = row()
+        self.assertEqual((r["expMin"], r["minSet"]), (34.5, True))  # rounded to half minutes
+        b.adjust(kid, expMin=None)
+        self.assertFalse(row()["minSet"])
         b.reset_adjustments()
         r = row()
         self.assertEqual((r["delta"], r["note"]), (0, "healthy"))

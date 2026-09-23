@@ -96,12 +96,40 @@ class DraftValueTest(unittest.TestCase):
         self.assertEqual(rows[1].rank, 1)
         self.assertAlmostEqual(min(r.ours for r in rows.values()), 1.0)
 
-    def test_positive_delta_raises_value(self):
+    def test_delta_is_rating_points(self):
         plain = self.value()
-        boosted = self.value({5: v.Adjustment(delta=20)})
-        self.assertGreater(boosted[5].proj_pg, plain[5].proj_pg)
+        boosted = self.value({5: v.Adjustment(delta=10)})
+        self.assertAlmostEqual(boosted[5].proj_pg, plain[5].last_pg + 10, places=4)
         self.assertGreater(boosted[5].ours, plain[5].ours)
         self.assertEqual(boosted[5].last_pg, plain[5].last_pg)
+        cut = self.value({5: v.Adjustment(delta=-15)})
+        self.assertAlmostEqual(cut[5].proj_pg, plain[5].last_pg - 15, places=4)
+
+    def test_delta_keeps_percentages_and_spreads_proportionally(self):
+        boosted = self.value({5: v.Adjustment(delta=10)})[5].proj_stats
+        base = self.players[4].base_pg
+        ratio = boosted["PTS"] / base["PTS"]
+        self.assertAlmostEqual(boosted["REB"] / base["REB"], ratio)
+        self.assertAlmostEqual(boosted["FG%"], base["FG%"])
+
+    def test_minutes_scale_production(self):
+        for p in self.players:
+            p.rate_line, p.rate_min, p.default_exp_min = dict(p.base_pg, MIN=30.0), 30.0, 30.0
+        plain = self.value()
+        more = self.value({5: v.Adjustment(exp_min=36)})[5]
+        self.assertAlmostEqual(more.proj_stats["PTS"], self.players[4].base_pg["PTS"] * 1.2)
+        self.assertAlmostEqual(more.proj_stats["FG%"], self.players[4].base_pg["FG%"])
+        self.assertGreater(more.proj_pg, plain[5].proj_pg)
+        self.assertEqual((more.exp_min, more.min_set), (36, True))
+        # Δ is applied on top of the minutes change.
+        both = self.value({5: v.Adjustment(exp_min=36, delta=10)})[5]
+        self.assertAlmostEqual(both.proj_pg, more.proj_pg + 10, places=4)
+
+    def test_scale_for_rating_bounds(self):
+        avg = line()
+        self.assertEqual(v.scale_for_rating(line(), avg, CATS, 0), 0.0)  # unreachably low clamps to 0
+        s = v.scale_for_rating(line(), avg, CATS, 300)
+        self.assertAlmostEqual(v.rate(v.scale(line(), s), avg, CATS), 300, places=3)
 
     def test_expected_games_only_moves_season_rating(self):
         plain = self.value()

@@ -23,6 +23,8 @@ BASE_URL = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba"
 BASE_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 POOL_CACHE_VERSION = 1
 MAX_GP = 82
+MAX_MIN = 48
+MIN_SAMPLE_GP = 20  # fewer games than this: last season's per-minute rates are too noisy
 KEPT_STATS = set(VOLUME_STATS) | set(PERCENT_STATS) | {"GP"}
 # Older espn_api releases use different names for some stats.
 STAT_ALIASES = {"3PTM": "3PM", "3PTA": "3PA", "3PT%": "3P%"}
@@ -171,9 +173,36 @@ class DraftPlayer:
         return self.proj_gp if self.base_is_projection else self.last_gp
 
     @property
+    def rate_line(self) -> Dict[str, float]:
+        """Per-game line whose per-minute rates drive the projection.
+
+        Last season when there's a real sample; otherwise ESPN's projection.
+        """
+        if self.last_gp >= MIN_SAMPLE_GP and self.last_pg.get("MIN"):
+            return self.last_pg
+        if self.proj_pg.get("MIN"):
+            return self.proj_pg
+        return self.base_pg
+
+    @property
+    def rate_source(self) -> str:
+        return "last" if self.rate_line is self.last_pg else "espn"
+
+    @property
+    def rate_min(self) -> float:
+        """Minutes per game behind rate_line."""
+        return float(self.rate_line.get("MIN") or 0)
+
+    @property
+    def default_exp_min(self) -> float:
+        """ESPN's projected minutes per game, else the rate line's minutes."""
+        return round(float(self.proj_pg.get("MIN") or self.rate_min), 1)
+
+    @property
     def default_exp_gp(self) -> int:
+        """Two-thirds ESPN's projected games, one-third last season's."""
         if self.last_gp > 0 and self.proj_gp > 0:
-            return min(MAX_GP, round((self.last_gp + self.proj_gp) / 2))
+            return min(MAX_GP, round((self.last_gp + 2 * self.proj_gp) / 3))
         return min(MAX_GP, self.last_gp or self.proj_gp)
 
 

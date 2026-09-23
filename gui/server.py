@@ -34,7 +34,7 @@ def _actions(board: DraftBoard) -> Dict[str, Callable[[Dict[str, Any]], Optional
 
     return {
         "weight": lambda b: board.set_weight(float(b["weight"])),
-        "adjust": lambda b: board.adjust(pid(b), **{k: b[k] for k in ("delta", "expGp", "note") if k in b}),
+        "adjust": lambda b: board.adjust(pid(b), **{k: b[k] for k in ("delta", "expGp", "expMin", "note") if k in b}),
         "reset-adjustments": lambda b: board.reset_adjustments(),
         "pick": lambda b: board.pick(pid(b), b.get("status"), opt(b, "price")),
         "price": lambda b: board.set_price(pid(b), float(b["price"])),

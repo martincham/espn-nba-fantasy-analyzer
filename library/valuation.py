@@ -124,6 +124,31 @@ def scale(stats: Stats, factor: float) -> Stats:
     return with_percentages(out)
 
 
+def scale_for_rating(stats: Stats, averages: Stats, categories: Sequence[str], target: float) -> float:
+    """Volume multiplier that moves a player's rating to `target`.
+
+    Δ is entered in rating points; this finds the single factor applied to
+    every counting stat and attempt (percentages unchanged) that produces
+    the target rating, so the change spreads across categories in
+    proportion to what the player already produces. Solved by bisection.
+    """
+    def rating_at(s: float) -> float:
+        return rate(scale(stats, s), averages, categories)
+
+    lo, hi = 0.0, 2.0
+    if target <= rating_at(lo):
+        return lo
+    while rating_at(hi) < target and hi < 64:
+        hi *= 2
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        if rating_at(mid) < target:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
 def pool_averages(lines: Sequence["tuple[Stats, float]"]) -> "tuple[Stats, Stats]":
     """Averages over a pool of (per-game stats, games played).
 
@@ -169,8 +194,9 @@ class LeagueShape:
 
 @dataclass
 class Adjustment:
-    delta: float = 0.0  # percent
+    delta: float = 0.0  # change in per-game rating points (100 = average player)
     exp_gp: Optional[int] = None
+    exp_min: Optional[float] = None  # minutes per game
     note: str = ""
 
 
@@ -180,6 +206,8 @@ class Valued:
     delta: float
     exp_gp: int
     gp_set: bool
+    exp_min: float
+    min_set: bool
     last_pg: float
     last_season: float
     proj_pg: float
@@ -231,9 +259,12 @@ def value_players(
     adjustments: Dict[int, Adjustment],
     weight: float,
 ) -> List[Valued]:
-    """Rate every player, apply Δ and expected games, and price the pool.
+    """Rate every player, apply minutes, Δ and expected games, and price the pool.
 
-    `players` need .id, .base_pg, .base_gp and .default_exp_gp.
+    `players` need .id, .base_pg, .base_gp and .default_exp_gp. Optionally
+    .rate_line / .rate_min / .default_exp_min: the projection keeps rate_line's
+    per-minute production and scales it to the expected minutes, then Δ
+    (rating points) is applied on top as a skill change.
     """
     rows: List[Valued] = []
     for p in players:
@@ -241,8 +272,17 @@ def value_players(
             continue
         adj = adjustments.get(p.id) or Adjustment()
         exp_gp = adj.exp_gp if adj.exp_gp is not None else p.default_exp_gp
-        proj = scale(p.base_pg, 1 + adj.delta / 100)
+        line = getattr(p, "rate_line", None) or p.base_pg
+        line_min = getattr(p, "rate_min", 0) or 0
+        default_min = getattr(p, "default_exp_min", None) or line_min
+        exp_min = adj.exp_min if adj.exp_min is not None else default_min
         last_pg = rate(p.base_pg, baseline.per_game, shape.rated)
+        # Role: same per-minute production, expected minutes.
+        proj = scale(line, exp_min / line_min) if line_min and exp_min else dict(line)
+        # Skill: Δ rating points on top of the minutes-adjusted line.
+        if adj.delta:
+            role_rating = rate(proj, baseline.per_game, shape.rated)
+            proj = scale(proj, scale_for_rating(proj, baseline.per_game, shape.rated, role_rating + adj.delta))
         last_season = rate(scale(p.base_pg, p.base_gp), baseline.season, shape.rated) if p.base_gp else 0.0
         proj_pg = rate(proj, baseline.per_game, shape.rated)
         proj_season = rate(scale(proj, exp_gp), baseline.season, shape.rated)
@@ -252,6 +292,8 @@ def value_players(
                 delta=adj.delta,
                 exp_gp=exp_gp,
                 gp_set=adj.exp_gp is not None,
+                exp_min=exp_min,
+                min_set=adj.exp_min is not None,
                 last_pg=last_pg,
                 last_season=last_season,
                 proj_pg=proj_pg,

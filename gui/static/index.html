@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Draft Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Lilex:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <span class="brand">Draft Room</span>
+    <div class="meta" id="meta"></div>
+    <span class="spacer"></span>
+    <div class="bar-actions">
+      <div class="seg" role="group" aria-label="Theme">
+        <button type="button" data-theme-btn="light">Light</button>
+        <button type="button" data-theme-btn="dark">Dark</button>
+        <button type="button" data-theme-btn="system">System</button>
+      </div>
+      <button class="btn" id="resetBtn" type="button">Clear adjustments</button>
+      <button class="btn" id="refreshBtn" type="button">Refresh from ESPN</button>
+    </div>
+    <div id="warnings" hidden></div>
+  </div>
+
+  <div class="scoreline" aria-live="polite">
+    <div class="score"><span class="lbl">Budget left</span><span class="val" id="sBudget">—</span><span class="sub" id="sMax"></span></div>
+    <div class="score"><span class="lbl">My roster</span><span class="val" id="sRoster">—</span><span class="sub" id="sRosterSub"></span></div>
+    <div class="score"><span class="lbl">Inflation</span><span class="val" id="sInfl">—</span><span class="sub" id="sInflSub"></span></div>
+    <div class="score"><span class="lbl">Best edge left</span><span class="val" id="sEdge">—</span><span class="sub" id="sEdgeSub"></span></div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Views">
+    <button class="tab" role="tab" id="tab-board" aria-selected="true" aria-controls="view-board" type="button">Board</button>
+    <button class="tab" role="tab" id="tab-team" aria-selected="false" aria-controls="view-team" type="button">My Team<span class="count" id="teamCount"></span></button>
+  </div>
+
+  <div id="view-board" role="tabpanel" aria-labelledby="tab-board">
+    <div class="controls">
+      <label class="search" for="q">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5"></circle><path d="M11 11l3.5 3.5"></path></svg>
+        <input id="q" type="search" placeholder="Search players or teams" autocomplete="off" aria-label="Search players">
+      </label>
+      <div class="chips" role="group" aria-label="Filter by position" id="chips"></div>
+      <label class="check" for="hideGone"><input type="checkbox" id="hideGone"> Hide drafted</label>
+      <label class="check" for="onlyAdj"><input type="checkbox" id="onlyAdj"> Only adjusted</label>
+      <label class="slider" for="weight" title="How value blends per-game quality with full-season production (which counts games played)">Value weighs
+        <input type="range" id="weight" min="0" max="100" step="5" value="50">
+        <output id="wOut" for="weight"></output></label>
+    </div>
+    <div class="strip" id="strip" aria-label="My roster slots. Drag players here."></div>
+    <div class="body">
+      <div class="tablewrap">
+        <table class="board" aria-label="Player pool">
+          <thead id="thead"></thead>
+          <tbody id="tbody"><tr><td class="loading">Loading player pool…</td></tr></tbody>
+        </table>
+      </div>
+      <aside class="detail" id="detail" aria-label="Player detail"></aside>
+    </div>
+  </div>
+
+  <div id="view-team" role="tabpanel" aria-labelledby="tab-team" hidden>
+    <div class="team">
+      <div class="slots" id="slots"></div>
+      <div class="ranks" id="ranks"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -107,6 +107,25 @@ Change ESPN Info:
 
 SWID and espn_s2 required for private leagues, ([finding SWID and espn_s2](https://github.com/cwendt94/espn-api/discussions/150)), league_id is required for all leagues. Your team number is required to calculate remaining value.
 
+## Draft Room (auction draft board)
+
+A local web app for draft day. It reads your league settings and every player's last-season stats and ESPN auction prices, then lets you:
+
+- search and filter the player pool
+- set a **Δ %** (expected improvement or decline) and **expected games** per player
+- weigh per-game quality against full-season production (health)
+- compare **our $ value** with ESPN's suggested price and the **average price paid** in ESPN auctions
+- drag players into your roster slots and see your **category ranks** against a simulated league
+- track your budget, max bid and inflation during the draft
+
+From the repo folder:
+
+```
+python3 -m gui
+```
+
+It opens `http://127.0.0.1:8000` in your browser. See [gui/README.md](gui/README.md) for setup, options and troubleshooting. It uses `leagueId` from `settings.txt` and needs no extra packages beyond `espn-api`. Your edits are saved to `draftState.json`, and the ESPN data is cached in `draftPool.json` (use **Refresh from ESPN** or `--refresh` to update it). Private leagues also need `espn_s2` and `SWID`.
+
 ## Reading the Data:
 
 This utility scores players where 100 is the **average production of players rostered in your league**, over the specified timespan. Averages can shift as players are rostered/dropped. A score of 200 will have double the production, 50 will have half. Rating will use all stats in "categories" unless in "ignoredStats".

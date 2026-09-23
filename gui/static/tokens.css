@@ -1,0 +1,92 @@
+/* Draft Room design tokens
+   Fonts: IBM Plex Sans (UI + headings), Lilex (numbers, data, labels)
+   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Lilex:wght@400;500;600&display=swap">
+*/
+
+:root {
+  /* Neutrals: concrete, a trace of warmth. Dark theme is warm charcoal, never blue-tinted. */
+  --ground: #F3F2F0;
+  --surface: #FFFFFF;
+  --sunk: #F8F7F5;
+  --ink: #1D1B19;
+  --ink-2: #4A4541;
+  --muted: #6E6862;
+  --faint: #9C958E;         /* placeholders, dividers, decoration only: never essential text */
+  --line: #E3E0DC;
+  --line-strong: #CBC6C0;
+
+  /* Accents (named by role; primary is swappable) */
+  --accent: #C44A08;        /* primary: actions, selection, "mine" (white text 4.85:1) */
+  --accent-text: #B64406;   /* orange for text on light surfaces (5.5:1 on white) */
+  --accent-ink: #FFFFFF;    /* text on orange fills */
+  --accent-soft: #FDEADF;   /* selected rows, "ours" columns */
+  --accent-line: #F3B894;
+  --edit: #E9A100;      /* user-edited values (Δ, Exp GP) */
+  --edit-text: #845B00;
+  --edit-soft: #FFF3D1;
+  --edit-line: #F0CD72;
+  --emph: #7A2E14;         /* emphasis, headings accents, 1st place */
+  --emph-soft: #F6E4DC;
+
+  /* Semantic (separate from accents) */
+  --good: #22784A;
+  --good-soft: #E1F2E7;
+  --bad: #BE2346;
+  --bad-soft: #FBE3E8;
+
+  /* Type */
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-data: "Lilex", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --fs-display: 2.5rem;   /* 40 */
+  --fs-h1: 1.75rem;       /* 28 */
+  --fs-h2: 1.25rem;       /* 20 */
+  --fs-h3: 1.0625rem;     /* 17 */
+  --fs-body: 0.9375rem;   /* 15 */
+  --fs-small: 0.8125rem;  /* 13 */
+  --fs-data: 0.84375rem;  /* 13.5, Lilex in tables */
+  --fs-label: 0.6875rem;  /* 11, Lilex uppercase */
+  --lh-tight: 1.15;
+  --lh-body: 1.5;
+  --track-label: 0.08em;
+
+  /* Space (4px base) */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+
+  /* Shape */
+  --r-sm: 4px;   /* inputs, pills, badges */
+  --r-md: 6px;   /* buttons, slots, tiles */
+  --r-lg: 10px;  /* app frame only */
+  --shadow-frame: 0 1px 0 var(--line), 0 14px 36px -20px rgba(40, 24, 12, .35);
+  --shadow-float: 0 10px 28px -12px rgba(40, 24, 12, .45);
+
+  /* Motion */
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --dur: 140ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #151311; --surface: #1E1B18; --sunk: #191714;
+    --ink: #F2EEE9; --ink-2: #D2CBC3; --muted: #A69D94; --faint: #756D65;
+    --line: #322E2A; --line-strong: #47413B;
+    --accent: #FF7A33; --accent-text: #FF8D4D; --accent-ink: #1A0D05; --accent-soft: #3A2114; --accent-line: #7A3E1C;
+    --edit: #FFC23D; --edit-text: #FFCF66; --edit-soft: #33280F; --edit-line: #6E551A;
+    --emph: #F0A487; --emph-soft: #3A221A;
+    --good: #5BCB8A; --good-soft: #13301F; --bad: #FF6F8A; --bad-soft: #3B1520;
+    --shadow-frame: 0 1px 0 var(--line), 0 14px 36px -20px rgba(0, 0, 0, .7);
+    --shadow-float: 0 10px 28px -12px rgba(0, 0, 0, .8);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #151311; --surface: #1E1B18; --sunk: #191714;
+  --ink: #F2EEE9; --ink-2: #D2CBC3; --muted: #A69D94; --faint: #756D65;
+  --line: #322E2A; --line-strong: #47413B;
+  --accent: #FF7A33; --accent-text: #FF8D4D; --accent-ink: #1A0D05; --accent-soft: #3A2114; --accent-line: #7A3E1C;
+  --edit: #FFC23D; --edit-text: #FFCF66; --edit-soft: #33280F; --edit-line: #6E551A;
+  --emph: #F0A487; --emph-soft: #3A221A;
+  --good: #5BCB8A; --good-soft: #13301F; --bad: #FF6F8A; --bad-soft: #3B1520;
+  --shadow-frame: 0 1px 0 var(--line), 0 14px 36px -20px rgba(0, 0, 0, .7);
+  --shadow-float: 0 10px 28px -12px rgba(0, 0, 0, .8);
+}

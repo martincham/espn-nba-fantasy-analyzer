@@ -1,4 +1,8 @@
 login.txt
+# Draft GUI local data
+draftPool.json
+draftState.json
+*.json.tmp
 settings.txt
 *.pickle
 *.xlsx

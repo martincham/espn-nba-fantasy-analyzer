@@ -1,0 +1,659 @@
+<title>Draft Room Style Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Lilex:wght@400;500;600&display=swap">
+<style>
+:root {
+  /* Neutrals: concrete, a trace of warmth. Dark theme is warm charcoal, never blue-tinted. */
+  --ground: #F3F2F0;
+  --surface: #FFFFFF;
+  --sunk: #F8F7F5;
+  --ink: #1D1B19;
+  --ink-2: #4A4541;
+  --muted: #6E6862;
+  --faint: #9C958E;         /* placeholders, dividers, decoration only: never essential text */
+  --line: #E3E0DC;
+  --line-strong: #CBC6C0;
+
+  /* Accents (named by role; primary is swappable) */
+  --accent: #C44A08;        /* primary: actions, selection, "mine" (white text 4.85:1) */
+  --accent-text: #B64406;   /* orange for text on light surfaces (5.5:1 on white) */
+  --accent-ink: #FFFFFF;    /* text on orange fills */
+  --accent-soft: #FDEADF;   /* selected rows, "ours" columns */
+  --accent-line: #F3B894;
+  --edit: #E9A100;      /* user-edited values (Δ, Exp GP) */
+  --edit-text: #845B00;
+  --edit-soft: #FFF3D1;
+  --edit-line: #F0CD72;
+  --emph: #7A2E14;         /* emphasis, headings accents, 1st place */
+  --emph-soft: #F6E4DC;
+
+  /* Semantic (separate from accents) */
+  --good: #22784A;
+  --good-soft: #E1F2E7;
+  --bad: #BE2346;
+  --bad-soft: #FBE3E8;
+
+  /* Type */
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-data: "Lilex", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --fs-display: 2.5rem;   /* 40 */
+  --fs-h1: 1.75rem;       /* 28 */
+  --fs-h2: 1.25rem;       /* 20 */
+  --fs-h3: 1.0625rem;     /* 17 */
+  --fs-body: 0.9375rem;   /* 15 */
+  --fs-small: 0.8125rem;  /* 13 */
+  --fs-data: 0.84375rem;  /* 13.5, Lilex in tables */
+  --fs-label: 0.6875rem;  /* 11, Lilex uppercase */
+  --lh-tight: 1.15;
+  --lh-body: 1.5;
+  --track-label: 0.08em;
+
+  /* Space (4px base) */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+
+  /* Shape */
+  --r-sm: 4px;   /* inputs, pills, badges */
+  --r-md: 6px;   /* buttons, slots, tiles */
+  --r-lg: 10px;  /* app frame only */
+  --shadow-frame: 0 1px 0 var(--line), 0 14px 36px -20px rgba(40, 24, 12, .35);
+  --shadow-float: 0 10px 28px -12px rgba(40, 24, 12, .45);
+
+  /* Motion */
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --dur: 140ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #151311; --surface: #1E1B18; --sunk: #191714;
+    --ink: #F2EEE9; --ink-2: #D2CBC3; --muted: #A69D94; --faint: #756D65;
+    --line: #322E2A; --line-strong: #47413B;
+    --accent: #FF7A33; --accent-text: #FF8D4D; --accent-ink: #1A0D05; --accent-soft: #3A2114; --accent-line: #7A3E1C;
+    --edit: #FFC23D; --edit-text: #FFCF66; --edit-soft: #33280F; --edit-line: #6E551A;
+    --emph: #F0A487; --emph-soft: #3A221A;
+    --good: #5BCB8A; --good-soft: #13301F; --bad: #FF6F8A; --bad-soft: #3B1520;
+    --shadow-frame: 0 1px 0 var(--line), 0 14px 36px -20px rgba(0, 0, 0, .7);
+    --shadow-float: 0 10px 28px -12px rgba(0, 0, 0, .8);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #151311; --surface: #1E1B18; --sunk: #191714;
+  --ink: #F2EEE9; --ink-2: #D2CBC3; --muted: #A69D94; --faint: #756D65;
+  --line: #322E2A; --line-strong: #47413B;
+  --accent: #FF7A33; --accent-text: #FF8D4D; --accent-ink: #1A0D05; --accent-soft: #3A2114; --accent-line: #7A3E1C;
+  --edit: #FFC23D; --edit-text: #FFCF66; --edit-soft: #33280F; --edit-line: #6E551A;
+  --emph: #F0A487; --emph-soft: #3A221A;
+  --good: #5BCB8A; --good-soft: #13301F; --bad: #FF6F8A; --bad-soft: #3B1520;
+  --shadow-frame: 0 1px 0 var(--line), 0 14px 36px -20px rgba(0, 0, 0, .7);
+  --shadow-float: 0 10px 28px -12px rgba(0, 0, 0, .8);
+}
+
+
+/* Lavender accent preview */
+:root[data-accent="lavender"]{--accent:#6A4BC4;--accent-text:#5A3DB0;--accent-ink:#FFFFFF;--accent-soft:#EEEAFB;--accent-line:#C9BDF0}
+@media (prefers-color-scheme: dark){:root[data-accent="lavender"]:not([data-theme="light"]){--accent:#B7A3FF;--accent-text:#C4B4FF;--accent-ink:#17112B;--accent-soft:#28223D;--accent-line:#54478A}}
+:root[data-theme="dark"][data-accent="lavender"]{--accent:#B7A3FF;--accent-text:#C4B4FF;--accent-ink:#17112B;--accent-soft:#28223D;--accent-line:#54478A}
+
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{background:var(--ground);color:var(--ink);font-family:var(--font-ui);font-size:var(--fs-body);line-height:var(--lh-body);padding-inline:clamp(16px,3vw,40px);padding-block:40px 80px;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+code,.num{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+code{font-size:.88em}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{margin:0}
+.page{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:168px minmax(0,1fr);gap:48px;align-items:start}
+.toc{position:sticky;top:calc(24px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:2px}
+.toc .lbl{margin-bottom:10px;color:var(--emph)}
+.toc a{color:var(--muted);text-decoration:none;padding:5px 10px;border-left:2px solid var(--line);font-size:var(--fs-small)}
+.toc a:hover{color:var(--ink);border-left-color:var(--accent)}
+.main{display:flex;flex-direction:column;gap:var(--s7);min-width:0}
+.lbl{font-family:var(--font-data);font-weight:500;font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--muted)}
+.lbl.accent{color:var(--accent-text)}
+.hero{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:24px;padding-bottom:28px;border-bottom:1px solid var(--line-strong)}
+.hero-t{display:flex;flex-direction:column;gap:10px;max-width:62ch}
+.hero h1{font-size:clamp(2.5rem,6vw,3.75rem);font-weight:700;letter-spacing:-.03em;line-height:1}
+.lede{color:var(--ink-2);font-size:1.0625rem}
+.ctl{display:flex;flex-direction:column;gap:8px}
+.ctl-row{display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--r-md);overflow:hidden;background:var(--surface)}
+.seg button{all:unset;cursor:pointer;padding:6px 12px;font-size:var(--fs-small);font-weight:500;color:var(--muted);display:inline-flex;align-items:center;gap:6px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.sec{display:flex;flex-direction:column;gap:20px}
+.sec-h{display:flex;flex-direction:column;gap:6px;max-width:68ch}
+.sec-h h2{font-size:var(--fs-h1);font-weight:700;letter-spacing:-.01em}
+.sec-h p{color:var(--muted)}
+.sub-h{font-size:var(--fs-h3);font-weight:600;margin-top:8px}
+.note{font-size:var(--fs-small);color:var(--muted);max-width:70ch}
+.note code{background:var(--sunk);border:1px solid var(--line);padding:0 4px;border-radius:var(--r-sm);color:var(--ink)}
+
+/* swatches */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.swatches.accents{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.sw{display:flex;gap:12px;align-items:flex-start;padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.sw .chip{flex:none;width:40px;height:40px;border-radius:var(--r-sm);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
+.sw.big{flex-direction:column}
+.sw.big .chip{width:100%;height:72px}
+.sw div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sw b{font-family:var(--font-data);font-weight:500;font-size:var(--fs-small)}
+.sw .role{font-size:var(--fs-small);color:var(--ink-2)}
+.sw code{color:var(--muted);font-size:12px}
+.ramp{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));border:1px solid var(--line-strong);border-radius:var(--r-md);overflow:hidden}
+.ramp div{min-height:100px;padding:10px 8px;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;color:var(--ink)}
+.ramp div.inv{color:var(--ground)}
+.ramp b{font-family:var(--font-data);font-weight:500;font-size:11.5px}
+.ramp code{font-size:11px;opacity:.8}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+table{border-collapse:collapse;width:100%}
+.plain th{font-family:var(--font-data);font-weight:500;font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--muted);text-align:left;padding:8px 12px;border-bottom:1px solid var(--line-strong)}
+.plain td{padding:7px 12px;border-bottom:1px solid var(--line);font-size:var(--fs-small)}
+.plain tr:last-child td{border-bottom:0}
+.r{text-align:right!important}
+.pair{display:inline-block;padding:3px 10px;border-radius:var(--r-sm);font-weight:600;border:1px solid var(--line)}
+.warnv{color:var(--bad)}
+
+/* type */
+.specimen{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.spec-row{display:grid;grid-template-columns:230px minmax(0,1fr);gap:20px;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--line)}
+.meta{font-family:var(--font-data);font-size:11.5px;color:var(--muted)}
+.t-display{font-size:var(--fs-display);font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.t-h1{font-size:var(--fs-h1);font-weight:700;letter-spacing:-.01em;line-height:1.15}
+.t-h2{font-size:var(--fs-h2);font-weight:600;line-height:1.2}
+.t-h3{font-size:var(--fs-h3);font-weight:600;line-height:1.3}
+.t-body{font-size:var(--fs-body);max-width:62ch}
+.t-small{font-size:var(--fs-small);line-height:1.45}
+.muted{color:var(--muted)}
+.t-data{font-family:var(--font-data);font-size:var(--fs-data)}
+.t-fig{font-family:var(--font-data);font-size:22px;font-weight:500}
+.t-fig .sep{color:var(--faint)}
+.twocol{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.lig{font-family:var(--font-data);font-size:17px;margin:0 0 6px;font-feature-settings:"calt" 1}
+.lig.off{font-feature-settings:"calt" 0;color:var(--muted)}
+.aligned{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.aligned div{display:grid;grid-template-columns:minmax(0,1fr) 70px 50px 56px;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-family:var(--font-data);font-size:var(--fs-data);text-align:right}
+.aligned div span:first-child{font-family:var(--font-ui);text-align:left;font-weight:500}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+
+/* space */
+.scale{display:flex;flex-direction:column;gap:6px}
+.scale div{display:grid;grid-template-columns:44px 56px auto;align-items:center;gap:10px;font-size:12px}
+.scale i{display:block;height:12px;background:var(--accent);border-radius:2px}
+.scale code{color:var(--muted)}
+.shapes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.shape{border:1px solid var(--line-strong);background:var(--sunk);padding:14px;display:flex;flex-direction:column;gap:2px;min-height:76px;justify-content:flex-end}
+.shape code{font-size:12px}
+.shape span{font-size:12px;color:var(--muted)}
+
+/* components */
+.comp{display:flex;flex-direction:column;gap:12px;padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.row{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center}
+.btn{border:1px solid var(--line-strong);background:var(--surface);border-radius:var(--r-md);padding:7px 14px;cursor:pointer;font-weight:600;font-size:var(--fs-small);transition:border-color var(--dur) var(--ease),color var(--dur) var(--ease),background var(--dur) var(--ease)}
+.btn:hover{border-color:var(--accent);color:var(--accent-text)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:color-mix(in srgb,var(--accent) 88%,var(--ink));color:var(--accent-ink)}
+.btn.danger:hover{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:disabled:hover{border-color:var(--line-strong);color:inherit}
+.linkbtn{all:unset;cursor:pointer;color:var(--accent-text);font-size:var(--fs-small);font-weight:600;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--accent-line)}
+.linkbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.search{position:relative;flex:1 1 220px;max-width:300px}
+.search input{width:100%;padding:8px 12px 8px 34px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.search input::placeholder{color:var(--faint)}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--faint);stroke-width:1.6;fill:none;stroke-linecap:round}
+.field{display:flex;flex-direction:column;gap:4px}
+.cell{width:84px;padding:5px 8px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface);font-family:var(--font-data);font-size:var(--fs-data);text-align:right;font-feature-settings:"calt" 0}
+.cell.edited{background:var(--edit-soft);border-color:var(--edit-line);color:var(--edit-text);font-weight:500}
+.slider{display:flex;align-items:center;gap:10px}
+.slider input{accent-color:var(--accent);width:140px}
+.slider output{font-size:var(--fs-small)}
+.check{display:flex;align-items:center;gap:6px;font-size:var(--fs-small);color:var(--ink-2)}
+.check input{accent-color:var(--accent);width:15px;height:15px}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.fchip{border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:4px 12px;font-family:var(--font-data);font-weight:500;font-size:12px;cursor:pointer;color:var(--muted)}
+.fchip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.tab{all:unset;cursor:pointer;padding:8px 14px 7px;font-weight:600;font-size:var(--fs-small);color:var(--muted);border-bottom:3px solid transparent}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .num{font-size:11px;color:var(--faint);margin-left:4px}
+.tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.pill,.rk,.edge{font-family:var(--font-data);font-weight:500;font-size:11px;letter-spacing:.04em;padding:1px 7px;border-radius:var(--r-sm);line-height:18px;display:inline-block;white-space:nowrap}
+.pill{text-transform:uppercase}
+.pill.mine{background:var(--accent);color:var(--accent-ink)}
+.pill.taken{background:var(--line);color:var(--muted)}
+.pill.inj{background:var(--bad-soft);color:var(--bad)}
+.pill.out{background:var(--bad);color:var(--surface)}
+.pill.low{background:var(--edit-soft);color:var(--edit-text)}
+.rk{min-width:42px;text-align:center;font-size:12px}
+.rk.top{background:var(--good-soft);color:var(--good)}
+.rk.mid{background:var(--sunk);color:var(--ink);border:1px solid var(--line)}
+.rk.low2{background:var(--bad-soft);color:var(--bad)}
+.edge{min-width:44px;text-align:right;font-size:12.5px;color:var(--ink-2)}
+.edge.pos{background:var(--good-soft);color:var(--good)}
+.edge.neg{background:var(--bad-soft);color:var(--bad)}
+.slots .sl{position:relative;display:flex;flex-direction:column;min-width:108px;padding:5px 26px 5px 9px;border:1px dashed var(--line-strong);border-radius:var(--r-md);background:var(--surface);font-size:12.5px;line-height:1.3}
+.sl .pos{font-family:var(--font-data);font-weight:500;font-size:10.5px;letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
+.sl .who{font-weight:600}
+.sl .who.empty{font-weight:400;color:var(--faint)}
+.sl.filled{border-style:solid;background:var(--sunk)}
+.sl.filled .pos{color:var(--accent-text)}
+.sl.ok{border:1px solid var(--good);background:var(--good-soft)}
+.sl.ok .who{color:var(--good)}
+.sl.no{opacity:.45}
+.sl.pick{outline:2px solid var(--accent);outline-offset:1px}
+.sl .x{all:unset;position:absolute;top:4px;right:4px;width:18px;height:18px;display:grid;place-items:center;border-radius:var(--r-sm);color:var(--faint);cursor:pointer;font-size:14px}
+.sl .x:hover{background:var(--bad-soft);color:var(--bad)}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.tiles>div{padding:10px 14px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--line);background:var(--sunk);min-width:0}
+.tiles>div:last-child{border-right:0}
+.fig{font-family:var(--font-data);font-size:22px;font-weight:500}
+.fig.pos-t{color:var(--good)}
+.toast-demo{align-self:flex-start;display:flex;gap:16px;align-items:center;background:var(--ink);color:var(--surface);padding:9px 16px;border-radius:var(--r-md);box-shadow:var(--shadow-float);font-size:var(--fs-small)}
+.toast-demo .undo{all:unset;cursor:pointer;font-weight:600;text-decoration:underline;text-underline-offset:3px;color:var(--accent-line)}
+
+/* data */
+.frame{box-shadow:var(--shadow-frame);border-color:var(--line-strong);border-radius:var(--r-lg)}
+.board{min-width:820px}
+.board th{font-family:var(--font-data);font-weight:500;font-size:var(--fs-label);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--muted);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line-strong);white-space:nowrap}
+.board th.l,.board td.l{text-align:left}
+.board tr.grp th{border-bottom:0;padding:10px 10px 0;text-align:center;color:var(--faint);font-size:10.5px}
+.board tr.grp th span{display:block;border-bottom:2px solid var(--line-strong);padding-bottom:4px}
+.board tr.grp th.g-out span{border-color:var(--edit-line);color:var(--edit-text)}
+.board tr.grp th.g-ours span{border-color:var(--accent);color:var(--accent-text)}
+.board th.ours-h{background:var(--accent-soft)}
+.board td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--font-data);font-size:var(--fs-data);white-space:nowrap}
+.board tr:last-child td{border-bottom:0}
+.board td.rk{color:var(--muted);font-size:12px}
+.board td.ours{background:color-mix(in srgb,var(--accent-soft) 55%,transparent)}
+.board tr.sel td{background:var(--accent-soft)}
+.board tr.gone td{color:var(--faint)}
+.board tr.gone .pname{text-decoration:line-through;text-decoration-color:var(--faint)}
+.pname{display:flex;align-items:center;gap:6px;font-family:var(--font-ui);font-weight:600;font-size:14px}
+.psub{display:flex;align-items:center;gap:6px;font-family:var(--font-ui);font-size:12px;color:var(--muted)}
+.cellv{display:inline-block;min-width:44px;padding:2px 6px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface)}
+.cellv.edited{background:var(--edit-soft);border-color:var(--edit-line);color:var(--edit-text);font-weight:500}
+#strips svg,#bars svg{display:block;width:100%;height:auto}
+#strips text,#bars text{font-family:var(--font-data);font-size:11px;fill:var(--muted)}
+#strips .cl,#bars .cl{fill:var(--ink);font-weight:500}
+
+/* rules + code */
+.rules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.rule{background:var(--surface);padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+.rule b{font-weight:600}
+.rule p{font-size:var(--fs-small);color:var(--muted)}
+.rule code{font-size:12px}
+.code{margin:0;background:var(--sunk);border:1px solid var(--line);border-radius:var(--r-md);padding:16px 18px;overflow-x:auto;font-family:var(--font-data);font-size:12.5px;line-height:1.65;color:var(--ink-2);max-height:420px}
+
+@media (max-width:900px){
+  .page{grid-template-columns:1fr;gap:28px}
+  .toc{position:static;flex-direction:row;flex-wrap:wrap;gap:4px}
+  .toc .lbl{width:100%;margin:0}
+  .toc a{border-left:0;border-bottom:2px solid var(--line);padding:4px 8px}
+  .twocol,.rules{grid-template-columns:1fr}
+  .spec-row{grid-template-columns:1fr;gap:4px}
+  .ramp{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tiles>div:nth-child(2){border-right:0}
+  .tiles>div:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .ctl-row{justify-content:flex-start}
+}
+
+</style>
+<div class="page">
+  <nav class="toc" aria-label="Sections">
+    <span class="lbl">Draft Room</span>
+    <a href="#color">Color</a>
+    <a href="#type">Type</a>
+    <a href="#space">Space &amp; shape</a>
+    <a href="#components">Components</a>
+    <a href="#data">Data display</a>
+    <a href="#rules">Rules</a>
+    <a href="#tokens">Tokens</a>
+  </nav>
+
+  <main class="main">
+    <header class="hero">
+      <div class="hero-t">
+        <span class="lbl accent">Style reference · v1</span>
+        <h1>Draft Room</h1>
+        <p class="lede">The visual system for the fantasy draft GUI: a court-orange accent and marigold on concrete neutrals, with a warm charcoal dark mode that's never blue-tinted. IBM Plex Sans is for words and Lilex is for numbers. The accent always means <em>you</em>: your action, your selection, your players.</p>
+      </div>
+      <div class="ctl">
+        <div class="ctl-row"><span class="lbl">Theme</span><div class="seg" role="group" aria-label="Preview theme">
+          <button type="button" id="th-light" data-th="light">Light</button>
+          <button type="button" id="th-dark" data-th="dark">Dark</button>
+          <button type="button" id="th-system" data-th="system" aria-pressed="true">System</button>
+        </div></div>
+        <div class="ctl-row"><span class="lbl">Accent</span><div class="seg" role="group" aria-label="Preview accent">
+          <button type="button" id="ac-orange" data-ac="orange" aria-pressed="true"><i class="dot" style="background:#C44A08"></i>Court orange</button>
+          <button type="button" id="ac-lavender" data-ac="lavender"><i class="dot" style="background:#6A4BC4"></i>Lavender</button>
+        </div></div>
+      </div>
+    </header>
+
+    <!-- COLOR -->
+    <section id="color" class="sec">
+      <div class="sec-h"><h2>Color</h2><p>Every color is a token. Components never use raw hex values, so both themes stay in sync. The swatches below show the current theme; switch themes to compare.</p></div>
+
+      <h3 class="sub-h">Accents</h3>
+      <div class="swatches accents">
+        <div class="sw big"><span class="chip" style="background:var(--accent)"></span><div><b>--accent</b><span class="role"><span class="acname">Court orange</span>. The primary color: actions, selection, your players, the "Ours" columns.</span><code data-hx="accent"></code></div></div>
+        <div class="sw big"><span class="chip" style="background:var(--edit)"></span><div><b>--edit</b><span class="role">Marigold. Marks any value you changed (Δ, Exp GP) and nothing else.</span><code>#E9A100 · #FFC23D</code></div></div>
+        <div class="sw big"><span class="chip" style="background:var(--emph)"></span><div><b>--emph</b><span class="role">Ember. Emphasis: the brand mark, key figures, rare highlights.</span><code>#7A2E14 · #F0A487</code></div></div>
+      </div>
+      <div class="swatches">
+        <div class="sw"><span class="chip" style="background:var(--accent-text)"></span><div><b>--accent-text</b><code data-hx="accent-text"></code></div></div>
+        <div class="sw"><span class="chip" style="background:var(--accent-soft)"></span><div><b>--accent-soft</b><code data-hx="accent-soft"></code></div></div>
+        <div class="sw"><span class="chip" style="background:var(--accent-line)"></span><div><b>--accent-line</b><code data-hx="accent-line"></code></div></div>
+        <div class="sw"><span class="chip" style="background:var(--edit-text)"></span><div><b>--edit-text</b><code>#845B00 · #FFCF66</code></div></div>
+        <div class="sw"><span class="chip" style="background:var(--edit-soft)"></span><div><b>--edit-soft</b><code>#FFF3D1 · #33280F</code></div></div>
+        <div class="sw"><span class="chip" style="background:var(--emph-soft)"></span><div><b>--emph-soft</b><code>#F6E4DC · #3A221A</code></div></div>
+      </div>
+
+      <h3 class="sub-h">Neutrals</h3>
+      <div class="ramp" aria-label="Neutral ramp">
+        <div style="background:var(--ground)"><b>ground</b><code>#F3F2F0</code><code>#151311</code></div>
+        <div style="background:var(--sunk)"><b>sunk</b><code>#F8F7F5</code><code>#191714</code></div>
+        <div style="background:var(--surface)"><b>surface</b><code>#FFFFFF</code><code>#1E1B18</code></div>
+        <div style="background:var(--line)"><b>line</b><code>#E3E0DC</code><code>#322E2A</code></div>
+        <div style="background:var(--line-strong)"><b>line-strong</b><code>#CBC6C0</code><code>#47413B</code></div>
+        <div class="inv" style="background:var(--faint)"><b>faint</b><code>#9C958E</code><code>#756D65</code></div>
+        <div class="inv" style="background:var(--muted)"><b>muted</b><code>#6E6862</code><code>#A69D94</code></div>
+        <div class="inv" style="background:var(--ink-2)"><b>ink-2</b><code>#4A4541</code><code>#D2CBC3</code></div>
+        <div class="inv" style="background:var(--ink)"><b>ink</b><code>#1D1B19</code><code>#F2EEE9</code></div>
+      </div>
+      <p class="note">Each cell shows the light value, then the dark value. Dark mode is <b>warm charcoal, never blue-tinted</b>. It runs from <code>#151311</code> (ground) through <code>#1E1B18</code> (surface) to <code>#F2EEE9</code> (ink), with shadows in pure black.</p>
+
+      <h3 class="sub-h">Semantic</h3>
+      <div class="swatches">
+        <div class="sw"><span class="chip" style="background:var(--good)"></span><div><b>--good</b><span class="role">Better than market or average: positive Edge, top-3 rank.</span><code>#22784A · #5BCB8A</code></div></div>
+        <div class="sw"><span class="chip" style="background:var(--bad)"></span><div><b>--bad</b><span class="role">Worse: negative Edge, bottom-3 rank, injury. Leans pink so it can't be mistaken for the orange accent.</span><code>#BE2346 · #FF6F8A</code></div></div>
+      </div>
+
+      <h3 class="sub-h">Contrast (light / dark)</h3>
+      <div class="tablebox"><table class="plain">
+        <thead><tr><th>Pair</th><th class="r">Light</th><th class="r">Dark</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pair" style="background:var(--accent);color:var(--accent-ink)">Add to my team</span></td><td class="r num" data-cr="btnL">4.85</td><td class="r num" data-cr="btnD">7.32</td><td>Primary button</td></tr>
+          <tr><td><span class="pair" style="background:var(--surface);color:var(--accent-text)">$42 Ours</span></td><td class="r num" data-cr="txtL">5.50</td><td class="r num" data-cr="txtD">7.48</td><td>Accent text</td></tr>
+          <tr><td><span class="pair" style="background:var(--edit-soft);color:var(--edit-text)">+5</span></td><td class="r num">5.46</td><td class="r num">9.90</td><td>Edited cell</td></tr>
+          <tr><td><span class="pair" style="background:var(--good-soft);color:var(--good)">+35</span></td><td class="r num">4.69</td><td class="r num">7.04</td><td>Positive badge</td></tr>
+          <tr><td><span class="pair" style="background:var(--bad-soft);color:var(--bad)">−12</span></td><td class="r num">4.90</td><td class="r num">6.01</td><td>Negative badge</td></tr>
+          <tr><td><span class="pair" style="background:var(--ground);color:var(--muted)">Secondary text</span></td><td class="r num">4.91</td><td class="r num">6.95</td><td>Muted text</td></tr>
+          <tr><td><span class="pair" style="background:var(--surface);color:var(--faint)">Drop here</span></td><td class="r num warnv">2.96</td><td class="r num warnv">3.37</td><td>Placeholders only</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- TYPE -->
+    <section id="type" class="sec">
+      <div class="sec-h"><h2>Type</h2><p>Two families with a strict split. <b>IBM Plex Sans</b> is for anything you read as words. <b>Lilex</b> is for anything you compare as a number, and for small uppercase labels, so the board reads like a stat sheet.</p></div>
+
+      <div class="specimen">
+        <div class="spec-row"><span class="meta">Display · Plex 700 · 40/1.1 · −0.02em</span><span class="t-display">Walker Kessler</span></div>
+        <div class="spec-row"><span class="meta">H1 · Plex 700 · 28/1.15 · −0.01em</span><span class="t-h1">Category ranks</span></div>
+        <div class="spec-row"><span class="meta">H2 · Plex 600 · 20/1.2</span><span class="t-h2">2026-27 outlook</span></div>
+        <div class="spec-row"><span class="meta">H3 · Plex 600 · 17/1.3</span><span class="t-h3">Roster</span></div>
+        <div class="spec-row"><span class="meta">Body · Plex 400 · 15/1.5</span><span class="t-body">Δ spreads across categories by scaling every counting stat and shot attempt by the same %. Shooting percentages stay the same.</span></div>
+        <div class="spec-row"><span class="meta">Small · Plex 400 · 13/1.45</span><span class="t-small">Only your best 9 of 12 count, by per-game rating.</span></div>
+        <div class="spec-row"><span class="meta">Label · Lilex 500 · 11 · caps +0.08em</span><span class="lbl">Budget left · Exp GP · Avg paid</span></div>
+        <div class="spec-row"><span class="meta">Data · Lilex 400 · 13.5 · tabular</span><span class="t-data">27.7 / 12.9 / 10.7 · .573 FG · $42 vs $7</span></div>
+        <div class="spec-row"><span class="meta">Figure · Lilex 500 · 22</span><span class="t-fig">$62 <span class="sep">·</span> 0.98× <span class="sep">·</span> 7th</span></div>
+      </div>
+
+      <div class="twocol">
+        <div class="card">
+          <span class="lbl">Lilex ligatures (calt on)</span>
+          <p class="lig">$42 -&gt; $7 &nbsp; Δ &gt;= +5 &nbsp; GP != 82 &nbsp; w == 0.5</p>
+          <span class="lbl">Same text, ligatures off</span>
+          <p class="lig off">$42 -&gt; $7 &nbsp; Δ &gt;= +5 &nbsp; GP != 82 &nbsp; w == 0.5</p>
+          <p class="note">Keep ligatures on in labels and formulas and off in inputs, so what you type is exactly what you see.</p>
+        </div>
+        <div class="card">
+          <span class="lbl">Numbers always align</span>
+          <div class="aligned">
+            <div><span>Wembanyama</span><span>171.7</span><span>$68</span><span class="pos">+0</span></div>
+            <div><span>Kessler</span><span>137.8</span><span>$42</span><span class="pos">+35</span></div>
+            <div><span>Flagg</span><span>126.1</span><span>$33</span><span class="neg">−3</span></div>
+            <div><span>Tatum</span><span>114.9</span><span>$24</span><span class="neg">−28</span></div>
+          </div>
+          <p class="note">Names are in Plex and left-aligned. Figures are in Lilex and right-aligned. Signs use a true minus (−), not a hyphen.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SPACE -->
+    <section id="space" class="sec">
+      <div class="sec-h"><h2>Space &amp; shape</h2><p>Spacing is on a 4px grid. Borders separate things; shadows are only for the app frame and floating messages.</p></div>
+      <div class="twocol">
+        <div class="card">
+          <span class="lbl">Spacing scale</span>
+          <div class="scale">
+            <div><code>--s1</code><i style="width:4px"></i><span class="num">4</span></div>
+            <div><code>--s2</code><i style="width:8px"></i><span class="num">8</span></div>
+            <div><code>--s3</code><i style="width:12px"></i><span class="num">12</span></div>
+            <div><code>--s4</code><i style="width:16px"></i><span class="num">16</span></div>
+            <div><code>--s5</code><i style="width:24px"></i><span class="num">24</span></div>
+            <div><code>--s6</code><i style="width:32px"></i><span class="num">32</span></div>
+            <div><code>--s7</code><i style="width:48px"></i><span class="num">48</span></div>
+          </div>
+          <p class="note">Table cells use 7 × 8. Panels use 16 × 18. Sections are separated by 48.</p>
+        </div>
+        <div class="card">
+          <span class="lbl">Radius &amp; elevation</span>
+          <div class="shapes">
+            <div class="shape" style="border-radius:var(--r-sm)"><code>--r-sm 4</code><span>inputs, pills</span></div>
+            <div class="shape" style="border-radius:var(--r-md)"><code>--r-md 6</code><span>buttons, slots</span></div>
+            <div class="shape" style="border-radius:var(--r-lg);box-shadow:var(--shadow-frame)"><code>--r-lg 10</code><span>app frame</span></div>
+            <div class="shape" style="border-radius:var(--r-md);box-shadow:var(--shadow-float);background:var(--ink);color:var(--surface);border-color:var(--ink)"><code style="color:inherit">float</code><span style="color:inherit;opacity:.8">toasts only</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPONENTS -->
+    <section id="components" class="sec">
+      <div class="sec-h"><h2>Components</h2><p>These are live samples built from the tokens. Hover and tab through them to see their states.</p></div>
+
+      <div class="comp">
+        <span class="lbl">Buttons</span>
+        <div class="row">
+          <button class="btn primary" type="button">Add to my team</button>
+          <button class="btn" type="button">Refresh from ESPN</button>
+          <button class="btn danger" type="button">Clear roster</button>
+          <button class="btn" type="button" disabled>Clear roster</button>
+          <button class="linkbtn" type="button">Use ESPN's</button>
+        </div>
+        <p class="note">One primary button per view. <b>Clear roster</b> and other destructive buttons turn crimson on hover and are undone from the message that follows, not a confirmation dialog.</p>
+      </div>
+
+      <div class="comp">
+        <span class="lbl">Inputs</span>
+        <div class="row">
+          <label class="search" for="sr-q"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5"></circle><path d="M11 11l3.5 3.5"></path></svg><input id="sr-q" type="search" placeholder="Search players" autocomplete="off"></label>
+          <label class="field" for="sr-d0"><span class="lbl">Δ %</span><input id="sr-d0" class="cell" type="number" placeholder="0"></label>
+          <label class="field" for="sr-d1"><span class="lbl">Δ % · edited</span><input id="sr-d1" class="cell edited" type="number" value="5"></label>
+          <label class="field" for="sr-g1"><span class="lbl">Exp GP · edited</span><input id="sr-g1" class="cell edited" type="number" value="62"></label>
+          <label class="field" for="sr-p"><span class="lbl">Price</span><input id="sr-p" class="cell" type="number" value="42"></label>
+        </div>
+        <div class="row">
+          <label class="slider" for="sr-w"><span class="lbl">Value weighs</span><input id="sr-w" type="range" min="0" max="100" value="50"><output class="num" for="sr-w">50/50</output></label>
+          <label class="check" for="sr-c1"><input id="sr-c1" type="checkbox" checked> Hide drafted</label>
+          <label class="check" for="sr-c2"><input id="sr-c2" type="checkbox"> Only adjusted</label>
+        </div>
+      </div>
+
+      <div class="comp">
+        <span class="lbl">Filters &amp; tabs</span>
+        <div class="row">
+          <div class="chips" role="group" aria-label="Position sample">
+            <button class="fchip" type="button" aria-pressed="true">All</button><button class="fchip" type="button" aria-pressed="false">PG</button><button class="fchip" type="button" aria-pressed="false">SG</button><button class="fchip" type="button" aria-pressed="false">SF</button><button class="fchip" type="button" aria-pressed="false">PF</button><button class="fchip" type="button" aria-pressed="false">C</button>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Tabs sample">
+            <button class="tab" role="tab" type="button" aria-selected="true">Board</button>
+            <button class="tab" role="tab" type="button" aria-selected="false">My Team <span class="num">4/12</span></button>
+          </div>
+        </div>
+        <p class="note">Selected filters use an ink fill, and the active tab has an accent underline. The accent is reserved for "you", not for filter state.</p>
+      </div>
+
+      <div class="comp">
+        <span class="lbl">Pills</span>
+        <div class="row">
+          <span class="pill mine">Mine $71</span>
+          <span class="pill taken">Taken $76</span>
+          <span class="pill inj">DTD</span>
+          <span class="pill out">Out</span>
+          <span class="pill low">5 GP</span>
+          <span class="rk top">1st</span>
+          <span class="rk mid">6th</span>
+          <span class="rk low2">12th</span>
+          <span class="edge pos">+35</span>
+          <span class="edge neg">−12</span>
+        </div>
+      </div>
+
+      <div class="comp">
+        <span class="lbl">Roster slots</span>
+        <div class="row slots">
+          <div class="sl"><span class="pos">PG</span><span class="who empty">Drop here</span></div>
+          <div class="sl filled"><span class="pos">C</span><span class="who">Wembanyama</span><button class="x" type="button" aria-label="Remove sample">×</button></div>
+          <div class="sl ok"><span class="pos">UT</span><span class="who empty">Can drop</span></div>
+          <div class="sl no"><span class="pos">C</span><span class="who empty">Can't play</span></div>
+          <div class="sl filled pick"><span class="pos">F</span><span class="who">Flagg</span><button class="x" type="button" aria-label="Remove sample">×</button></div>
+          <div class="sl bench"><span class="pos">Bench</span><span class="who empty">Drop here</span></div>
+        </div>
+        <p class="note">States: empty (dashed), filled, can drop (green while dragging), can't play (dimmed), picked (accent outline, for click-to-move).</p>
+      </div>
+
+      <div class="comp">
+        <span class="lbl">Score tiles &amp; message</span>
+        <div class="tiles">
+          <div><span class="lbl">Budget left</span><span class="fig">$62</span><span class="t-small muted">max bid $55</span></div>
+          <div><span class="lbl">My roster</span><span class="fig">4 / 12</span><span class="t-small muted">White, Flagg, Wembanyama, Kessler</span></div>
+          <div><span class="lbl">Inflation</span><span class="fig">0.98×</span><span class="t-small muted">8 drafted · $2,116 left</span></div>
+          <div><span class="lbl">Best edge left</span><span class="fig pos-t">+35</span><span class="t-small muted">Kessler · $42 vs $7</span></div>
+        </div>
+        <div class="toast-demo" role="status">Cleared 4 players from your roster. <button class="undo" type="button">Undo</button></div>
+      </div>
+    </section>
+
+    <!-- DATA -->
+    <section id="data" class="sec">
+      <div class="sec-h"><h2>Data display</h2><p>The board is scanned, not read. Group headers name the time period, color marks state, and every figure sits right-aligned in Lilex.</p></div>
+
+      <div class="tablebox frame">
+        <table class="board">
+          <thead>
+            <tr class="grp"><th colspan="2"></th><th colspan="2"><span>2025-26</span></th><th colspan="3" class="g-out"><span>2026-27 outlook</span></th><th colspan="3" class="g-ours"><span>Auction $</span></th></tr>
+            <tr><th>Rk</th><th class="l">Player</th><th>GP</th><th>Per gm</th><th>Exp GP</th><th>Δ %</th><th>Value</th><th>Avg paid</th><th class="ours-h">Ours</th><th class="ours-h">Edge</th></tr>
+          </thead>
+          <tbody>
+            <tr class="gone"><td class="rk">1</td><td class="l"><span class="pname">Victor Wembanyama <span class="pill mine">Mine $71</span></span><span class="psub">SAS · C</span></td><td>64</td><td>165.5</td><td><span class="cellv">66</span></td><td><span class="cellv">·</span></td><td>171.7</td><td>$74</td><td class="ours">$68</td><td class="ours"><span class="edge neg">−6</span></td></tr>
+            <tr class="sel"><td class="rk">7</td><td class="l"><span class="pname">Walker Kessler</span><span class="psub">LAL · C <span class="pill low">5 GP</span></span></td><td>5</td><td>131.1</td><td><span class="cellv edited">62</span></td><td><span class="cellv edited">+5</span></td><td>137.8</td><td>$7</td><td class="ours">$42</td><td class="ours"><span class="edge pos">+35</span></td></tr>
+            <tr><td class="rk">16</td><td class="l"><span class="pname">Cooper Flagg</span><span class="psub">DAL · SF/PF</span></td><td>70</td><td>108.1</td><td><span class="cellv">71</span></td><td><span class="cellv edited">+12</span></td><td>126.1</td><td>$36</td><td class="ours">$33</td><td class="ours"><span class="edge">−3</span></td></tr>
+            <tr><td class="rk">36</td><td class="l"><span class="pname">Jayson Tatum</span><span class="psub">BOS · SF/PF <span class="pill inj">DTD</span> <span class="pill low">16 GP</span></span></td><td>16</td><td>116.9</td><td><span class="cellv edited">58</span></td><td><span class="cellv">·</span></td><td>114.9</td><td>$52</td><td class="ours">$24</td><td class="ours"><span class="edge neg">−28</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Row states: <b>selected</b> (accent-soft), <b>drafted</b> (faint text), <b>edited cell</b> (marigold). Edge between −3 and +3 stays neutral, because a small edge is noise. The numbers are sample values from the mockup.</p>
+
+      <div class="twocol">
+        <div class="card">
+          <span class="lbl">Category rank strip</span>
+          <div id="strips"></div>
+          <p class="note">One dot per team, with better to the right. Your team is the accent dot; the dashed line is the league average.</p>
+        </div>
+        <div class="card">
+          <span class="lbl">Before / after bars · 100 = pool avg</span>
+          <div id="bars"></div>
+          <p class="note">The thick grey bar is last season and the thin bar is the projection: accent at or above average, crimson below.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- RULES -->
+    <section id="rules" class="sec">
+      <div class="sec-h"><h2>Rules</h2><p>Blue is never the primary accent. Other cool colors are fine where they earn a place, and lavender is a ready alternative.</p></div>
+      <div class="rules">
+        <div class="rule"><b>The accent means you.</b><p>Your actions, your selection, your players, our valuation. It's never decoration, and filter state never uses it.</p></div>
+        <div class="rule"><b>Marigold means you changed it.</b><p>Only for values you've edited (Δ, Exp GP). Clearing the value clears the color.</p></div>
+        <div class="rule"><b>Green and crimson mean better and worse.</b><p>Only for comparisons: Edge, ranks, rating deltas, injuries. Never for branding or for buttons, apart from destructive hover.</p></div>
+        <div class="rule"><b>Words in Plex, numbers in Lilex.</b><p>Uppercase labels are Lilex at 11px with +0.08em tracking. Headings are Plex with tight tracking. Don't add a third family.</p></div>
+        <div class="rule"><b>Dark mode is never blue.</b><p>Neutrals stay warm charcoal or neutral black. No navy or slate grounds, and no blue-tinted greys or shadows.</p></div>
+        <div class="rule"><b>Borders before shadows.</b><p>Only the app frame and floating messages cast shadows. Panels, tiles and slots are separated with borders.</p></div>
+        <div class="rule"><b>Faint is never essential.</b><p><code>--faint</code> fails contrast for body text. Use it for placeholders, dividers and struck-through drafted players only.</p></div>
+      </div>
+    </section>
+
+    <!-- TOKENS -->
+    <section id="tokens" class="sec">
+      <div class="sec-h"><h2>Tokens</h2><p>Source of truth: <code>gui/static/tokens.css</code> on the <code>gui</code> branch. Excerpt below (light theme):</p></div>
+      <pre class="code" tabindex="0"><code id="tokcode"></code></pre>
+    </section>
+  </main>
+</div>
+<script>
+const TOKENS=":root {\n  /* Neutrals: concrete, a trace of warmth. Dark theme is warm charcoal, never blue-tinted. */\n  --ground: #F3F2F0;\n  --surface: #FFFFFF;\n  --sunk: #F8F7F5;\n  --ink: #1D1B19;\n  --ink-2: #4A4541;\n  --muted: #6E6862;\n  --faint: #9C958E;         /* placeholders, dividers, decoration only: never essential text */\n  --line: #E3E0DC;\n  --line-strong: #CBC6C0;\n\n  /* Accents (named by role; primary is swappable) */\n  --accent: #C44A08;        /* primary: actions, selection, \"mine\" (white text 4.85:1) */\n  --accent-text: #B64406;   /* orange for text on light surfaces (5.5:1 on white) */\n  --accent-ink: #FFFFFF;    /* text on orange fills */\n  --accent-soft: #FDEADF;   /* selected rows, \"ours\" columns */\n  --accent-line: #F3B894;\n  --edit: #E9A100;      /* user-edited values (\u0394, Exp GP) */\n  --edit-text: #845B00;\n  --edit-soft: #FFF3D1;\n  --edit-line: #F0CD72;\n  --emph: #7A2E14;         /* emphasis, headings accents, 1st place */\n  --emph-soft: #F6E4DC;\n\n  /* Semantic (separate from accents) */\n  --good: #22784A;\n  --good-soft: #E1F2E7;\n  --bad: #BE2346;\n  --bad-soft: #FBE3E8;\n\n  /* Type */\n  --font-ui: \"IBM Plex Sans\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  --font-data: \"Lilex\", \"IBM Plex Mono\", ui-monospace, \"SF Mono\", Menlo, monospace;\n  --fs-display: 2.5rem;   /* 40 */\n  --fs-h1: 1.75rem;       /* 28 */\n  --fs-h2: 1.25rem;       /* 20 */\n  --fs-h3: 1.0625rem;     /* 17 */\n  --fs-body: 0.9375rem;   /* 15 */\n  --fs-small: 0.8125rem;  /* 13 */\n  --fs-data: 0.84375rem;  /* 13.5, Lilex in tables */\n  --fs-label: 0.6875rem;  /* 11, Lilex uppercase */\n  --lh-tight: 1.15;\n  --lh-body: 1.5;\n  --track-label: 0.08em;\n\n  /* Space (4px base) */\n  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;\n\n  /* Shape */\n  --r-sm: 4px;   /* inputs, pills, badges */\n  --r-md: 6px;   /* buttons, slots, tiles */\n  --r-lg: 10px;  /* app frame only */\n  --shadow-frame: 0 1px 0 var(--line), 0 14px 36px -20px rgba(40, 24, 12, .35);\n  --shadow-float: 0 10px 28px -12px rgba(40, 24, 12, .45);\n\n  /* Motion */\n  --ease: cubic-bezier(.2, .7, .2, 1);\n  --dur: 140ms;\n}\n  /* dark theme: see tokens.css */";
+
+const HEX={
+  orange:{accent:"#C44A08 · #FF7A33","accent-text":"#B64406 · #FF8D4D","accent-soft":"#FDEADF · #3A2114","accent-line":"#F3B894 · #7A3E1C",name:"Court orange",cr:{btnL:"4.85",btnD:"7.32",txtL:"5.50",txtD:"7.48"}},
+  lavender:{accent:"#6A4BC4 · #B7A3FF","accent-text":"#5A3DB0 · #C4B4FF","accent-soft":"#EEEAFB · #28223D","accent-line":"#C9BDF0 · #54478A",name:"Lavender",cr:{btnL:"6.15",btnD:"8.42",txtL:"7.69",txtD:"9.24"}}
+};
+const root=document.documentElement;
+function setAccent(a){
+  if(a==="orange")delete root.dataset.accent;else root.dataset.accent=a;
+  document.querySelectorAll("[data-ac]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.ac===a));
+  document.querySelectorAll("[data-hx]").forEach(c=>c.textContent=HEX[a][c.dataset.hx]);
+  document.querySelectorAll(".acname").forEach(c=>c.textContent=HEX[a].name);
+  document.querySelectorAll("[data-cr]").forEach(c=>c.textContent=HEX[a].cr[c.dataset.cr]);
+}
+function setTheme(t){
+  if(t==="system")delete root.dataset.theme;else root.dataset.theme=t;
+  document.querySelectorAll("[data-th]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.th===t));
+}
+document.querySelectorAll("[data-th]").forEach(b=>b.addEventListener("click",()=>setTheme(b.dataset.th)));
+document.querySelectorAll("[data-ac]").forEach(b=>b.addEventListener("click",()=>setAccent(b.dataset.ac)));
+document.querySelectorAll(".fchip").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".fchip").forEach(c=>c.setAttribute("aria-pressed",c===b));}));
+const w=document.getElementById("sr-w");w.addEventListener("input",()=>{w.nextElementSibling.textContent=`${w.value}/${100-w.value}`;});
+setAccent("orange");
+
+// rank strips: sample season totals for 12 teams, index 0 = you
+const STR=[["BLK",[676,365,426,524,422,330,465,408,462,523,225,418],"1st"],["FG%",[.512,.478,.489,.495,.470,.484,.501,.476,.492,.483,.468,.487],"3rd"],["AST",[2710,3240,3410,2980,3570,3120,2890,3300,3050,3380,2950,3190],"12th"]];
+function strip(k,vals,rk){
+  const W=420,x0=46,x1=W-50,lo=Math.min(...vals),hi=Math.max(...vals),p=(hi-lo)*.08;
+  const x=v=>x0+(v-lo+p)/(hi-lo+2*p)*(x1-x0), avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+  let s=`<svg viewBox="0 0 ${W} 30" role="img" aria-label="${k}: you rank ${rk} of 12">`;
+  s+=`<text class="cl" x="0" y="19">${k}</text><line x1="${x0}" x2="${x1}" y1="15" y2="15" stroke="var(--line)" stroke-width="2"></line>`;
+  s+=`<line x1="${x(avg)}" x2="${x(avg)}" y1="6" y2="24" stroke="var(--line-strong)" stroke-dasharray="2 2"></line>`;
+  vals.slice(1).forEach(v=>s+=`<circle cx="${x(v)}" cy="15" r="4" fill="var(--faint)" opacity=".6"></circle>`);
+  s+=`<circle cx="${x(vals[0])}" cy="15" r="6.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"></circle>`;
+  return s+`<text x="${W}" y="19" text-anchor="end">${rk}</text></svg>`;
+}
+document.getElementById("strips").innerHTML=STR.map(r=>strip(...r)).join("");
+
+const BAR=[["PTS",83,87],["REB",186,195],["BLK",277,291],["FT%",76,74]];
+(function(){
+  const MAX=300,x0=40,w=300,rh=24,x=v=>x0+Math.min(v,MAX)/MAX*w;
+  let s=`<svg viewBox="0 0 390 ${BAR.length*rh+22}" role="img" aria-label="Walker Kessler per-game categories, last season versus projected">`;
+  s+=`<line x1="${x(100)}" x2="${x(100)}" y1="0" y2="${BAR.length*rh}" stroke="var(--line-strong)" stroke-dasharray="3 3"></line>`;
+  BAR.forEach(([k,b,a],i)=>{const y=i*rh+5;
+    s+=`<text class="cl" x="0" y="${y+11}">${k}</text><rect x="${x0}" y="${y}" width="${w}" height="14" rx="2" fill="var(--sunk)"></rect>`;
+    s+=`<rect x="${x0}" y="${y}" width="${x(b)-x0}" height="14" rx="2" fill="var(--line-strong)"></rect>`;
+    s+=`<rect x="${x0}" y="${y+4}" width="${x(a)-x0}" height="6" rx="1" fill="${a>=100?"var(--accent)":"var(--bad)"}"></rect>`;
+    s+=`<text x="${x0+w+6}" y="${y+11}">${a}</text>`;});
+  const ty=BAR.length*rh+14;[0,100,200,300].forEach(t=>s+=`<text x="${x(t)}" y="${ty}" text-anchor="${t===0?"start":t===300?"end":"middle"}">${t}</text>`);
+  document.getElementById("bars").innerHTML=s+`</svg>`;
+})();
+document.getElementById("tokcode").textContent=TOKENS;
+</script>

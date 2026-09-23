@@ -37,43 +37,65 @@ Per player (`players[].player`):
 
 ## Stack
 
-**FastAPI backend + a plain-JS frontend with no build step.** This changed from Streamlit because of drag and drop.
+**Python standard-library HTTP server + a plain-JS frontend with no build step.** No new dependencies: the GUI needs only `espn_api`, which the CLI already uses.
 
-- Streamlit reruns the whole script on every interaction, and dragging players into roster slots needs a third-party component (`streamlit-sortables`). That's a poor fit for a live auction screen.
-- The mockup is already a working vanilla-JS frontend: search, inline edits, sliders, drag and drop, and category ranks. The backend just has to serve the player pool and save your edits.
-- **Backend** (`gui/server.py`, FastAPI + uvicorn):
-  - Imports `library/` directly.
-  - `GET /api/pool` returns the cached ESPN pool plus pool averages.
-  - `POST /api/refresh` re-pulls from ESPN.
-  - `GET/PUT /api/state` loads and saves Δ, Exp GP, notes, picks and slots.
-  - Later: `GET /api/draft` for live picks.
-- **Frontend** (`gui/static/`): `index.html`, `app.js` and `styles.css`, served by FastAPI.
-  - The valuation math runs in the browser so sliders stay instant.
-  - `library/valuation.py` is the Python reference, and tests keep the two in sync.
-- Run with `python3 -m gui` and open `http://localhost:8000`.
+- Streamlit was dropped because of drag and drop. It reruns the whole script on every interaction and needs a third-party component for sortable slots.
+- FastAPI was planned but not needed. The API is a handful of JSON endpoints, and `http.server` avoids a `pip install` for anyone running the tool.
+- **All math runs on the server** (`gui/board.py` → `library/valuation.py`). The browser only renders, so there's one implementation of the model and it's tested in Python.
+  - A full recalculation takes about 15 ms. Slider drags send at most one request at a time.
+- Run with `python3 -m gui` (options: `--port`, `--settings`, `--refresh`, `--no-browser`). It listens on `127.0.0.1` only.
+
+### API
+
+| Route | Does |
+|---|---|
+| `GET /api/board` | Full snapshot: league meta, every player row, market, my team, category ranks |
+| `POST /api/adjust` | `{id, delta?, expGp?, note?}`. `expGp: null` resets to the default |
+| `POST /api/weight` | `{weight}` from 0 to 1 (per game ↔ season) |
+| `POST /api/pick` | `{id, status: "mine" or "taken" or null, price?}`. "mine" auto-slots the player |
+| `POST /api/move` | `{id, slot, price?}`. Drag and drop, with swaps and bumps |
+| `POST /api/price` | `{id, price}` |
+| `POST /api/clear-roster`, `/api/reset-adjustments` | Bulk clears |
+| `POST /api/state` | `{state}`. Restores a previous state (Undo) |
+| `POST /api/refresh` | Re-download the pool from ESPN |
+
+Every POST returns `{board, error}`. Errors are user-facing sentences, e.g. "Cooper Flagg can't play C."
 
 ## Architecture
 
 ```
 library/
-  draft.py          NEW  fetch + parse ESPN player pool → DraftPlayer records; cache to draftPool.json
-  valuation.py      NEW  pure functions: pool averages, rating, replacement level, auction $
-  rating.py         (reuse ratePlayer / categoryRatePlayer / ratePercentStat)
+  valuation.py      pure math: rating (shared with the CLI), Δ scaling, pool averages,
+                    auction $, inflation, simulated-league category ranks
+  roster.py         slot eligibility (ESPN eligibleSlots), add / move / swap / remove
+  draft.py          ESPN fetch + parse (league settings, player pool), JSON cache
+  rating.py, schedule.py, config.py   now import the shared math and constants from valuation.py
 gui/
-  __main__.py       NEW  starts uvicorn
-  server.py         NEW  FastAPI: /api/pool, /api/refresh, /api/state
-  static/           NEW  index.html, app.js, styles.css (from the mockup)
-draftState.json         gitignored: {adjustments: {playerId: {delta, expGp, note}}, picks: {playerId: {status, price}}, slots: [playerId|null × teamSize]}
-draftPool.json          gitignored: cached ESPN pull with fetchedAt timestamp
+  __main__.py       CLI entry: python3 -m gui
+  server.py         stdlib HTTP server, static files + JSON API
+  board.py          DraftBoard: pool + your edits → snapshot
+  static/           index.html, app.js, styles.css, tokens.css
+tests/
+  valuation_test.py, roster_test.py, draft_test.py (+ fixtures/)  offline, 34 tests
+draftPool.json      gitignored: cached ESPN pull
+draftState.json     gitignored: {weight, adjustments, picks, filled}
 ```
 
-### Required refactor
+### Refactor (done)
 
-`rating.py` imports `library.globals`, which loads `league.pickle` at import time and can call `quit()` in `validate()`. The GUI must not trigger that.
+- `rating.ratePlayer`/`ratePercentStat` and `schedule`'s duplicate copies now delegate to `valuation.py`, and `config.py` re-exports its constants from there.
+- Checked against the saved league: 1,238 ratings, maximum difference 6×10⁻¹⁴.
+- Zero league averages are now skipped instead of raising `ZeroDivisionError`.
+- The GUI never imports `library.globals` or `library.config`, so it never loads `league.pickle` and never creates `settings.txt`.
 
-- Move the pure math (`ratePlayer`, `ratePercentStat`, `categoryRatePlayer`) into `valuation.py`, or make `globals` lazy.
-- Leave the existing CLI's behavior unchanged.
-- While in there, guard `playerStat / averageStat` against division by zero.
+### Data details found while building
+
+- `https://…/games/fba` returns `currentSeasonId`, which is used as the draft season unless `settings.txt` sets `"draftSeason"`.
+- Public leagues need no cookies.
+  - The league endpoint gives size, auction budget, draft type, scoring categories (TO has `isReverseItem`) and roster slot counts.
+  - The league player endpoint also gives `draftAuctionValue`, ESPN's league-specific $, which is shown as "ESPN".
+- Players with no last-season games (injured all year, or rookies) fall back to ESPN's projection and get an "ESPN proj" badge. They're excluded from the pool averages.
+- Older `espn_api` releases (the one installed for Python 3.9) name three-pointers `3PTM`/`3PTA`. `draft.stat_name` normalizes them.
 
 ## Rating and value model
 
@@ -108,7 +130,7 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
 8. **Edge** = `Ours − Avg paid` (ESPN `auctionValueAverage`). This shows who's underpriced in the market.
 9. **Inflation** (during the draft) = `(money left in league − roster spots left × $1) / Σ(Ours − 1) of undrafted players`.
    - **Bid to** = `1 + (Ours − 1) × inflation`.
-   - The price box defaults to Bid to.
+   - Bid to is shown for reference. Prices default to Avg paid.
 
 ## Screens
 
@@ -143,7 +165,7 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
   - Drag between slots, or click one slot and then another. This works from the keyboard too.
   - Dropping on an occupied slot swaps the two players if both fit. Otherwise the displaced player goes to the next open eligible slot.
   - An ineligible drop is rejected with a message like "Flagg (SF/PF) can't play C".
-- **Picks:** adding a player marks them *Mine* with a price, defaulting to Bid to and editable in the slot.
+- **Picks:** adding a player marks them *Mine* with a price, defaulting to **Avg paid** (ESPN's `auctionValueAverage`, minimum $1) and editable in the slot. *Mark taken* uses the same default.
 - **Removing:**
   - Every filled slot has an **×**, both on the Board strip and in My Team, that sends the player back to the board.
   - **Clear roster** (on both) empties every slot.
@@ -172,6 +194,8 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
 
 ## Milestones
 
+Status as of 2026-09-23: milestones 1–4 are built, and 5 is next.
+
 1. **Data layer:** `draft.py` + `valuation.py`, the rating refactor, and tests against a saved ESPN JSON fixture (no network in tests).
 2. **Draft Board:** search, filters, editable Δ, persistence, Our $, and Edge.
 3. **Player detail** panel and category bars.
@@ -188,6 +212,5 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
 
 ## Open questions
 
-- Stack: confirm FastAPI + plain JS instead of Streamlit (see Stack).
 - Exp GP default: is a midpoint with ESPN's projection right, or should it lean more on history, like a 3-season average?
 - Worktree setup: `settings.txt` and the pickles are gitignored, so they aren't in this worktree. Symlink or copy `settings.txt` over before running.

@@ -120,6 +120,22 @@ class DraftValueTest(unittest.TestCase):
         self.assertEqual(market.spots_left, self.shape.pool_size - 1)
         self.assertAlmostEqual(v.apply_inflation(rows, self.shape, {}).inflation, 1.0)
 
+    def test_team_ratings(self):
+        avg = line()
+        self.assertAlmostEqual(v.team_ratings(avg, avg, CATS + ["TO"], ["TO"])["PTS"], 100.0)
+        better = v.team_ratings(line(pts=12, to=1.0), avg, ["PTS", "TO", "FG%"], ["TO"])
+        self.assertAlmostEqual(better["PTS"], 120.0)
+        self.assertAlmostEqual(better["TO"], 150.0)  # fewer turnovers rate higher
+        self.assertAlmostEqual(better["FG%"], 100.0)
+
+    def test_simulate_league_ratings_follow_roster(self):
+        rows = list(self.value().values())
+        stars = v.simulate_league(rows, [1, 2, 3], [], self.shape)
+        empty = v.simulate_league(rows, [], [], self.shape)
+        self.assertEqual(set(stars.ratings), set(self.shape.categories))
+        self.assertGreater(stars.ratings["PTS"], 100)
+        self.assertGreater(stars.ratings["PTS"], empty.ratings["PTS"])
+
     def test_simulate_league_ranks(self):
         rows = list(self.value().values())
         best = [1, 2, 3]

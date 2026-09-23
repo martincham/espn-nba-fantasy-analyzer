@@ -428,6 +428,7 @@ class DraftBoard:
                 {
                     "cat": c,
                     "rank": sim.ranks[c],
+                    "rating": round(sim.ratings.get(c, 100.0), 1),
                     "mine": sim.teams[0][c],
                     "avg": averages[c],
                     "teams": [t[c] for t in sim.teams],

@@ -310,11 +310,11 @@ def season_totals(row: Valued) -> Stats:
     return scale(row.proj_stats, row.exp_gp)
 
 
-def team_categories(members: Sequence["tuple[Stats, float]"], categories: Sequence[str], counted: int) -> Stats:
-    """Category totals from the best `counted` members by per-game rating.
+def team_totals(members: Sequence["tuple[Stats, float]"], counted: int) -> Stats:
+    """Season totals from the best `counted` members by per-game rating.
 
-    `members` are (season totals, per-game rating) pairs. Percent categories
-    are pooled makes / attempts.
+    `members` are (season totals, per-game rating) pairs. Percentages are
+    pooled makes / attempts.
     """
     best = sorted(members, key=lambda m: m[1], reverse=True)[:counted]
     totals: Stats = {}
@@ -322,14 +322,38 @@ def team_categories(members: Sequence["tuple[Stats, float]"], categories: Sequen
         for k in VOLUME_STATS:
             if k in stats:
                 totals[k] = totals.get(k, 0.0) + stats[k]
-    totals = with_percentages(totals)
+    return with_percentages(totals)
+
+
+def team_categories(members: Sequence["tuple[Stats, float]"], categories: Sequence[str], counted: int) -> Stats:
+    totals = team_totals(members, counted)
     return {c: totals.get(c, 0.0) for c in categories}
+
+
+def team_ratings(team: Stats, average_team: Stats, categories: Sequence[str], reverse: Sequence[str]) -> Dict[str, float]:
+    """Team category ratings vs the average team, on the player scale (100 = average).
+
+    Percentages use the same volume-weighted formula as players; `reverse`
+    categories (e.g. TO) are inverted so higher is always better.
+    """
+    ratings = {}
+    for cat in categories:
+        if cat in PERCENT_STATS:
+            ratings[cat] = rate_percent_stat(team, average_team, cat) * 100
+            continue
+        average = average_team.get(cat) or 0
+        if not average:
+            continue
+        ratio = (team.get(cat) or 0) / average
+        ratings[cat] = (2 - ratio if cat in reverse else ratio) * 100
+    return ratings
 
 
 @dataclass
 class LeagueSim:
-    teams: List[Stats]  # index 0 is my team
+    teams: List[Stats]  # category values per team; index 0 is my team
     ranks: Dict[str, int]
+    ratings: Dict[str, float]  # my team vs the average team, 100 = average
     roto: int
     overall: int
     expected_wins: float
@@ -375,7 +399,11 @@ def simulate_league(
         opp[opponents - 1 - pos if rnd % 2 else pos].append((season_totals(r), r.proj_pg))
 
     cats = shape.categories
-    teams = [team_categories(me, cats, shape.counted)] + [team_categories(t, cats, shape.counted) for t in opp]
+    totals = [team_totals(me, shape.counted)] + [team_totals(t, shape.counted) for t in opp]
+    teams = [{c: t.get(c, 0.0) for c in cats} for t in totals]
+    average_team = with_percentages(
+        {k: sum(t.get(k, 0.0) for t in totals) / len(totals) for k in VOLUME_STATS}
+    )
 
     def better(a: float, b: float, cat: str) -> bool:
         return a < b if cat in shape.reverse else a > b
@@ -389,6 +417,7 @@ def simulate_league(
     return LeagueSim(
         teams=teams,
         ranks=all_ranks[0],
+        ratings=team_ratings(totals[0], average_team, cats, shape.reverse),
         roto=roto[0],
         overall=overall,
         expected_wins=expected,

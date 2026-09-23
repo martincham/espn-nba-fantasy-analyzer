@@ -85,6 +85,9 @@ To start over, stop the app and delete `draftState.json`.
 - **Value weighs:** slide toward per game to judge players on how good they are when they play. Slide toward season to penalize missed games.
 - **Add players:** drag a player's name onto a slot in the **My roster** strip. You can also use **Add to my team** in the side panel, or select a player and click an empty slot.
   - New players are priced at **Avg paid** by default. You can edit the price in the side panel or on the My Team tab.
+- **Team ratings row:** under the budget row, each league category has a column and a rating. 100 means the average team in the simulated league, and the badge shows your rank.
+  - Bars point up when you beat the average team and down when you trail it. TO is inverted, so up is always better.
+  - Whenever a change moves a rating, a small +/− chip shows by how much for a few seconds. Click the row to open My Team.
 - **Rearrange:** on **My Team**, drag between slots or click one slot and then another.
   - **×** removes a player and **Clear roster** empties every slot.
   - Both show an **Undo** message.

@@ -99,11 +99,11 @@ function render() {
     const first = [...B.rows].sort((a, b) => a.rank - b.rank).find((r) => !r.status);
     UI.sel = first ? first.id : null;
   }
-  renderMeta(); renderScore(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam();
+  renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam();
 }
 function renderLive() { // while dragging a slider: leave the panel being dragged alone
   byId = new Map(B.rows.map((r) => [r.id, r]));
-  renderScore(); renderBody(); renderStrip(); renderTeam();
+  renderScore(); renderCatRow(); renderBody(); renderStrip(); renderTeam();
 }
 function renderKeepFocus() {
   const a = document.activeElement, id = a && a.id;
@@ -152,6 +152,58 @@ function renderScore() {
   $("sEdgeSub").textContent = best ? `${best.name} · ${money(best.ours)} vs ${money(best.avg)}` : "—";
   $("teamCount").textContent = `${me.count}/${B.meta.rosterSize}`;
 }
+
+// ------------------------------------------------------------------ team category row
+
+// Built once per category list, then updated in place so bars animate between values.
+let catRowKey = "", prevRatings = null;
+const chipTimers = {};
+function renderCatRow() {
+  const el = $("catrow"), t = B.team, n = B.meta.teams;
+  el.hidden = !t.categories.length || t.categories[0].rating == null; // older server: no ratings yet
+  if (el.hidden) return;
+  const key = t.categories.map((c) => c.cat).join("|");
+  if (key !== catRowKey) {
+    catRowKey = key; prevRatings = null;
+    el.style.setProperty("--cats", t.categories.length);
+    el.innerHTML = `<div class="cr-head"><span class="lbl">My team</span><span class="v" id="crOverall"></span><span class="s" id="crSub"></span></div>` +
+      t.categories.map((c, i) => `<div class="cc" id="cc-${i}">
+        <span class="lbl">${esc(c.cat)}</span>
+        <span class="col"><i></i></span>
+        <span class="nums"><span class="rv"></span><span class="rk"></span></span>
+        <span class="dchip"></span></div>`).join("");
+  }
+  $("crOverall").textContent = `${ord(t.overall)} of ${n}`;
+  $("crSub").textContent = `100 = average team${t.filled < B.meta.rosterSize ? ` · ${B.meta.rosterSize - t.filled} empty slots at replacement` : ""}`;
+  const next = {};
+  t.categories.forEach((c, i) => {
+    const cell = $(`cc-${i}`), r = c.rating;
+    next[c.cat] = r;
+    const bar = cell.querySelector(".col i");
+    // Diverging from the 100 midline: up = better than the average team, down = worse. ±40 fills a half.
+    bar.classList.toggle("below", r < 100);
+    bar.style.height = `${Math.min(Math.abs(r - 100), 40) / 40 * 50}%`;
+    cell.querySelector(".rv").textContent = Math.round(r);
+    const rk = cell.querySelector(".rk");
+    rk.textContent = ord(c.rank);
+    rk.className = "rk " + (c.rank <= 3 ? "top" : c.rank >= n - 2 ? "low" : "mid");
+    cell.title = `${c.cat}: rating ${Math.round(r)}, ${ord(c.rank)} of ${n}${c.reverse ? " (lower totals are better)" : ""}`;
+    const prev = prevRatings && prevRatings[c.cat];
+    const d = prev == null ? 0 : Math.round(r) - Math.round(prev);
+    if (d) {
+      const chip = cell.querySelector(".dchip");
+      chip.textContent = signed(d);
+      chip.className = "dchip show " + (d > 0 ? "up" : "down");
+      clearTimeout(chipTimers[i]);
+      chipTimers[i] = setTimeout(() => chip.classList.remove("show"), 3500);
+    }
+  });
+  prevRatings = next;
+}
+$("catrow").addEventListener("click", () => { setView("team"); render(); });
+$("catrow").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setView("team"); render(); }
+});
 
 // ------------------------------------------------------------------ board table
 

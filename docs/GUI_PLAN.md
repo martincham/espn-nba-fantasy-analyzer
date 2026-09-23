@@ -178,6 +178,10 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
   - For each category: a strip with all 12 teams (mine highlighted), my rank, my total, and the difference from the league average.
   - Overall rank by roto points, and expected H2H categories won per week.
   - A callout for strong and weak categories, with the best-value available players for the weakest category.
+- **Team ratings row** (under the scoreline, visible on both tabs):
+  - One column per league category with a rating on the player scale, where 100 is the average simulated team. It uses `valuation.team_ratings`: the same volume-weighted formula for percentages, with TO inverted.
+  - Columns diverge from the 100 line, and ±40 fills a half-column.
+  - Each column shows a rank badge. A +/− chip flashes whenever a change moves a rating.
 - **Once live sync lands:** replace the simulated opponents with the real rosters from the ESPN draft, simulating only the rest of the draft.
 - **Include TO** (lower is better) once the pool data has it. It's in `categories` and missing from the mockup.
 

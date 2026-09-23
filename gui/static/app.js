@@ -5,7 +5,7 @@
 const $ = (id) => document.getElementById(id);
 let B = null; // latest board snapshot
 let byId = new Map();
-const UI = { q: "", pos: "ALL", hideGone: false, onlyAdj: false, sort: { key: "rank", dir: 1 },
+const UI = { q: "", pos: "ALL", team: "ALL", hideGone: false, onlyAdj: false, sort: { key: "rank", dir: 1 },
   sel: null, view: "board", pickSlot: null, dragging: false };
 
 // ------------------------------------------------------------------ format
@@ -107,6 +107,7 @@ function render() {
     const first = [...B.rows].sort((a, b) => a.rank - b.rank).find((r) => !r.status);
     UI.sel = first ? first.id : null;
   }
+  if (!$("teams").childElementCount) renderTeams();
   renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam();
 }
 function renderLive() { // while dragging a slider: leave the panel being dragged alone
@@ -254,6 +255,7 @@ function visibleRows() {
   const rows = B.rows.filter((r) =>
     (!q || norm(r.name).includes(q) || norm(r.team).includes(q)) &&
     (UI.pos === "ALL" || r.elig.includes(UI.pos)) &&
+    (UI.team === "ALL" || r.team === UI.team) &&
     (!UI.hideGone || !r.status) &&
     (!UI.onlyAdj || r.delta || r.gpSet || r.minSet || r.note));
   const { key, dir } = UI.sort;
@@ -554,6 +556,71 @@ $("chips").addEventListener("click", (e) => {
   UI.pos = b.dataset.pos;
   document.querySelectorAll(".fchip").forEach((c) => c.setAttribute("aria-pressed", c.dataset.pos === UI.pos));
   renderBody();
+});
+
+// ESPN abbreviations → [name, primary, secondary]. The swatch shows both colors
+// so dark primaries (navy, black) still read on the dark theme.
+const NBA_TEAMS = {
+  ATL: ["Atlanta Hawks", "#E03A3E", "#C1D32F"], BOS: ["Boston Celtics", "#007A33", "#BA9653"],
+  BKN: ["Brooklyn Nets", "#000000", "#FFFFFF"], CHA: ["Charlotte Hornets", "#1D1160", "#00788C"],
+  CHI: ["Chicago Bulls", "#CE1141", "#000000"], CLE: ["Cleveland Cavaliers", "#860038", "#FDBB30"],
+  DAL: ["Dallas Mavericks", "#00538C", "#B8C4CA"], DEN: ["Denver Nuggets", "#0E2240", "#FEC524"],
+  DET: ["Detroit Pistons", "#C8102E", "#1D42BA"], GSW: ["Golden State Warriors", "#1D428A", "#FFC72C"],
+  HOU: ["Houston Rockets", "#CE1141", "#C4CED4"], IND: ["Indiana Pacers", "#002D62", "#FDBB30"],
+  LAC: ["LA Clippers", "#C8102E", "#1D428A"], LAL: ["Los Angeles Lakers", "#552583", "#FDB927"],
+  MEM: ["Memphis Grizzlies", "#5D76A9", "#12173F"], MIA: ["Miami Heat", "#98002E", "#F9A01B"],
+  MIL: ["Milwaukee Bucks", "#00471B", "#EEE1C6"], MIN: ["Minnesota Timberwolves", "#0C2340", "#78BE20"],
+  NOP: ["New Orleans Pelicans", "#0C2340", "#C8102E"], NYK: ["New York Knicks", "#006BB6", "#F58426"],
+  OKC: ["Oklahoma City Thunder", "#007AC1", "#EF3B24"], ORL: ["Orlando Magic", "#0077C0", "#C4CED4"],
+  PHL: ["Philadelphia 76ers", "#006BB6", "#ED174C"], PHO: ["Phoenix Suns", "#1D1160", "#E56020"],
+  POR: ["Portland Trail Blazers", "#E03A3E", "#000000"], SAC: ["Sacramento Kings", "#5A2D81", "#63727A"],
+  SAS: ["San Antonio Spurs", "#C4CED4", "#000000"], TOR: ["Toronto Raptors", "#CE1141", "#000000"],
+  UTA: ["Utah Jazz", "#4B2A7B", "#000000"], WAS: ["Washington Wizards", "#002B5C", "#E31837"],
+  FA: ["Free agents", "#8A827A", "#CBC6C0"],
+};
+const inkOn = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? "#1D1B19" : "#FFFFFF";
+};
+
+function renderTeams() {
+  const present = new Set(B.rows.map((r) => r.team));
+  const codes = Object.keys(NBA_TEAMS).filter((t) => t !== "FA").sort();
+  if (present.has("FA")) codes.push("FA");
+  const chip = (code, label, title, style = "") =>
+    `<button class="tchip" type="button" role="radio" data-team="${code}" aria-checked="${UI.team === code}"` +
+    ` tabindex="${UI.team === code ? 0 : -1}" title="${esc(title)}"${style}>${label}</button>`;
+  $("teams").innerHTML = chip("ALL", "All", "All teams") + codes.map((t) => {
+    const [name, c1, c2] = NBA_TEAMS[t];
+    return chip(t, t, name, ` style="--c1:${c1};--c2:${c2};--on:${inkOn(c1)}"`);
+  }).join("");
+}
+
+function setTeam(code, focus = false) {
+  UI.team = code;
+  document.querySelectorAll(".tchip").forEach((c) => {
+    const on = c.dataset.team === code;
+    c.setAttribute("aria-checked", on);
+    c.tabIndex = on ? 0 : -1;
+    if (on && focus) c.focus();
+  });
+  renderBody();
+}
+
+$("teams").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-team]");
+  if (!b) return;
+  // Clicking the selected team again goes back to all teams.
+  setTeam(b.dataset.team === UI.team ? "ALL" : b.dataset.team);
+});
+$("teams").addEventListener("keydown", (e) => {
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  if (!step) return;
+  e.preventDefault();
+  const chips = [...document.querySelectorAll(".tchip")];
+  const i = chips.findIndex((c) => c.dataset.team === UI.team);
+  setTeam(chips[(i + step + chips.length) % chips.length].dataset.team, true);
 });
 $("q").addEventListener("input", (e) => { UI.q = e.target.value; renderBody(); });
 ["hideGone", "onlyAdj"].forEach((k) => $(k).addEventListener("change", (e) => { UI[k] = e.target.checked; renderBody(); }));

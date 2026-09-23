@@ -88,6 +88,15 @@ p{margin:0}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
 .fchip{border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:3px 11px;font-family:var(--font-data);font-weight:500;font-size:12px;cursor:pointer;color:var(--muted)}
 .fchip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.teams{flex:1 1 100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(36px,1fr));gap:3px}
+.tchip{--c1:var(--ink);--c2:var(--ink);--on:var(--surface);position:relative;overflow:hidden;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-sm);padding:2px 4px 4px;font-family:var(--font-data);font-weight:500;font-size:11px;letter-spacing:.02em;line-height:1.3;color:var(--ink-2);cursor:pointer}
+/* two-tone team stripe along the bottom edge */
+.tchip::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--c1) 0 62%,var(--c2) 62%)}
+.tchip[data-team="ALL"]::after{display:none}
+.tchip:hover{border-color:var(--line-strong);color:var(--ink)}
+.tchip[aria-checked="true"]{background:var(--c1);border-color:var(--c2);color:var(--on);font-weight:600}
+.tchip[aria-checked="true"]::after{background:var(--c2)}
+.tchip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .check{display:flex;align-items:center;gap:6px;font-size:var(--fs-small);color:var(--ink-2);cursor:pointer;user-select:none}
 .check input{accent-color:var(--accent);width:15px;height:15px;margin:0}
 .slider{display:flex;align-items:center;gap:8px;font-size:var(--fs-small);color:var(--ink-2)}

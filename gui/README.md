@@ -79,6 +79,7 @@ To start over, stop the app and delete `draftState.json`.
 ## Using it
 
 - **Search:** press **/** to jump to the search box. It matches player names and NBA team abbreviations, ignoring accents.
+- **Filter by team:** the row of team-colored buttons under the search box shows one NBA team at a time (**FA** is unsigned players). Click the selected team again, or **All**, to clear it. Arrow keys move between teams.
 - **Edit a player:** drag sideways on an **Exp GP**, **Exp MIN** or **Δ** cell to change it (hold Shift for bigger steps), or click the cell to type. You can also select a row and use the sliders in the side panel.
   - **Exp MIN defaults to ESPN's projected minutes.** Production scales with minutes, keeping the player's per-minute rates from last season. With fewer than 20 games last season, ESPN's projected line is used instead. Clear the cell to go back to ESPN's minutes.
   - **Δ is in rating points** on the per-game scale where 100 is the average player: `+10` turns a 133 into a 143. It's applied on top of the minutes change, so use it for real improvement or decline, not role. The change spreads across categories in proportion to what the player already produces.

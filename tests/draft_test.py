@@ -223,6 +223,15 @@ class BoardTest(unittest.TestCase):
         b.update_settings(fadeStart=80, fadeEnd=81)
         self.assertLess(spread(), normal / 2)
 
+    def test_category_columns(self):
+        snap = self.board.snapshot()
+        cats = snap["meta"]["categories"]
+        jokic = next(r for r in snap["rows"] if r["name"] == "Nikola Jokic")
+        self.assertEqual(set(jokic["cats"]), set(cats))  # every league category, TO included
+        self.assertGreater(jokic["cats"]["AST"], 150)
+        self.assertGreater(jokic["catStats"]["AST"], 5)
+        self.assertLess(jokic["catStats"]["FG%"], 1)
+
     def test_win_chances(self):
         b = self.board
         snap = b.snapshot()

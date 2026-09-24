@@ -6,7 +6,7 @@ The ideas behind how Draft Room values players, and the draft strategy it's buil
 
 - **Draft:** a 12-team auction, $200 per team.
 - **Roster:** 12 players. Seven start each night (PG, C, F, F, SG/SF, SG/SF, UT) and five sit on the bench.
-- **Scoring:** head-to-head, 9 categories (PTS, REB, AST, STL, BLK, 3PM, FG%, FT%, TO). Lineups are set daily.
+- **Scoring:** head-to-head **each category**, 9 categories (PTS, REB, AST, STL, BLK, 3PM, FG%, FT%, TO). Every category is its own win or loss each week, and your record is the sum: an 8–1 week counts 8 wins, a 5–4 week counts 5. Lineups are set daily.
 - **Transactions:** 3 adds per week.
 - **IR:** 2 slots. An injured player on IR doesn't use a roster spot.
 
@@ -79,7 +79,7 @@ Why 7? See [the strategy section](#7-roster-strategy-a-core-seven-and-a-rotating
 
 ## 6. Win categories, not points
 
-In head-to-head you don't win on total rating. You win **categories**: each week, whoever has more in a category takes it, and the team that takes 5 of 9 wins the matchup. So a point of rating isn't worth the same everywhere.
+In head-to-head you don't win on total rating. You win **categories**: each week, whoever has more in a category takes it, and in this league each category counts in the standings. The goal is the most category wins per week, not just taking the matchup. So a point of rating isn't worth the same everywhere.
 
 - **Taking a category from 80 to 100 turns losses into toss-ups.** A weak category is where extra strength wins the most.
 - **Taking a category from 130 to 150 wins nothing.** You were already winning it every week, so the extra is wasted.
@@ -120,7 +120,7 @@ These are last season's fitted spreads pulled halfway toward the overall 25, aga
 - The player rating counts every category the same, so it overrates swingy ones. That's part of why an extreme shot-blocker rates so high.
 
 **In the app:**
-- **Team row:** each category shows your win chance. The first box shows expected categories won per week, and the chance of winning the week: taking 5 or more of the 9, treating categories as independent.
+- **Team row:** each category shows your win chance. The first box shows your expected weekly record, the sum of the nine win chances, e.g. 5.8–3.2.
 - **All of these are against the average team.** Real draft-day projections are less certain than last season's final numbers, so true win rates sit a bit closer to 50%.
 
 ### Fit: value to the team you have
@@ -146,7 +146,11 @@ The **Fit** column rates each player by how much he'd help *your current team*. 
 
 ### Punting is always your choice
 
-**Punting** means giving up a category on purpose: you expect to lose it most weeks, and you spend nothing on it. It can be a strong strategy. With 9 categories you need 5, so conceding one lets you be stronger in the other 8.
+**Punting** means giving up a category on purpose: you expect to lose it most weeks, and you spend nothing on it. In an each-category league a punt has a clear price: you give up that category's weekly win chance (about 0.4–0.5 wins a week for a middling category), every week. It's worth it only if the money and roster spots add more than that across the other eight.
+
+Checked against your roster in September 2026, a hard punt of TO and FG% didn't pay:
+- **Hard punt:** tanking them to 82 and 88 made the other seven stronger, but the record fell to about 5.6 wins a week.
+- **Soft punt:** letting them sit near 97–99 while strengthening the rest reached about 5.8.
 
 - **Draft Room never punts for you.** A category you're losing is a category to fix, until you decide otherwise.
 - **To punt a category,** tick **Punt** on it in the team row under the scoreline. Fit then ignores it completely. It still shows in your team ratings, dimmed.
@@ -245,7 +249,7 @@ The draft sets your team up. Most weeks are won by how you manage it.
    - On the last days of a week you're narrowly ahead, bench poor shooters and start low-volume players.
 4. **Build around categories that go together.**
    - Big men bring REB, BLK and FG% together. Guards bring AST, 3PM, STL and FT% together.
-   - A team that reliably wins one bundle, plus one or two more categories, wins 5 of 9 most weeks.
+   - A team that reliably wins one bundle, plus one or two more categories, starts every week well above .500.
    - Draft Room shows the bundles as they form in the team row.
 5. **Draft for the fantasy playoffs.**
    - The regular season only gets you in; the playoff weeks decide the season.

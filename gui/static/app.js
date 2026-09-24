@@ -5,7 +5,7 @@
 const $ = (id) => document.getElementById(id);
 let B = null; // latest board snapshot
 let byId = new Map();
-const UI = { q: "", pos: "ALL", team: "ALL", hideGone: false, onlyAdj: false, sort: { key: "rank", dir: 1 },
+const UI = { q: "", pos: "ALL", team: "ALL", hideGone: false, onlyAdj: false, affordable: false, catSel: [], sort: { key: "rank", dir: 1 },
   sel: null, view: "board", pickSlot: null, dragging: false };
 
 // ------------------------------------------------------------------ format
@@ -144,6 +144,8 @@ function renderScore() {
   const me = B.me, pool = B.pool;
   $("sBudget").textContent = money(me.budgetLeft);
   $("sMax").textContent = `max bid ${money(me.maxBid)}`;
+  $("affordableTxt").textContent = `Only affordable (≤ ${money(me.maxBid)})`;
+  $("affordableLbl").title = `Hide undrafted players whose Avg paid is more than your max bid (${money(me.maxBid)})`;
   $("sRoster").textContent = `${me.count} / ${B.meta.rosterSize}`;
   $("sRosterSub").textContent = me.count ? me.names.map(lastName).join(", ") : "No picks yet";
   $("sPool").textContent = `${pool.left} / ${pool.size}`;
@@ -188,9 +190,15 @@ function renderCatRow() {
   $("crOverall").textContent = `Winning ${wins} of ${t.categories.length}`;
   $("crOverall").title = `Better than the average team in ${wins} categories, worse in ${losses}${even ? `, even in ${even}` : ""}`;
   t.categories.forEach((c, i) => { $(`wl-${i}`).className = outcome(c.rating); $(`wl-${i}`).title = `${c.cat}: ${signed(c.rating - 100)}`; });
-  $("crOdds").innerHTML = t.matchupWin == null ? "" :
-    `<b>${t.expectedWins.toFixed(1)}</b> cats a week · wins the week <b>${Math.round(t.matchupWin * 100)}%</b>`;
-  $("crOdds").title = "Expected categories won per week, and the chance of winning 5 or more, against the average team";
+  // In "each category" leagues every category is a win or loss in the standings, so the
+  // expected weekly record is what counts. Only "most categories" leagues score the matchup.
+  const mostCats = B.meta.scoringType === "H2H_MOST_CATEGORIES";
+  $("crOdds").innerHTML = t.expectedWins == null ? "" : mostCats && t.matchupWin != null
+    ? `<b>${t.expectedWins.toFixed(1)}</b> cats a week · wins the week <b>${Math.round(t.matchupWin * 100)}%</b>`
+    : `Expected record <b>${t.expectedWins.toFixed(1)}–${(t.categories.length - t.expectedWins).toFixed(1)}</b> a week`;
+  $("crOdds").title = mostCats
+    ? "Expected categories won per week, and the chance of winning more than half, against the average team"
+    : "Expected category wins and losses per week against the average team. Each category counts in the standings.";
   $("crSub").textContent = `vs the average team${t.filled < B.meta.rosterSize ? ` · ${B.meta.rosterSize - t.filled} empty slots at replacement` : ""}`;
   const next = {};
   t.categories.forEach((c, i) => {
@@ -237,13 +245,19 @@ $("catrow").addEventListener("change", (e) => {
 
 // ------------------------------------------------------------------ board table
 
+// The Categories group (one sortable column per league category) is collapsible;
+// whether it's open is remembered in this browser.
+let showCats = false;
+try { showCats = localStorage.getItem("draftroom-cats") === "1"; } catch (e) { /* storage blocked */ }
+const catKey = (c) => "cat:" + c;
 const GROUPS = () => [
-  { label: "", span: 3 },
+  { label: "", span: 3, toggle: true },
+  ...(showCats ? [{ label: "Categories · per game", span: B.meta.categories.length + 1, cls: "g-cats" }] : []),
   { label: B.meta.statsLabel, span: 3 },
   { label: `${B.meta.seasonLabel} outlook`, span: 7, cls: "g-out" },
   { label: "Auction $", span: 4, cls: "g-ours" },
 ];
-const COLS = [
+const BASE_COLS = [
   { key: "taken", label: "", sr: "Taken", nosort: true, cls: "tk-h", title: "Drafted by another team" },
   { key: "rank", label: "Rk", title: "Rank by value" },
   { key: "name", label: "Player", cls: "l" },
@@ -263,9 +277,28 @@ const COLS = [
   { key: "fitEdge", label: "Fit edge", cls: "ours-h", title: "Fit $ − Avg paid: the bargain for your current team. Fit $ converts Fit to dollars at the league's rate." },
 ];
 
+function cols() {
+  if (!showCats) return BASE_COLS;
+  const at = BASE_COLS.findIndex((c) => c.key === "name") + 1;
+  const m = B.meta;
+  const mix = {
+    key: "catmix", label: UI.catSel.length ? `Mix <small>${UI.catSel.length}</small>` : "Mix", cls: "cat-h mix-h",
+    title: UI.catSel.length
+      ? `Average percentile in ${UI.catSel.join(", ")} among the top ${m.poolSize} players. 90 = better than 90% of them. Click to reverse.`
+      : "Click category headers to pick one or more; the board sorts by their Mix: the average percentile in the picked categories.",
+  };
+  const cats = m.categories.map((c) => ({
+    key: catKey(c), label: esc(c), cls: "cat-h" + (m.rated.includes(c) && !m.punt.includes(c) ? "" : " off") + (UI.catSel.includes(c) ? " picked" : ""),
+    title: `${c} rating, projected per game (100 = average)${m.reverse.includes(c) ? "; fewer is better, so a higher rating means fewer" : ""}${m.rated.includes(c) ? "" : ". Not in player value"}${m.punt.includes(c) ? ". Punted" : ""}. Click to ${UI.catSel.includes(c) ? "remove it from" : "add it to"} the Mix sort.`,
+  }));
+  return [...BASE_COLS.slice(0, at), mix, ...cats, ...BASE_COLS.slice(at)];
+}
+
 function renderHead() {
-  const g = `<tr class="grp">${GROUPS().map((g) => `<th colspan="${g.span}" class="${g.cls || ""}">${g.label ? `<span>${esc(g.label)}</span>` : ""}</th>`).join("")}</tr>`;
-  const c = `<tr>${COLS.map((c) => {
+  const g = `<tr class="grp">${GROUPS().map((g) => g.toggle
+    ? `<th colspan="${g.span}" class="g-toggle"><button type="button" class="cat-toggle" data-toggle-cats aria-expanded="${showCats}">${showCats ? "◂ Hide categories" : "Categories ▸"}</button></th>`
+    : `<th colspan="${g.span}" class="${g.cls || ""}">${g.label ? `<span>${esc(g.label)}</span>` : ""}</th>`).join("")}</tr>`;
+  const c = `<tr>${cols().map((c) => {
     if (c.nosort) return `<th class="${c.cls || ""}" scope="col" title="${esc(c.title)}"><span class="sr">${c.sr}</span></th>`;
     const s = UI.sort.key === c.key ? ` aria-sort="${UI.sort.dir < 0 ? "descending" : "ascending"}"` : "";
     const title = c.key === "avg" ? `${c.title} (ESPN average × ${B.meta.marketScale.toFixed(2)})` : c.title || "";
@@ -281,10 +314,12 @@ function visibleRows() {
     (UI.pos === "ALL" || r.elig.includes(UI.pos)) &&
     (UI.team === "ALL" || r.team === UI.team) &&
     (!UI.hideGone || !r.status) &&
-    (!UI.onlyAdj || r.delta || r.gpDelta || r.minSet || r.note));
+    (!UI.onlyAdj || r.delta || r.gpDelta || r.minSet || r.note) &&
+    (!UI.affordable || r.status || Math.round(r.avg) <= B.me.maxBid));
   const { key, dir } = UI.sort;
+  const val = (r) => (key === "catmix" ? catMix(r) : r[key]);
   rows.sort((a, b) => {
-    const x = a[key], y = b[key];
+    const x = val(a), y = val(b);
     if (typeof x === "string") return dir * x.localeCompare(y);
     return dir * ((x ?? -1e9) - (y ?? -1e9));
   });
@@ -315,6 +350,41 @@ function takenToggle(r) {
     ` aria-label="${esc(r.name)} drafted by another team" title="${on ? "Taken by another team. Click to undo." : "Mark drafted by another team"}"></button>`;
 }
 
+// Percentile of a rating within the draftable pool (top N by value), per category.
+// Mix averages the picked categories' percentiles, so one extreme category
+// (a 578 in blocks) can't drown out the others.
+let pctCache = { board: null, sorted: {} };
+function percentile(cat, v) {
+  if (pctCache.board !== B) {
+    const pool = B.rows.filter((r) => r.rank <= B.meta.poolSize);
+    pctCache = { board: B, sorted: {} };
+    B.meta.categories.forEach((c) => { pctCache.sorted[c] = pool.map((r) => (r.cats || {})[c]).filter((x) => x != null).sort((a, b) => a - b); });
+  }
+  const arr = pctCache.sorted[cat] || [];
+  if (!arr.length || v == null) return null;
+  let lo = 0, hi = arr.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (arr[mid] < v) lo = mid + 1; else hi = mid; }
+  return (100 * lo) / arr.length;
+}
+function catMix(r) {
+  if (!UI.catSel.length) return null;
+  const ps = UI.catSel.map((c) => percentile(c, (r.cats || {})[c])).filter((x) => x != null);
+  return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null;
+}
+
+// One heat-mapped cell per category: green above 100 (full by 160), red below (full by 60).
+function catCells(r) {
+  const cats = r.cats || {}, stats = r.catStats || {};
+  const mix = catMix(r);
+  const cells = B.meta.categories.map((c) => {
+    const v = cats[c];
+    if (v == null) return `<td class="catv">—</td>`;
+    const up = Math.min(Math.max((v - 100) / 60, 0), 1).toFixed(2), down = Math.min(Math.max((100 - v) / 40, 0), 1).toFixed(2);
+    const stat = stats[c] == null ? "" : c.endsWith("%") ? stats[c].toFixed(3).replace(/^0/, "") : fmt(stats[c]);
+    return `<td class="catv${UI.catSel.includes(c) ? " picked" : ""}" style="--up:${up};--down:${down}" title="${esc(c)}: ${stat} per game, rating ${Math.round(v)}">${Math.round(v)}</td>`;
+  });
+  return `<td class="catv mix">${mix == null ? "" : Math.round(mix)}</td>` + cells.join("");
+}
 const edgeCls = (e) => (e >= 3 ? "pos" : e <= -3 ? "neg" : "");
 
 function rowHTML(r) {
@@ -323,7 +393,7 @@ function rowHTML(r) {
   return `<tr data-id="${r.id}" class="${UI.sel === r.id ? "sel" : ""} ${r.status ? "gone" : ""}">
     <td class="tk">${takenToggle(r)}</td>
     <td class="rk">${r.rank}</td>
-    <td class="l"><div class="pcell"${drag}><span class="pname">${esc(r.name)}${statusPill(r)}</span><span class="psub">${esc(r.team)} · ${esc(r.pos)}${badges(r)}</span></div></td>
+    <td class="l"><div class="pcell"${drag}><span class="pname">${esc(r.name)}${statusPill(r)}</span><span class="psub">${esc(r.team)} · ${esc(r.pos)}${badges(r)}</span></div></td>${showCats ? catCells(r) : ""}
     <td>${r.fromProj ? "—" : r.gp}</td>
     <td>${fmt(r.lastPg)}</td>
     <td>${r.fromProj ? "—" : fmt(r.lastValue)}</td>
@@ -344,7 +414,7 @@ function rowHTML(r) {
 function renderBody() {
   const rows = visibleRows();
   $("tbody").innerHTML = rows.length ? rows.map(rowHTML).join("")
-    : `<tr><td colspan="${COLS.length}" class="empty-row">No players match${UI.q ? ` “${esc(UI.q)}”` : ""}. Clear the search or turn off a filter.</td></tr>`;
+    : `<tr><td colspan="${cols().length}" class="empty-row">No players match${UI.q ? ` “${esc(UI.q)}”` : ""}. Clear the search or turn off a filter.</td></tr>`;
 }
 
 // ------------------------------------------------------------------ detail panel
@@ -478,7 +548,7 @@ function renderTeam() {
     <div class="overall">
       <div><span class="lbl">Overall</span><span class="v">${ord(t.overall)}</span><span class="s">of ${n} by roto points</span></div>
       <div><span class="lbl">Roto points</span><span class="v">${t.roto}</span><span class="s">of ${t.rotoMax} possible</span></div>
-      <div><span class="lbl">H2H cats won</span><span class="v">${t.expectedWins.toFixed(1)}–${(t.categories.length - t.expectedWins).toFixed(1)}</span><span class="s">expected per week vs the average team${t.matchupWin == null ? "" : ` · wins the week ${Math.round(t.matchupWin * 100)}%`}</span></div>
+      <div><span class="lbl">H2H cats won</span><span class="v">${t.expectedWins.toFixed(1)}–${(t.categories.length - t.expectedWins).toFixed(1)}</span><span class="s">expected record per week vs the average team${B.meta.scoringType === "H2H_MOST_CATEGORIES" && t.matchupWin != null ? ` · wins the week ${Math.round(t.matchupWin * 100)}%` : ""}</span></div>
     </div>
     <div class="catwrap"><table class="cattab" aria-label="Category ranks">
       <thead><tr><th class="l" scope="col">Cat</th><th class="l" scope="col">worse ← league → better</th><th scope="col">Rank</th><th scope="col">Yours</th><th scope="col">vs avg</th></tr></thead>
@@ -663,11 +733,27 @@ $("teams").addEventListener("keydown", (e) => {
   setTeam(chips[(i + step + chips.length) % chips.length].dataset.team, true);
 });
 $("q").addEventListener("input", (e) => { UI.q = e.target.value; renderBody(); });
-["hideGone", "onlyAdj"].forEach((k) => $(k).addEventListener("change", (e) => { UI[k] = e.target.checked; renderBody(); }));
+["hideGone", "onlyAdj", "affordable"].forEach((k) => $(k).addEventListener("change", (e) => { UI[k] = e.target.checked; renderBody(); }));
 $("thead").addEventListener("click", (e) => {
+  if (e.target.closest("[data-toggle-cats]")) {
+    showCats = !showCats;
+    try { localStorage.setItem("draftroom-cats", showCats ? "1" : "0"); } catch (err) { /* storage blocked */ }
+    if (!showCats && UI.sort.key === "catmix") { UI.sort = { key: "rank", dir: 1 }; UI.catSel = []; }
+    renderHead(); renderBody();
+    return;
+  }
   const b = e.target.closest("[data-sort]");
   if (!b) return;
   const k = b.dataset.sort;
+  if (k.startsWith("cat:")) {
+    // Category headers pick categories for the Mix sort (best first).
+    const c = k.slice(4);
+    UI.catSel = UI.catSel.includes(c) ? UI.catSel.filter((x) => x !== c) : [...UI.catSel, c];
+    UI.sort = UI.catSel.length ? { key: "catmix", dir: -1 } : { key: "rank", dir: 1 };
+    renderHead(); renderBody();
+    return;
+  }
+  if (k === "catmix" && !UI.catSel.length) return;
   UI.sort = UI.sort.key === k ? { key: k, dir: -UI.sort.dir } : { key: k, dir: k === "name" || k === "rank" ? 1 : -1 };
   renderHead(); renderBody();
 });

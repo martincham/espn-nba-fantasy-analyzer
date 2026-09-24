@@ -421,6 +421,7 @@ class DraftBoard:
             pick = picks.get(r.id)
             cat_last = valuation.category_ratings(p.base_pg, base.per_game, shape.rated)
             cat_proj = valuation.category_ratings(r.proj_stats, base.per_game, shape.rated)
+            cat_all = valuation.category_ratings(r.proj_stats, base.per_game, shape.categories)
             out_rows.append({
                 "id": r.id,
                 "name": p.name,
@@ -462,6 +463,13 @@ class DraftBoard:
                 "note": (adjustments.get(str(r.id)) or {}).get("note", ""),
                 "catLast": {k: _r(v * 100, 0) for k, v in cat_last.items()},
                 "catProj": {k: _r(v * 100, 0) for k, v in cat_proj.items()},
+                # Every league category, projected per game: rating (100 = average) and the stat itself.
+                "cats": {k: _r(v * 100, 0) for k, v in cat_all.items()},
+                "catStats": {
+                    k: _r(r.proj_stats.get(k), 3 if k in valuation.PERCENT_STATS else 1)
+                    for k in shape.categories
+                    if r.proj_stats.get(k) is not None
+                },
                 "espnDelta": self._espn_delta(p),
             })
 

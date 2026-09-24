@@ -80,6 +80,10 @@ To start over, stop the app and delete `draftState.json`.
 ## Using it
 
 - **Search:** press **/** to jump to the search box. It matches player names and NBA team abbreviations, ignoring accents.
+- **Categories:** click **Categories ▸** above the Rk column to open a column for each league category, right after the player's name. Each shows his projected per-game rating in that category (100 = average; hover for the stat itself), tinted green above average and red below. **◂ Hide categories** closes them again; the app remembers which you chose.
+  - **Sort by one or more categories:** click category headers to pick them (they're underlined), and the board sorts by **Mix**, best first. Click a picked header again to drop it; click Mix to reverse.
+  - **Mix** is the player's average percentile in the picked categories among the top 144 players: 90 means better than 90% of them. Percentiles keep one extreme category (a 578 in blocks) from drowning out the others.
+- **Only affordable:** hides undrafted players whose Avg paid is more than your max bid. The label shows your current max bid.
 - **Filter by team:** the row of team-colored buttons under the search box shows one NBA team at a time (**FA** is unsigned players). Click the selected team again, or **All**, to clear it. Arrow keys move between teams.
 - **Edit a player:** drag sideways on a **GP Δ**, **Exp MIN** or **Δ** cell to change it (hold Shift for bigger steps), or click the cell to type. You can also select a row and use the sliders in the side panel.
   - **Exp MIN defaults to ESPN's projected minutes.** Production scales with minutes, keeping the player's per-minute rates from last season. With fewer than 20 games last season, ESPN's projected line is used instead. Clear the cell to go back to ESPN's minutes.
@@ -94,7 +98,7 @@ To start over, stop the app and delete `draftState.json`.
   - New players are priced at **Avg paid** by default. You can edit the price in the side panel or on the My Team tab.
 - **Team ratings row:** under the budget row, each league category has a column and a rating. 100 means the average team in the simulated league, and the badge shows your rank.
   - Bars point up when you beat the average team and down when you trail it. TO is inverted, so up is always better.
-  - Each category shows how far you're ahead of or behind the average team (+15, −6), your chance of winning it in a given week, and your rank. The first box counts the categories you're winning, with expected categories won per week and your chance of winning the week.
+  - Each category shows how far you're ahead of or behind the average team (+15, −6), your chance of winning it in a given week, and your rank. The first box counts the categories you're winning and your expected weekly record, e.g. 5.8–3.2. In an each-category league like this one, every category is a win or loss in the standings, so 8–1 beats 5–4.
   - Whenever a change moves a rating, a small +/− chip shows by how much for a few seconds. **Open My Team** in the row's first box shows the details.
   - **Punt** checkboxes: tick one to give up that category on purpose. The Fit column then ignores it. Nothing is ever punted unless you tick it.
 - **Fit:** each player's value to *your current team*, on the same scale as Value. It's how much he raises your weekly category win chances, so categories you're already winning count less. Steady categories (PTS, FG%, FT%) reach a sure win sooner than swingy ones (BLK, STL). Settings → Fit can switch to a simple fade instead: full weight up to 110, nothing past 140. Sort by Fit during the draft to find who helps you most.

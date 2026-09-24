@@ -1,0 +1,1524 @@
+[
+ {
+  "name": "6a  ESPN per-game projection (w=1)",
+  "note": "",
+  "accepted": true,
+  "acceptedOn": "ranking",
+  "meanRho": 0.69,
+  "dRho": 0.024,
+  "dRhoCI": [
+   0.003,
+   0.046
+  ],
+  "rhoWins": 4,
+  "meanDollarError": 13.34,
+  "dDollar": 0.72,
+  "dDollarCI": [
+   -0.19,
+   1.62
+  ],
+  "dollarWins": 4,
+  "bySeason": {
+   "2021": {
+    "rho": 0.692,
+    "dRho": 0.017,
+    "dollarError": 13.09,
+    "top200": 0.662,
+    "topPrice": 103
+   },
+   "2022": {
+    "rho": 0.648,
+    "dRho": 0.005,
+    "dollarError": 14.08,
+    "top200": 0.603,
+    "topPrice": 79
+   },
+   "2024": {
+    "rho": 0.766,
+    "dRho": 0.036,
+    "dollarError": 12.94,
+    "top200": 0.757,
+    "topPrice": 97
+   },
+   "2025": {
+    "rho": 0.654,
+    "dRho": 0.037,
+    "dollarError": 13.26,
+    "top200": 0.701,
+    "topPrice": 168
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2022": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2024": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2025": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   }
+  }
+ },
+ {
+  "name": "6b  blend ESPN + board line (LOSO, shrunk)",
+  "note": "grid {\"2021\": {\"0.0\": 0.675, \"0.25\": 0.686, \"0.5\": 0.693, \"0.75\": 0.692, \"1.0\": 0.692}, \"2022\": {\"0.0\": 0.643, \"0.25\": 0.647, \"0.5\": 0.651, \"0.75\": 0.652, \"1.0\": 0.648}, \"2024\": {\"0.0\": 0.73, \"0.25\": 0.741, \"0.5\": 0.753, \"0.75\": 0.763, \"1.0\": 0.766}, \"2025\": {\"0.0\": 0.617, \"0.25\": 0.629, \"0.5\": 0.641, \"0.75\": 0.65, \"1.0\": 0.654}}",
+  "accepted": false,
+  "acceptedOn": null,
+  "meanRho": 0.683,
+  "dRho": -0.008,
+  "dRhoCI": [
+   -0.02,
+   0.004
+  ],
+  "rhoWins": 2,
+  "meanDollarError": 13.66,
+  "dDollar": -0.31,
+  "dDollarCI": [
+   -1.07,
+   0.44
+  ],
+  "dollarWins": 1,
+  "bySeason": {
+   "2021": {
+    "rho": 0.693,
+    "dRho": 0.001,
+    "dollarError": 12.84,
+    "top200": 0.669,
+    "topPrice": 100
+   },
+   "2022": {
+    "rho": 0.651,
+    "dRho": 0.003,
+    "dollarError": 14.28,
+    "top200": 0.602,
+    "topPrice": 86
+   },
+   "2024": {
+    "rho": 0.753,
+    "dRho": -0.013,
+    "dollarError": 13.37,
+    "top200": 0.735,
+    "topPrice": 110
+   },
+   "2025": {
+    "rho": 0.633,
+    "dRho": -0.021,
+    "dollarError": 14.14,
+    "top200": 0.672,
+    "topPrice": 146
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 0.5,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2022": {
+    "w_espn": 0.5,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2024": {
+    "w_espn": 0.5,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2025": {
+    "w_espn": 0.375,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   }
+  },
+  "blendChosen": {
+   "2021": 0.5,
+   "2022": 0.5,
+   "2024": 0.5,
+   "2025": 0.375
+  }
+ },
+ {
+  "name": "4   games x measured actual/projected",
+  "note": "",
+  "accepted": false,
+  "acceptedOn": null,
+  "meanRho": 0.691,
+  "dRho": 0.001,
+  "dRhoCI": [
+   -0.001,
+   0.002
+  ],
+  "rhoWins": 2,
+  "meanDollarError": 13.36,
+  "dDollar": -0.01,
+  "dDollarCI": [
+   -0.05,
+   0.02
+  ],
+  "dollarWins": 1,
+  "bySeason": {
+   "2021": {
+    "rho": 0.692,
+    "dRho": -0.0,
+    "dollarError": 13.11,
+    "top200": 0.663,
+    "topPrice": 104
+   },
+   "2022": {
+    "rho": 0.649,
+    "dRho": 0.001,
+    "dollarError": 14.06,
+    "top200": 0.605,
+    "topPrice": 79
+   },
+   "2024": {
+    "rho": 0.766,
+    "dRho": -0.0,
+    "dollarError": 12.95,
+    "top200": 0.757,
+    "topPrice": 97
+   },
+   "2025": {
+    "rho": 0.656,
+    "dRho": 0.001,
+    "dollarError": 13.3,
+    "top200": 0.706,
+    "topPrice": 170
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 1.0,
+    "gp_scale": 0.8647711284886955,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2022": {
+    "w_espn": 1.0,
+    "gp_scale": 0.8790864181291358,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2024": {
+    "w_espn": 1.0,
+    "gp_scale": 0.8369701105451316,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2025": {
+    "w_espn": 1.0,
+    "gp_scale": 0.8643438462932754,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   }
+  }
+ },
+ {
+  "name": "4b  games pulled toward the average (LOSO, shrunk)",
+  "note": "",
+  "accepted": false,
+  "acceptedOn": null,
+  "meanRho": 0.69,
+  "dRho": 0.0,
+  "dRhoCI": [
+   0.0,
+   0.0
+  ],
+  "rhoWins": 0,
+  "meanDollarError": 13.34,
+  "dDollar": 0.0,
+  "dDollarCI": [
+   0.0,
+   0.0
+  ],
+  "dollarWins": 0,
+  "bySeason": {
+   "2021": {
+    "rho": 0.692,
+    "dRho": 0.0,
+    "dollarError": 13.09,
+    "top200": 0.662,
+    "topPrice": 103
+   },
+   "2022": {
+    "rho": 0.648,
+    "dRho": 0.0,
+    "dollarError": 14.08,
+    "top200": 0.603,
+    "topPrice": 79
+   },
+   "2024": {
+    "rho": 0.766,
+    "dRho": 0.0,
+    "dollarError": 12.94,
+    "top200": 0.757,
+    "topPrice": 97
+   },
+   "2025": {
+    "rho": 0.654,
+    "dRho": 0.0,
+    "dollarError": 13.26,
+    "top200": 0.701,
+    "topPrice": 168
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board",
+    "gp_mean": 71.485
+   },
+   "2022": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board",
+    "gp_mean": 71.805
+   },
+   "2024": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board",
+    "gp_mean": 66.765
+   },
+   "2025": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board",
+    "gp_mean": 70.99
+   }
+  }
+ },
+ {
+  "name": "5   replacement = measured pickup rating",
+  "note": "",
+  "accepted": false,
+  "acceptedOn": null,
+  "meanRho": 0.691,
+  "dRho": 0.001,
+  "dRhoCI": [
+   -0.001,
+   0.003
+  ],
+  "rhoWins": 4,
+  "meanDollarError": 13.35,
+  "dDollar": -0.01,
+  "dDollarCI": [
+   -0.13,
+   0.11
+  ],
+  "dollarWins": 2,
+  "bySeason": {
+   "2021": {
+    "rho": 0.694,
+    "dRho": 0.002,
+    "dollarError": 13.12,
+    "top200": 0.665,
+    "topPrice": 104
+   },
+   "2022": {
+    "rho": 0.649,
+    "dRho": 0.001,
+    "dollarError": 14.06,
+    "top200": 0.617,
+    "topPrice": 79
+   },
+   "2024": {
+    "rho": 0.766,
+    "dRho": 0.0,
+    "dollarError": 12.86,
+    "top200": 0.774,
+    "topPrice": 95
+   },
+   "2025": {
+    "rho": 0.655,
+    "dRho": 0.001,
+    "dollarError": 13.35,
+    "top200": 0.686,
+    "topPrice": 170
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 92.38326470989749,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2022": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 92.61401156925339,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2024": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 93.11753358741483,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2025": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 92.78002397844395,
+    "weights": null,
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   }
+  }
+ },
+ {
+  "name": "1   category weights from win curves",
+  "note": "",
+  "accepted": true,
+  "acceptedOn": "ranking",
+  "meanRho": 0.722,
+  "dRho": 0.032,
+  "dRhoCI": [
+   0.016,
+   0.048
+  ],
+  "rhoWins": 4,
+  "meanDollarError": 12.36,
+  "dDollar": 0.98,
+  "dDollarCI": [
+   0.42,
+   1.54
+  ],
+  "dollarWins": 4,
+  "bySeason": {
+   "2021": {
+    "rho": 0.716,
+    "dRho": 0.024,
+    "dollarError": 12.16,
+    "top200": 0.674,
+    "topPrice": 95
+   },
+   "2022": {
+    "rho": 0.69,
+    "dRho": 0.043,
+    "dollarError": 12.61,
+    "top200": 0.663,
+    "topPrice": 101
+   },
+   "2024": {
+    "rho": 0.786,
+    "dRho": 0.021,
+    "dollarError": 12.06,
+    "top200": 0.76,
+    "topPrice": 107
+   },
+   "2025": {
+    "rho": 0.695,
+    "dRho": 0.04,
+    "dollarError": 12.62,
+    "top200": 0.748,
+    "topPrice": 131
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1314914166377994,
+     "BLK": 0.589999583508625,
+     "STL": 0.8075887752714485,
+     "AST": 0.9191068706086631,
+     "REB": 1.1167920668537992,
+     "3PM": 0.7049747960366871,
+     "TO": 0.8437658655680217,
+     "FT%": 1.4366894994422368,
+     "FG%": 1.4495911260727192
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2022": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.169834154477448,
+     "BLK": 0.5791013276556914,
+     "STL": 0.7970889105853595,
+     "AST": 0.9307891520815188,
+     "REB": 1.0892888448450955,
+     "3PM": 0.6986077754200252,
+     "TO": 0.8599772883760398,
+     "FT%": 1.4247224078100449,
+     "FG%": 1.4505901387487767
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2024": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.145188730195888,
+     "BLK": 0.5776639896338962,
+     "STL": 0.8023275087160138,
+     "AST": 0.9440130863200712,
+     "REB": 1.0757263074372818,
+     "3PM": 0.7169724180054045,
+     "TO": 0.8504982088639298,
+     "FT%": 1.428440847452908,
+     "FG%": 1.459168903374607
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2025": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1482198420296905,
+     "BLK": 0.5827011717115843,
+     "STL": 0.8137925573188417,
+     "AST": 0.94346115082246,
+     "REB": 1.101372369698724,
+     "3PM": 0.7028725839815952,
+     "TO": 0.8566698174145546,
+     "FT%": 1.4280753388714214,
+     "FG%": 1.4228351681511278
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   }
+  }
+ },
+ {
+  "name": "2   linear FG%/FT% impact",
+  "note": "",
+  "accepted": false,
+  "acceptedOn": null,
+  "meanRho": 0.727,
+  "dRho": 0.005,
+  "dRhoCI": [
+   0.001,
+   0.01
+  ],
+  "rhoWins": 4,
+  "meanDollarError": 12.19,
+  "dDollar": 0.17,
+  "dDollarCI": [
+   -0.07,
+   0.42
+  ],
+  "dollarWins": 3,
+  "bySeason": {
+   "2021": {
+    "rho": 0.722,
+    "dRho": 0.006,
+    "dollarError": 11.88,
+    "top200": 0.677,
+    "topPrice": 97
+   },
+   "2022": {
+    "rho": 0.697,
+    "dRho": 0.006,
+    "dollarError": 12.39,
+    "top200": 0.668,
+    "topPrice": 99
+   },
+   "2024": {
+    "rho": 0.787,
+    "dRho": 0.0,
+    "dollarError": 12.12,
+    "top200": 0.754,
+    "topPrice": 107
+   },
+   "2025": {
+    "rho": 0.702,
+    "dRho": 0.007,
+    "dollarError": 12.37,
+    "top200": 0.749,
+    "topPrice": 139
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1314914166377994,
+     "BLK": 0.589999583508625,
+     "STL": 0.8075887752714485,
+     "AST": 0.9191068706086631,
+     "REB": 1.1167920668537992,
+     "3PM": 0.7049747960366871,
+     "TO": 0.8437658655680217,
+     "FT%": 1.4366894994422368,
+     "FG%": 1.4495911260727192
+    },
+    "linear_pct": true,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2022": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.169834154477448,
+     "BLK": 0.5791013276556914,
+     "STL": 0.7970889105853595,
+     "AST": 0.9307891520815188,
+     "REB": 1.0892888448450955,
+     "3PM": 0.6986077754200252,
+     "TO": 0.8599772883760398,
+     "FT%": 1.4247224078100449,
+     "FG%": 1.4505901387487767
+    },
+    "linear_pct": true,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2024": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.145188730195888,
+     "BLK": 0.5776639896338962,
+     "STL": 0.8023275087160138,
+     "AST": 0.9440130863200712,
+     "REB": 1.0757263074372818,
+     "3PM": 0.7169724180054045,
+     "TO": 0.8504982088639298,
+     "FT%": 1.428440847452908,
+     "FG%": 1.459168903374607
+    },
+    "linear_pct": true,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2025": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1482198420296905,
+     "BLK": 0.5827011717115843,
+     "STL": 0.8137925573188417,
+     "AST": 0.94346115082246,
+     "REB": 1.101372369698724,
+     "3PM": 0.7028725839815952,
+     "TO": 0.8566698174145546,
+     "FT%": 1.4280753388714214,
+     "FG%": 1.4228351681511278
+    },
+    "linear_pct": true,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   }
+  }
+ },
+ {
+  "name": "3   leave TO out of the rating",
+  "note": "",
+  "accepted": false,
+  "acceptedOn": null,
+  "meanRho": 0.701,
+  "dRho": -0.021,
+  "dRhoCI": [
+   -0.04,
+   -0.004
+  ],
+  "rhoWins": 1,
+  "meanDollarError": 12.86,
+  "dDollar": -0.5,
+  "dDollarCI": [
+   -1.49,
+   0.5
+  ],
+  "dollarWins": 1,
+  "bySeason": {
+   "2021": {
+    "rho": 0.707,
+    "dRho": -0.01,
+    "dollarError": 12.51,
+    "top200": 0.634,
+    "topPrice": 94
+   },
+   "2022": {
+    "rho": 0.692,
+    "dRho": 0.002,
+    "dollarError": 12.55,
+    "top200": 0.656,
+    "topPrice": 99
+   },
+   "2024": {
+    "rho": 0.739,
+    "dRho": -0.048,
+    "dollarError": 13.45,
+    "top200": 0.723,
+    "topPrice": 107
+   },
+   "2025": {
+    "rho": 0.668,
+    "dRho": -0.027,
+    "dollarError": 12.92,
+    "top200": 0.691,
+    "topPrice": 135
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1314914166377994,
+     "BLK": 0.589999583508625,
+     "STL": 0.8075887752714485,
+     "AST": 0.9191068706086631,
+     "REB": 1.1167920668537992,
+     "3PM": 0.7049747960366871,
+     "FT%": 1.4366894994422368,
+     "FG%": 1.4495911260727192
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2022": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.169834154477448,
+     "BLK": 0.5791013276556914,
+     "STL": 0.7970889105853595,
+     "AST": 0.9307891520815188,
+     "REB": 1.0892888448450955,
+     "3PM": 0.6986077754200252,
+     "FT%": 1.4247224078100449,
+     "FG%": 1.4505901387487767
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2024": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.145188730195888,
+     "BLK": 0.5776639896338962,
+     "STL": 0.8023275087160138,
+     "AST": 0.9440130863200712,
+     "REB": 1.0757263074372818,
+     "3PM": 0.7169724180054045,
+     "FT%": 1.428440847452908,
+     "FG%": 1.459168903374607
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   },
+   "2025": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1482198420296905,
+     "BLK": 0.5827011717115843,
+     "STL": 0.8137925573188417,
+     "AST": 0.94346115082246,
+     "REB": 1.101372369698724,
+     "3PM": 0.7028725839815952,
+     "FT%": 1.4280753388714214,
+     "FG%": 1.4228351681511278
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "board"
+   }
+  }
+ },
+ {
+  "name": "7   dollars from the league's price curve",
+  "note": "",
+  "accepted": true,
+  "acceptedOn": "dollars",
+  "meanRho": 0.722,
+  "dRho": 0.0,
+  "dRhoCI": [
+   0.0,
+   0.0
+  ],
+  "rhoWins": 0,
+  "meanDollarError": 11.38,
+  "dDollar": 0.98,
+  "dDollarCI": [
+   0.25,
+   1.71
+  ],
+  "dollarWins": 4,
+  "bySeason": {
+   "2021": {
+    "rho": 0.716,
+    "dRho": 0.0,
+    "dollarError": 11.38,
+    "top200": 0.674,
+    "topPrice": 78
+   },
+   "2022": {
+    "rho": 0.69,
+    "dRho": 0.0,
+    "dollarError": 12.07,
+    "top200": 0.663,
+    "topPrice": 77
+   },
+   "2024": {
+    "rho": 0.786,
+    "dRho": 0.0,
+    "dollarError": 11.08,
+    "top200": 0.76,
+    "topPrice": 80
+   },
+   "2025": {
+    "rho": 0.695,
+    "dRho": 0.0,
+    "dollarError": 11.01,
+    "top200": 0.748,
+    "topPrice": 78
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1314914166377994,
+     "BLK": 0.589999583508625,
+     "STL": 0.8075887752714485,
+     "AST": 0.9191068706086631,
+     "REB": 1.1167920668537992,
+     "3PM": 0.7049747960366871,
+     "TO": 0.8437658655680217,
+     "FT%": 1.4366894994422368,
+     "FG%": 1.4495911260727192
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "curve"
+   },
+   "2022": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.169834154477448,
+     "BLK": 0.5791013276556914,
+     "STL": 0.7970889105853595,
+     "AST": 0.9307891520815188,
+     "REB": 1.0892888448450955,
+     "3PM": 0.6986077754200252,
+     "TO": 0.8599772883760398,
+     "FT%": 1.4247224078100449,
+     "FG%": 1.4505901387487767
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "curve"
+   },
+   "2024": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.145188730195888,
+     "BLK": 0.5776639896338962,
+     "STL": 0.8023275087160138,
+     "AST": 0.9440130863200712,
+     "REB": 1.0757263074372818,
+     "3PM": 0.7169724180054045,
+     "TO": 0.8504982088639298,
+     "FT%": 1.428440847452908,
+     "FG%": 1.459168903374607
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "curve"
+   },
+   "2025": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1482198420296905,
+     "BLK": 0.5827011717115843,
+     "STL": 0.8137925573188417,
+     "AST": 0.94346115082246,
+     "REB": 1.101372369698724,
+     "3PM": 0.7028725839815952,
+     "TO": 0.8566698174145546,
+     "FT%": 1.4280753388714214,
+     "FG%": 1.4228351681511278
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "curve"
+   }
+  }
+ },
+ {
+  "name": "ALL accepted changes vs the board as saved",
+  "note": "",
+  "accepted": null,
+  "acceptedOn": "ranking",
+  "meanRho": 0.722,
+  "dRho": 0.056,
+  "dRhoCI": [
+   0.028,
+   0.083
+  ],
+  "rhoWins": 4,
+  "meanDollarError": 11.38,
+  "dDollar": 2.68,
+  "dDollarCI": [
+   1.48,
+   3.87
+  ],
+  "dollarWins": 4,
+  "bySeason": {
+   "2021": {
+    "rho": 0.716,
+    "dRho": 0.041,
+    "dollarError": 11.38,
+    "top200": 0.674,
+    "topPrice": 78
+   },
+   "2022": {
+    "rho": 0.69,
+    "dRho": 0.047,
+    "dollarError": 12.07,
+    "top200": 0.663,
+    "topPrice": 77
+   },
+   "2024": {
+    "rho": 0.786,
+    "dRho": 0.057,
+    "dollarError": 11.08,
+    "top200": 0.76,
+    "topPrice": 80
+   },
+   "2025": {
+    "rho": 0.695,
+    "dRho": 0.078,
+    "dollarError": 11.01,
+    "top200": 0.748,
+    "topPrice": 78
+   }
+  },
+  "configs": {
+   "2021": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1314914166377994,
+     "BLK": 0.589999583508625,
+     "STL": 0.8075887752714485,
+     "AST": 0.9191068706086631,
+     "REB": 1.1167920668537992,
+     "3PM": 0.7049747960366871,
+     "TO": 0.8437658655680217,
+     "FT%": 1.4366894994422368,
+     "FG%": 1.4495911260727192
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "curve"
+   },
+   "2022": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.169834154477448,
+     "BLK": 0.5791013276556914,
+     "STL": 0.7970889105853595,
+     "AST": 0.9307891520815188,
+     "REB": 1.0892888448450955,
+     "3PM": 0.6986077754200252,
+     "TO": 0.8599772883760398,
+     "FT%": 1.4247224078100449,
+     "FG%": 1.4505901387487767
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "curve"
+   },
+   "2024": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.145188730195888,
+     "BLK": 0.5776639896338962,
+     "STL": 0.8023275087160138,
+     "AST": 0.9440130863200712,
+     "REB": 1.0757263074372818,
+     "3PM": 0.7169724180054045,
+     "TO": 0.8504982088639298,
+     "FT%": 1.428440847452908,
+     "FG%": 1.459168903374607
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "curve"
+   },
+   "2025": {
+    "w_espn": 1.0,
+    "gp_scale": null,
+    "gp_shrink": 1.0,
+    "replacement": 95.0,
+    "weights": {
+     "PTS": 1.1482198420296905,
+     "BLK": 0.5827011717115843,
+     "STL": 0.8137925573188417,
+     "AST": 0.94346115082246,
+     "REB": 1.101372369698724,
+     "3PM": 0.7028725839815952,
+     "TO": 0.8566698174145546,
+     "FT%": 1.4280753388714214,
+     "FG%": 1.4228351681511278
+    },
+    "linear_pct": false,
+    "rated": [
+     "PTS",
+     "BLK",
+     "STL",
+     "AST",
+     "REB",
+     "3PM",
+     "TO",
+     "FT%",
+     "FG%"
+    ],
+    "pricing": "curve"
+   }
+  }
+ }
+]

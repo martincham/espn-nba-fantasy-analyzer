@@ -3,6 +3,10 @@ login.txt
 draftPool.json
 draftState.json
 *.json.tmp
+history/20*/
+# League analysis with managers' names and team names: keep local
+history/analysis.json
+history/report.html
 settings.txt
 *.pickle
 *.xlsx

@@ -7,13 +7,14 @@ math runs here, so the frontend only renders.
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import threading
 import time
 from typing import Any, Dict, List, Optional
 
-from library import draft, roster, valuation
+from library import draft, planner, roster, valuation
 from library.valuation import Adjustment, LeagueShape
 
 DEFAULT_SETTINGS = {
@@ -88,6 +89,7 @@ class DraftBoard:
         self.punt: List[str] = []
         self.fit_model = FIT_MODELS[0]
         self.proj_line, self.cat_weights, self.pricing_model = PROJ_LINES[0], CAT_WEIGHTS[0], PRICING_MODELS[0]
+        self.plan: Optional[Dict[str, Any]] = None  # the Plan tab's last result (not saved)
         self.default_rated: List[str] = []
         self.default_ignore = 0
         self.state = self._empty_state()
@@ -440,6 +442,91 @@ class DraftBoard:
 
     # -------------------------------------------------------------- snapshot
 
+    # ------------------------------------------------------------------ plan
+
+    def _plan_stamp(self) -> str:
+        """Everything a plan depends on; when it changes, the plan is out of date."""
+        s = self.state
+        return json.dumps([s["picks"], s["filled"], s["adjustments"], s["settings"], self.fetched_at], sort_keys=True)
+
+    def _plan_cost(self, p: draft.DraftPlayer, row: Optional[valuation.Valued]) -> int:
+        """What a player should cost: my price, else ESPN's scaled average, else our value when ESPN has none."""
+        market = self._market(p)
+        if market < 0.5 and row is not None:
+            market = row.ours
+        return max(1, int(round(market)))
+
+    def build_plan(self) -> Optional[str]:
+        """Start searching for the recommended team in the background."""
+        with self.lock:
+            if self.plan and self.plan.get("status") == "building":
+                return None
+            rows = valuation.value_players(self.players, self.baseline, self.shape, self._adjustments())
+            by_row = {r.id: r for r in rows}
+            picks = {int(k): v for k, v in self.state["picks"].items()}
+            mine = [pid for pid in self.state["filled"] if pid is not None]
+            inputs = {
+                "rows": rows,
+                "shape": copy.deepcopy(self.shape),
+                "schedule": self.schedule,
+                "costs": {p.id: self._plan_cost(p, by_row.get(p.id)) for p in self.players},
+                "mine": mine,
+                "taken": [pid for pid, v in picks.items() if v["status"] == TAKEN],
+                "budget_left": self._me(picks, mine)["budgetLeft"],
+                "punt": list(self.punt),
+            }
+            stamp = self._plan_stamp()
+            self.plan = {"status": "building", "stamp": stamp, "started": time.time()}
+        threading.Thread(target=self._run_plan, args=(inputs, stamp), daemon=True).start()
+        return None
+
+    def _run_plan(self, inputs: Dict[str, Any], stamp: str) -> None:
+        started = time.time()
+        try:
+            result = planner.plan_team(**inputs)
+            payload = self._plan_payload(result, inputs["costs"]) if result else None
+            done = {"status": "ready", "stamp": stamp, "seconds": round(time.time() - started, 1), "builtAt": time.time(),
+                    "result": payload, "full": result is None}
+        except Exception as ex:  # keep the app alive; show the error on the tab
+            done = {"status": "error", "stamp": stamp, "error": f"The plan failed: {ex}"}
+        with self.lock:
+            self.plan = done
+
+    @staticmethod
+    def _plan_payload(plan: planner.Plan, costs: Dict[int, int]) -> Dict[str, Any]:
+        def build(b: planner.Build) -> Dict[str, Any]:
+            return {
+                "ids": b.ids, "cost": b.cost, "wins": round(b.wins, 2),
+                "chances": {c: round(x, 3) for c, x in b.chances.items()},
+                "ratings": {c: round(x, 1) for c, x in b.ratings.items()},
+            }
+
+        best = build(plan.best)
+        others = []
+        for b in plan.builds:
+            out = build(b)
+            out["adds"] = [i for i in b.ids if i not in plan.best.ids]
+            out["drops"] = [i for i in plan.best.ids if i not in b.ids]
+            others.append(out)
+        ids = set(plan.best.ids) | {i for b in plan.builds for i in b.ids}
+        swaps = {}
+        for out_id, options in plan.swaps.items():
+            swaps[str(out_id)] = [{"id": s.in_id, "costChange": s.cost_change, "winsChange": round(s.wins_change, 3)} for s in options]
+            ids |= {s.in_id for s in options}
+        return {
+            "best": best, "builds": others, "swaps": swaps, "mine": plan.mine,
+            "budgetLeft": plan.budget_left, "streamers": plan.streamers,
+            "searched": plan.searched, "evaluated": plan.evaluated,
+            "costs": {str(i): costs[i] for i in ids},
+        }
+
+    def _plan_snapshot(self) -> Optional[Dict[str, Any]]:
+        if not self.plan:
+            return None
+        out = {k: x for k, x in self.plan.items() if k != "stamp"}
+        out["stale"] = self.plan["stamp"] != self._plan_stamp()
+        return out
+
     def snapshot(self) -> Dict[str, Any]:
         with self.lock:
             return self._snapshot()
@@ -529,6 +616,7 @@ class DraftBoard:
             "rows": out_rows,
             "pool": self._pool(rows, picks),
             "pricing": {"replacement": round(rate.replacement, 2), "perPoint": round(rate.per_point, 3)},
+            "plan": self._plan_snapshot(),
             "me": self._me(picks, mine),
             "team": self._team(sim, rows, picks),
         }

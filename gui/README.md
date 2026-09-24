@@ -86,7 +86,7 @@ To start over, stop the app and delete `draftState.json`.
 - **Only affordable:** hides undrafted players whose Avg paid is more than your max bid. The label shows your current max bid.
 - **Filter by team:** the row of team-colored buttons under the search box shows one NBA team at a time (**FA** is unsigned players). Click the selected team again, or **All**, to clear it. Arrow keys move between teams.
 - **Edit a player:** drag sideways on a **GP Δ**, **Exp MIN** or **Δ** cell to change it (hold Shift for bigger steps), or click the cell to type. You can also select a row and use the sliders in the side panel.
-  - **Exp MIN defaults to ESPN's projected minutes.** Production scales with minutes, keeping the player's per-minute rates from last season. With fewer than 20 games last season, ESPN's projected line is used instead. Clear the cell to go back to ESPN's minutes.
+  - **Exp MIN defaults to ESPN's projected minutes.** Production starts from ESPN's projected per-game line and scales with minutes, keeping ESPN's per-minute rates. (Settings → Rating model can use last season's per-minute rates instead.) Clear the cell to go back to ESPN's minutes.
   - **Δ is in rating points** on the per-game scale where 100 is the average player: `+10` turns a 133 into a 143. It's applied on top of the minutes change, so use it for real improvement or decline, not role. The change spreads across categories in proportion to what the player already produces.
   - **Exp GP** is ESPN's projected games plus your **GP Δ**: type `-10` for a player you think misses ten more games than ESPN expects.
   - Type Δ however is natural: `+5`, `-10` and `−10` all work. Press ↑/↓ to step by 1, or hold Shift to step by 5.
@@ -95,6 +95,7 @@ To start over, stop the app and delete `draftState.json`.
   - **Use ESPN's** copies ESPN's projection.
 - **Cost:** what a player should cost. It starts at ESPN's Avg paid, scaled to your league. If you disagree, type your own price or drag the cell. Your price is highlighted, and it drives Edge, Fit edge, "Only affordable" and the default price when you add him to your team. Clear the cell to go back to ESPN's. **Clear adjustments** keeps your prices.
 - **Value** is the player's per-game rating across an 82-game season. His expected games count at his rating, and the games he misses count at the **replacement rating** (default 95): the free agent you pick up while he's out. The ideas behind the model are in [`docs/PHILOSOPHY.md`](../docs/PHILOSOPHY.md).
+- **My roster strip:** each filled slot shows what you paid, so you can see what dropping him frees up. The label shows your total spent and what's left.
 - **Add players:** drag a player's name onto a slot in the **My roster** strip. You can also use **Add to my team** in the side panel, or select a player and click an empty slot.
   - New players are priced at **Avg paid** by default. You can edit the price in the side panel or on the My Team tab.
 - **Team ratings row:** under the budget row, each league category has a column and a rating. 100 means the average team in the simulated league, and the badge shows your rank.
@@ -105,6 +106,10 @@ To start over, stop the app and delete `draftState.json`.
 - **Fit:** each player's value to *your current team*, on the same scale as Value. It's how much he raises your weekly category win chances, so categories you're already winning count less. Steady categories (PTS, FG%, FT%) reach a sure win sooner than swingy ones (BLK, STL). Settings → Fit can switch to a simple fade instead: full weight up to 110, nothing past 140. Sort by Fit during the draft to find who helps you most.
   - Fit follows the NBA schedule. Each day only 7 players start, so a player whose games fall on nights your roster is already full adds less, and one who plays on nights your core is idle adds more. Your streaming spots fill open slots at the replacement rating. The player panel shows **Starts**: the share of his games that would make your lineup.
   - **Fit edge** = Fit $ − Avg paid: the bargain *for your team*, where Edge is the bargain for anyone. **Fit $** (Fit converted to dollars) and **Fit rank** are in the player panel. ESPN's own suggested price is also in the panel now.
+- **Plan tab:** click **Build plan** for the team that wins the most categories per week at expected prices (Cost: Avg paid or your own price). It keeps the players already on your roster, skips taken players, fits your budget, and ignores categories you punt. Only your best 9 count, so it buys up to 9 and leaves $1 streaming spots. It takes about 5–15 seconds.
+  - Each recommended player has **alternatives**: the best players who could take his spot within your budget, and how many categories per week you'd gain or lose.
+  - **Other builds** are different rosters that finished close behind, with what goes in and out and which categories move.
+  - The plan doesn't update by itself. When you mark a pick or change a price or setting, it says it's out of date: click **Rebuild**.
 - **Rearrange:** on **My Team**, drag between slots or click one slot and then another.
   - **×** removes a player and **Clear roster** empties every slot.
   - Both show an **Undo** message.
@@ -112,7 +117,8 @@ To start over, stop the app and delete `draftState.json`.
   - **Pool left** counts how many core players (the top 84 by value with 7 per team) are still available.
 - **Settings tab:**
   - **Replacement player:** the per-game rating of the free agent who fills a hurt player's games. Lower it to make health count more; 0 counts missed games as lost.
-  - **Core players:** how many players per team share the money (default 7). The rest of the roster are priced at $1.
+  - **Core players:** how many players per team share the money (default 7) under the *Core formula* pricing. The rest of the roster are priced at $1.
+  - **Rating model:** the per-game line (*ESPN projection* or *Last season per minute*), category weights (*Weekly win impact* or *Equal*) and dollars (*League price curve* or *Core formula*). The defaults tested better on this league's past seasons; see [`docs/BACKTEST_PLAN.md`](../docs/BACKTEST_PLAN.md).
   - **Fit:** *Win chances* (default) or *Simple fade*, with the fade's start (110) and end (140).
   - **Avg paid scale:** Auto fits ESPN's prices to your league's budget. Drag the slider to set your own multiplier.
   - **Categories in player value:** starts from `ignoredStats` in settings.txt. Team ranks always show every category.

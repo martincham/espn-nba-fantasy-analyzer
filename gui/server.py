@@ -5,6 +5,8 @@ GET  /static/<file>    CSS / JS
 GET  /api/board        full snapshot
 GET  /api/version      restart/static-file fingerprint (auto-reload)
 POST /api/<action>     apply an edit, then return {"board": snapshot, "error": msg|null}
+                       (POST /api/plan starts the recommended-team search; the snapshot's
+                       "plan" shows it building, then ready)
 """
 
 from __future__ import annotations
@@ -58,6 +60,7 @@ def _actions(board: DraftBoard) -> Dict[str, Callable[[Dict[str, Any]], Optional
         "settings": lambda b: board.update_settings(**{k: b[k] for k in ("marketScale", "rated", "ignorePlayers", "replacement", "core", "fadeStart", "fadeEnd", "punt", "fitModel", "projLine", "catWeights", "pricing") if k in b}),
         "state": lambda b: board.replace_state(b["state"]),
         "refresh": lambda b: board.load(refresh=True),
+        "plan": lambda b: board.build_plan(),
     }
 
 

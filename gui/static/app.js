@@ -108,7 +108,7 @@ function render() {
     UI.sel = first ? first.id : null;
   }
   if (!$("teams").childElementCount) renderTeams();
-  renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam(); renderSettings();
+  renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam(); renderPlan(); renderSettings();
 }
 function renderLive() { // while dragging a slider: leave the panel being dragged alone
   byId = new Map(B.rows.map((r) => [r.id, r]));
@@ -495,10 +495,12 @@ function renderDetail() {
 
 function renderStrip() {
   const slots = B.meta.slots, filled = B.state.filled;
-  $("strip").innerHTML = `<span class="lbl">My roster</span>` + slots.map((s, i) => {
+  const me = B.me;
+  $("strip").innerHTML = `<span class="lbl">My roster${me.count ? `<small>$${me.spent} spent · $${me.budgetLeft} left</small>` : ""}</span>` + slots.map((s, i) => {
     const r = byId.get(filled[i]);
-    return `<div class="sl ${r ? "filled" : ""} ${UI.pickSlot === i ? "pick" : ""}" data-slot="${i}" ${r ? `draggable="true" data-drag="${r.id}"` : ""} tabindex="0" role="button" aria-label="${s} slot${r ? `: ${esc(r.name)}` : ", empty"}">
-      <span class="pos">${s === "BE" ? "Bench" : s}</span><span class="who ${r ? "" : "empty"}">${r ? esc(lastName(r.name)) : "Drop here"}</span>
+    const paid = r && r.price != null ? `<span class="cost" title="You paid $${r.price}; removing him frees $${r.price}">$${r.price}</span>` : "";
+    return `<div class="sl ${r ? "filled" : ""} ${UI.pickSlot === i ? "pick" : ""}" data-slot="${i}" ${r ? `draggable="true" data-drag="${r.id}"` : ""} tabindex="0" role="button" aria-label="${s} slot${r ? `: ${esc(r.name)}${r.price != null ? `, paid $${r.price}` : ""}` : ", empty"}">
+      <span class="pos">${s === "BE" ? "Bench" : s}${paid}</span><span class="who ${r ? "" : "empty"}">${r ? esc(lastName(r.name)) : "Drop here"}</span>
       ${r ? `<button class="x" type="button" data-remove="${r.id}" aria-label="Remove ${esc(r.name)} from team" title="Remove from team">×</button>` : ""}</div>`;
   }).join("") + `<button class="btn danger clearbtn" type="button" data-clear ${filled.some((x) => x != null) ? "" : "disabled"}>Clear roster</button>`;
 }
@@ -955,6 +957,101 @@ $("refreshBtn").addEventListener("click", async () => {
   if (ok) toast("Player pool refreshed from ESPN.");
 });
 
+// ------------------------------------------------------------------ plan
+
+const PLAN = { open: new Set(), polling: false };
+function renderPlan() {
+  const el = $("planPanel"), P = B.plan, m = B.meta;
+  const building = P?.status === "building";
+  const R = P?.status === "ready" ? P.result : null;
+  const cost = (id) => R?.costs[id] ?? byId.get(id)?.avg;
+  const who = (id) => { const r = byId.get(id); return r ? `<button class="linkbtn" type="button" data-goto="${id}">${esc(r.name)}</button>` : "?"; };
+  let h = `<div class="plan-head"><div><h3>Recommended team</h3>
+      <p class="sub">The players to buy that win the most categories per week at expected prices: Avg paid, or your own cost where you set one. It starts from your roster and budget, skips taken players, and ignores categories you punt.</p></div>
+      <button class="btn primary ${building ? "busy" : ""}" type="button" id="planBuild" ${building ? "disabled" : ""}>${building ? "Building…" : P ? "Rebuild" : "Build plan"}</button></div>`;
+  if (!P) {
+    h += `<p class="plan-empty">Build a plan to see the best team you can still make, with the best alternative for every player. Takes about 5–15 seconds.</p>`;
+  } else if (building) {
+    h += `<p class="plan-empty">Searching for the best team…</p>`;
+  } else if (P.status === "error") {
+    h += `<p class="plan-empty bad">${esc(P.error)}</p>`;
+  } else if (!R) {
+    h += `<p class="plan-empty">Your roster is full, so there's nothing left to plan.</p>`;
+  } else {
+    if (P.stale) h += `<p class="plan-stale">Your draft changed since this plan was built. Rebuild to update it.</p>`;
+    if (R.budgetLeft < R.streamers + R.best.cost) h += `<p class="plan-stale">You have $${R.budgetLeft} left for ${R.best.ids.length + R.streamers} open spot${R.best.ids.length + R.streamers > 1 ? "s" : ""}, and every spot costs at least $1.</p>`;
+    else if (!R.best.ids.length) h += `<p class="plan-empty">Your best ${m.counted} are set. Fill the open spots with $1 streamers.</p>`;
+    const best = R.best, cats = m.categories, n = cats.length;
+    const mine = R.mine.map((id) => byId.get(id)).filter(Boolean);
+    const spend = best.cost + R.streamers;
+    h += `<div class="overall">
+      <div><span class="lbl">Cats won per week</span><span class="v">${best.wins.toFixed(1)}–${(n - best.wins).toFixed(1)}</span><span class="s">expected vs the average team</span></div>
+      <div><span class="lbl">Spend</span><span class="v">$${spend}</span><span class="s">of $${R.budgetLeft} left${R.budgetLeft - spend ? `, $${R.budgetLeft - spend} to spare` : ""}</span></div>
+      <div><span class="lbl">Buy</span><span class="v">${best.ids.length}</span><span class="s">players${R.streamers ? ` + ${R.streamers} $1 streaming spot${R.streamers > 1 ? "s" : ""}` : ""}${mine.length ? `, with your ${mine.length}` : ""}</span></div>
+    </div>
+    <div class="plancats" role="list" aria-label="Weekly win chance by category">${cats.map((c) => {
+      const p = best.chances[c], r = best.ratings[c];
+      return `<div class="pc ${p >= 0.65 ? "hi" : p <= 0.35 ? "lo" : ""} ${m.punt.includes(c) ? "punted" : ""}" role="listitem" title="${esc(c)}: team rating ${Math.round(r)} (100 = the average team)${m.punt.includes(c) ? ", punted" : ""}">
+        <span class="k">${esc(c)}</span><span class="w">${Math.round(p * 100)}%</span><span class="r">${Math.round(r)}</span></div>`;
+    }).join("")}</div>
+    <div class="plantab-wrap"><table class="plantab" aria-label="Recommended team">
+      <thead><tr><th class="l" scope="col">Player</th><th class="l" scope="col">Pos</th><th scope="col">Cost</th><th scope="col" title="Our dollar value">Ours</th><th scope="col" title="Projected per-game rating">Per game</th><th scope="col">GP</th><th scope="col" title="Season value">Value</th><th class="l" scope="col">Alternatives</th></tr></thead><tbody>`;
+    for (const r of mine) {
+      h += `<tr class="yours"><td class="l">${who(r.id)} <span class="pill mine">Yours</span></td><td class="l">${esc(r.team)} · ${esc(r.pos)}</td>
+        <td>$${r.price ?? "—"}</td><td>${money(r.ours)}</td><td>${fmt(r.projPg)}</td><td>${r.expGp}</td><td>${fmt(r.value)}</td><td class="l muted">already on your team</td></tr>`;
+    }
+    for (const id of best.ids) {
+      const r = byId.get(id), alts = R.swaps[id] || [], open = PLAN.open.has(id);
+      if (!r) continue;
+      h += `<tr><td class="l">${who(id)}${r.inj && r.inj !== "ACTIVE" ? ` <span class="pill inj">${esc(r.inj.replace(/_/g, " "))}</span>` : ""}</td><td class="l">${esc(r.team)} · ${esc(r.pos)}</td>
+        <td><b>$${cost(id)}</b></td><td>${money(r.ours)}</td><td>${fmt(r.projPg)}</td><td>${r.expGp}</td><td>${fmt(r.value)}</td>
+        <td class="l">${alts.length ? `<button class="linkbtn" type="button" data-alt="${id}" aria-expanded="${open}">${open ? "Hide" : `${alts.length} alternative${alts.length > 1 ? "s" : ""}`}</button>` : `<span class="muted">none affordable</span>`}</td></tr>`;
+      if (open) {
+        h += `<tr class="alts"><td colspan="8"><ul>${alts.map((a) => `<li>${who(a.id)} <span class="muted">${esc(byId.get(a.id)?.team || "")} · ${esc(byId.get(a.id)?.pos || "")}</span>
+          <span class="num">$${cost(a.id)} <span class="muted">(${a.costChange === 0 ? "same price" : signed(a.costChange) + " $"})</span></span>
+          <span class="num ${a.winsChange < -0.05 ? "neg" : ""}">${signed(a.winsChange, 2)} cats/week</span></li>`).join("")}</ul></td></tr>`;
+      }
+    }
+    if (R.streamers) h += `<tr class="stream"><td class="l" colspan="2">${R.streamers} streaming spot${R.streamers > 1 ? "s" : ""}</td><td>$1 each</td><td class="l muted" colspan="5">Any free agents. Only your best ${m.counted} count, so these spots stream pickups at the replacement rating.</td></tr>`;
+    h += `</tbody></table></div>`;
+    if (R.builds.length) {
+      h += `<div class="builds"><h3>Other builds</h3><p class="sub">Different rosters the search also found, close behind the recommended one.</p>`;
+      R.builds.forEach((b, i) => {
+        const adds = b.adds.map((id) => `${who(id)} <span class="num">$${cost(id)}</span>`).join(", ");
+        const drops = b.drops.map((id) => esc(byId.get(id)?.name || "?")).join(", ");
+        const moved = cats.map((c) => [c, b.chances[c] - best.chances[c]]).filter(([, d]) => Math.abs(d) >= 0.05).sort((x, y) => y[1] - x[1]);
+        h += `<div class="build"><div class="build-t"><b>Build ${String.fromCharCode(66 + i)}</b>
+            <span class="num">${b.wins.toFixed(2)} cats/week (${signed(b.wins - best.wins, 2)})</span><span class="num">$${b.cost + R.streamers}</span></div>
+          <p><span class="lbl">In</span> ${adds}</p><p><span class="lbl">Out</span> ${drops}</p>
+          ${moved.length ? `<p class="muted">${moved.map(([c, d]) => `${esc(c)} ${signed(d * 100)}%`).join(" · ")} weekly win chance</p>` : ""}</div>`;
+      });
+      h += `</div>`;
+    }
+    h += `<p class="callout">Win chances are against the average of ${m.teams - 1} simulated opponents who get the taken players and the best remaining by value. The cheapest picks are often players the market discounts for injury risk. Built in ${P.seconds}s from ${R.searched} starting rosters.</p>`;
+  }
+  el.innerHTML = h;
+  if (building) pollPlan();
+}
+async function pollPlan() {
+  if (PLAN.polling) return;
+  PLAN.polling = true;
+  while (B.plan?.status === "building") {
+    await new Promise((r) => setTimeout(r, 700));
+    const b = await api("/api/board");
+    if (!b) break;
+    B = b;
+    if (B.plan?.status !== "building") { PLAN.polling = false; render(); return; }
+  }
+  PLAN.polling = false;
+}
+$("planPanel").addEventListener("click", (e) => {
+  if (e.target.closest("#planBuild")) { PLAN.open.clear(); return act("plan"); }
+  const alt = e.target.closest("[data-alt]");
+  if (alt) { const id = +alt.dataset.alt; PLAN.open.has(id) ? PLAN.open.delete(id) : PLAN.open.add(id); return renderPlan(); }
+  const g = e.target.closest("[data-goto]");
+  if (g) { UI.sel = +g.dataset.goto; setView("board"); render(); }
+});
+
 // ------------------------------------------------------------------ settings
 
 function renderSettings() {
@@ -1142,7 +1239,7 @@ function setView(v) {
     $("tab-" + k).setAttribute("aria-selected", v === k);
   });
 }
-const VIEWS = ["board", "team", "settings"];
+const VIEWS = ["board", "team", "plan", "settings"];
 VIEWS.forEach((k) => $("tab-" + k).addEventListener("click", () => { setView(k); render(); }));
 
 function setTheme(t) {

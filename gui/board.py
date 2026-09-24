@@ -37,8 +37,13 @@ DEFAULT_FADE = (110, 140)  # team category rating where extra strength starts to
 DEFAULT_ROOM_SETTINGS = {
     "marketScale": None, "rated": None, "ignorePlayers": None, "replacement": None, "core": None,
     "fadeStart": None, "fadeEnd": None, "punt": [], "fitModel": None,
+    "projLine": None, "catWeights": None, "pricing": None,
 }
 FIT_MODELS = ("wins", "fade")  # weekly win chances (default), or the simple 110-140 fade
+# Rating model choices; the first of each is the default, backtested in docs/BACKTEST_PLAN.md.
+PROJ_LINES = ("espn", "last")  # ESPN's per-game projection, or last season's per-minute rates
+CAT_WEIGHTS = ("league", "equal")  # valuation.CATEGORY_WEIGHTS, or every category equal
+PRICING_MODELS = ("curve", "formula")  # this league's price curve, or the core-share formula
 
 
 def load_settings(path: str) -> Dict[str, Any]:
@@ -69,6 +74,8 @@ class DraftBoard:
         self.settings: Dict[str, Any] = {}
         self.league: Optional[draft.LeagueInfo] = None
         self.players: List[draft.DraftPlayer] = []
+        self.team_days: Dict[str, List[int]] = {}  # NBA schedule: each team's game days
+        self.schedule: Optional[valuation.Schedule] = None
         self.by_id: Dict[int, draft.DraftPlayer] = {}
         self.fetched_at = 0.0
         self.shape = LeagueShape()
@@ -80,6 +87,7 @@ class DraftBoard:
         self.fade = valuation.Fade(*DEFAULT_FADE)
         self.punt: List[str] = []
         self.fit_model = FIT_MODELS[0]
+        self.proj_line, self.cat_weights, self.pricing_model = PROJ_LINES[0], CAT_WEIGHTS[0], PRICING_MODELS[0]
         self.default_rated: List[str] = []
         self.default_ignore = 0
         self.state = self._empty_state()
@@ -95,7 +103,12 @@ class DraftBoard:
             self.settings = load_settings(self.settings_path)
             cached = None if refresh else draft.load_pool(self.pool_path)
             if cached:
-                self.league, self.players, self.fetched_at = cached
+                self.league, self.players, team_days, self.fetched_at = cached
+                if team_days is None:  # cached before schedules were stored
+                    self.team_days = self._fetch_schedule(self.league.season)
+                    draft.save_pool(self.pool_path, self.league, self.players, self.team_days)
+                else:
+                    self.team_days = team_days
             else:
                 self._fetch()
             self._prepare()
@@ -114,8 +127,17 @@ class DraftBoard:
                 self.warnings.append(f"Using default league settings: {ex}")
         league = league or draft.LeagueInfo(league_id=None, season=season)
         players = draft.fetch_pool(season, league.league_id, s2, swid, rank_type=league.rank_type)
+        self.team_days = self._fetch_schedule(season)
         self.league, self.players, self.fetched_at = league, players, time.time()
-        draft.save_pool(self.pool_path, league, players)
+        draft.save_pool(self.pool_path, league, players, self.team_days)
+
+    def _fetch_schedule(self, season: int) -> Dict[str, List[int]]:
+        try:
+            days = draft.fetch_schedule(season)
+        except draft.EspnError as ex:
+            days = {}
+            self.warnings.append(f"No NBA schedule, so Fit ignores it: {ex}")
+        return days
 
     def _prepare(self) -> None:
         league, s = self.league, self.settings
@@ -127,6 +149,7 @@ class DraftBoard:
         ignored = set(s.get("ignoredStats") or [])
         self.default_rated = [c for c in league.categories if c not in ignored]
         self.default_ignore = int(s.get("ignorePlayers") or 0)
+        self.schedule = valuation.Schedule(self.team_days) if self.team_days else None
         self.shape = LeagueShape(
             teams=league.teams,
             budget=league.budget,
@@ -135,8 +158,9 @@ class DraftBoard:
             categories=list(league.categories),
             reverse=list(league.reverse),
             rated=list(self.default_rated),
+            starters=sum(1 for slot in self.slots if slot != roster.BENCH),
         )
-        self.warnings = [w for w in self.warnings if w.startswith("Using default")]
+        self.warnings = [w for w in self.warnings if w.startswith(("Using default", "No NBA schedule"))]
         if league.draft_type != "AUCTION":
             self.warnings.append(f"This league's draft type is {league.draft_type.lower()}; values are still shown in auction dollars.")
         # ESPN's average prices come from leagues of every size, so they add up
@@ -158,6 +182,13 @@ class DraftBoard:
         self.fade = valuation.Fade(start=start, end=max(end, start + 1))
         self.punt = list(room["punt"])
         self.fit_model = room["fitModel"] or FIT_MODELS[0]
+        self.proj_line = room["projLine"] or PROJ_LINES[0]
+        self.cat_weights = room["catWeights"] or CAT_WEIGHTS[0]
+        self.pricing_model = room["pricing"] or PRICING_MODELS[0]
+        for p in self.players:
+            p.line_source = self.proj_line
+        self.shape.weights = dict(valuation.CATEGORY_WEIGHTS) if self.cat_weights == "league" else {}
+        self.shape.price_curve = list(valuation.PRICE_CURVE) if self.pricing_model == "curve" else []
         # The pool and its averages depend on which categories are rated.
         history = [p for p in self.players if not p.base_is_projection]
         self.baseline = valuation.compute_baseline(history, self.shape)
@@ -231,6 +262,12 @@ class DraftBoard:
                 room["fadeEnd"] = max(80, min(300, int(round(float(saved["fadeEnd"])))))
             if saved.get("fitModel") in FIT_MODELS:
                 room["fitModel"] = saved["fitModel"]
+            if saved.get("projLine") in PROJ_LINES:
+                room["projLine"] = saved["projLine"]
+            if saved.get("catWeights") in CAT_WEIGHTS:
+                room["catWeights"] = saved["catWeights"]
+            if saved.get("pricing") in PRICING_MODELS:
+                room["pricing"] = saved["pricing"]
             # Punting is always your choice: only categories you tick are punted.
             room["punt"] = [c for c in cats if c in set(saved.get("punt") or [])]
         except (TypeError, ValueError):
@@ -413,10 +450,11 @@ class DraftBoard:
         picks = {int(k): v for k, v in state["picks"].items()}
         mine = [pid for pid in state["filled"] if pid is not None]
         taken = [pid for pid, v in picks.items() if v["status"] == TAKEN]
-        sim = valuation.simulate_league(rows, mine, taken, shape)
+        sim = valuation.simulate_league(rows, mine, taken, shape, self.schedule)
         fit_cats = self.fit_categories()
         useful = valuation.fit_by_wins if self.fit_model == "wins" else valuation.fit_by_fade(self.fade)
-        fits = valuation.team_fit(rows, mine, shape, sim, base, fit_cats, useful)
+        starts: Dict[int, float] = {}
+        fits = valuation.team_fit(rows, mine, shape, sim, base, fit_cats, useful, starts)
         rate = valuation.pricing(rows, shape)
         # Fit rank among players I can still get (and my own).
         fit_order = sorted((pid for pid in fits if picks.get(pid, {}).get("status") != TAKEN), key=lambda pid: -fits[pid])
@@ -468,6 +506,8 @@ class DraftBoard:
                 "fitDollars": _r(rate.dollars(fits[r.id]), 2) if r.id in fits else None,
                 "fitRank": fit_rank.get(r.id),
                 "fitEdge": _r(rate.dollars(fits[r.id]) - self._market(p), 2) if r.id in fits else None,
+                "starts": _r(starts[r.id], 3) if r.id in starts else None,
+                "teamGames": len(self.team_days.get(p.pro_team, [])) or None,
                 "status": pick["status"] if pick else None,
                 "price": pick.get("price") if pick else None,
                 "note": (adjustments.get(str(r.id)) or {}).get("note", ""),
@@ -506,6 +546,8 @@ class DraftBoard:
             "rosterSize": shape.roster_size,
             "poolSize": shape.pool_size,
             "counted": shape.counted,
+            "starters": shape.starters,
+            "daily": self.schedule is not None,  # team totals from daily lineups on the NBA schedule
             "draftType": league.draft_type,
             "scoringType": league.scoring_type,
             "categories": shape.categories,
@@ -518,6 +560,11 @@ class DraftBoard:
             "pricedSize": shape.priced_size,
             "fade": [self.fade.start, self.fade.end],
             "fitModel": self.fit_model,
+            "projLine": self.proj_line,
+            "catWeights": self.cat_weights,
+            "pricingModel": self.pricing_model,
+            "categoryWeights": {c: valuation.CATEGORY_WEIGHTS.get(c, 1.0) for c in shape.categories},
+            "curveTop": round(valuation.league_curve(shape)[0]) if shape.price_curve else None,
             "spreads": {c: valuation.spread(c) for c in shape.categories},
             "punt": self.punt,
             "fitCategories": self.fit_categories(),
@@ -573,7 +620,8 @@ class DraftBoard:
             return None
         avg, cats = self.baseline.per_game, self.shape.rated
         at_espn_minutes = valuation.scale(p.rate_line, p.proj_pg["MIN"] / p.rate_min)
-        change = valuation.rate(p.proj_pg, avg, cats) - valuation.rate(at_espn_minutes, avg, cats)
+        weights = self.shape.weights
+        change = valuation.rate(p.proj_pg, avg, cats, weights) - valuation.rate(at_espn_minutes, avg, cats, weights)
         return max(-MAX_DELTA, min(MAX_DELTA, round(change)))
 
     def _team(self, sim: valuation.LeagueSim, rows, picks) -> Dict[str, Any]:

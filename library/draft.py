@@ -158,6 +158,9 @@ class DraftPlayer:
     adp: float
     owned: float
     on_team_id: int = 0
+    # Which per-game line drives the projection: "espn" (ESPN's projection,
+    # which backtested better) or "last" (last season's per-minute rates).
+    line_source: str = "espn"
 
     @property
     def base_is_projection(self) -> bool:
@@ -176,8 +179,12 @@ class DraftPlayer:
     def rate_line(self) -> Dict[str, float]:
         """Per-game line whose per-minute rates drive the projection.
 
-        Last season when there's a real sample; otherwise ESPN's projection.
+        With line_source "espn": ESPN's projection when it has minutes. With
+        "last" (or no ESPN minutes): last season when there's a real sample,
+        otherwise ESPN's projection.
         """
+        if self.line_source == "espn" and self.proj_pg.get("MIN"):
+            return self.proj_pg
         if self.last_gp >= MIN_SAMPLE_GP and self.last_pg.get("MIN"):
             return self.last_pg
         if self.proj_pg.get("MIN"):
@@ -272,16 +279,42 @@ def fetch_pool(
 
 
 # --------------------------------------------------------------------------
+# NBA schedule
+# --------------------------------------------------------------------------
+
+
+def parse_schedule(data: dict) -> Dict[str, List[int]]:
+    """Each NBA team's game days, as ESPN scoring periods (one per fantasy day).
+
+    Teams are keyed like DraftPlayer.pro_team. Games not yet scheduled (e.g.
+    NBA Cup knockouts) aren't included.
+    """
+    days: Dict[str, List[int]] = {}
+    for team in data.get("settings", {}).get("proTeams", []):
+        abbrev = PRO_TEAM_MAP.get(team.get("id"))
+        games = [g for period in (team.get("proGamesByScoringPeriod") or {}).values() for g in period]
+        if abbrev and abbrev != "FA" and games:
+            days[abbrev] = sorted({int(g["scoringPeriodId"]) for g in games})
+    return days
+
+
+def fetch_schedule(season: int) -> Dict[str, List[int]]:
+    """The season's NBA schedule. Empty when ESPN hasn't published it yet."""
+    return parse_schedule(_get_json(f"{BASE_URL}/seasons/{season}?view=proTeamSchedules_wl"))
+
+
+# --------------------------------------------------------------------------
 # Cache
 # --------------------------------------------------------------------------
 
 
-def save_pool(path: str, league: LeagueInfo, players: List[DraftPlayer]) -> None:
+def save_pool(path: str, league: LeagueInfo, players: List[DraftPlayer], schedule: Optional[Dict[str, List[int]]] = None) -> None:
     payload = {
         "version": POOL_CACHE_VERSION,
         "fetchedAt": time.time(),
         "league": asdict(league),
         "players": [asdict(p) for p in players],
+        "schedule": schedule or {},
     }
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
@@ -290,7 +323,10 @@ def save_pool(path: str, league: LeagueInfo, players: List[DraftPlayer]) -> None
 
 
 def load_pool(path: str):
-    """Returns (league, players, fetched_at) or None if missing or outdated."""
+    """Returns (league, players, schedule, fetched_at) or None if missing or outdated.
+
+    The schedule is None in caches saved before it was stored.
+    """
     try:
         with open(path) as f:
             payload = json.load(f)
@@ -302,4 +338,4 @@ def load_pool(path: str):
     league_data["team_names"] = {int(k): v for k, v in league_data.get("team_names", {}).items()}
     league = LeagueInfo(**league_data)
     players = [DraftPlayer(**p) for p in payload["players"]]
-    return league, players, payload.get("fetchedAt", 0)
+    return league, players, payload.get("schedule"), payload.get("fetchedAt", 0)

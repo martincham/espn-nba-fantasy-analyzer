@@ -19,7 +19,8 @@ A player's rating is how much they add to each category, compared with the avera
 - **100 is the average player** in the pool: the top 144 players (12 teams × 12 roster spots).
 - **Counting stats** (PTS, REB, …) compare the player's output with the pool average. Twice the average scores 200.
 - **Percentages** are weighted by attempts. A 60% shooter on 15 shots moves a team's FG% far more than one on 4 shots.
-- **Categories can be left out** of the rating. TO is left out by default, since it's usually punted. The Settings tab controls this.
+- **Categories count by how much they swing weekly wins.** Each category's rating is weighted by how much a rating point in it moves weekly category wins in this league: PTS 1.15, REB 1.10, AST 0.94, STL 0.81, BLK 0.58, 3PM 0.71, TO 0.85, FG% 1.44, FT% 1.42 (mean 1). An equal-weight rating counted a block like 1.7 blocks are worth and undercounted the percentages by about 40%. The weights were measured on 2020-21 to 2024-25 matchups and barely change from season to season. Settings → Rating model can switch back to equal.
+- **Categories can be left out** of the rating. The Settings tab controls this. Keep TO in: leaving it out made the backtest worse (docs/BACKTEST_PLAN.md).
 
 One number per player is a simplification: it adds all categories together, so a shot-blocker and a point guard can have the same rating. That's fine for pricing players against the market. For your own team, the **Fit** column corrects it (section 6).
 
@@ -29,9 +30,11 @@ A player's outlook changes for three different reasons. Each has its own control
 
 | Reason | Control | Default |
 |---|---|---|
-| **Role:** more or fewer minutes | Exp MIN | ESPN's projected minutes |
+| **Role:** more or fewer minutes | Exp MIN | ESPN's projected minutes, on ESPN's projected per-game line |
 | **Skill:** better or worse per minute | Δ, in rating points | 0 |
 | **Health:** more or fewer games | GP Δ, in games | 0, so ESPN's projected games |
+
+The starting line is ESPN's projected per-game stats. It predicted each season better than last season's per-minute rates did, in every season backtested. Settings → Rating model can switch back to last season's per-minute rates.
 
 Keeping them separate prevents double counting. If you expect a young player to jump from 20 to 28 minutes, change Exp MIN. His production scales with the minutes automatically, so don't also add a big Δ for the same jump. Use Δ only when you think he'll get better per minute.
 
@@ -58,9 +61,13 @@ Examples at a replacement rating of 95:
 
 **Health still matters, but less than a simple rating × games.** At a replacement rating of 0, the formula becomes plain rating × games ÷ 82, and the 50-game star drops to 85. The replacement rating is on the Settings tab. Health is set per player with GP Δ.
 
-## 4. Dollars go to the core
+## 4. Dollars follow the league's price curve
 
-A player's value in dollars (**Ours**) comes from how far he is above the best player you can get for $1.
+A player's value in dollars (**Ours**) is what this league pays for a player of his rank. The Nth most valuable player is worth what the league paid, on average, for its Nth most expensive player in its 2020-21 to 2024-25 auctions, scaled so every roster spot adds up to $2,400. The best player comes out near $80.
+
+This replaced the formula below, which priced stars far above what anyone pays (Wembanyama at $170 on the 2026-27 board). The curve cut dollar error by about $1 per player in the backtest. Settings → Rating model can switch back to the formula:
+
+A player's value in dollars comes from how far he is above the best player you can get for $1.
 
 - Every roster spot costs at least $1.
 - The rest of the league's money ($2,400 − $144) is split among each team's **core players**: 7 per team by default, so the top 84.
@@ -141,6 +148,11 @@ The **Fit** column rates each player by how much he'd help *your current team*. 
 - **Weak categories are never faded down on their own.** Only strength is faded.
   - Below 100, a category keeps the value per point it has at 100.
   - The raw win-chance curve would flatten for very weak categories, which amounts to punting them automatically. Punting is your choice.
+- **Only games he'd start count.** Team totals come from daily lineups on the 2026-27 NBA schedule:
+  - Each day, your best 9 players with a game fill the 7 starting slots, best per-game rating first. Games past the 7th are lost on the bench.
+  - The other 3 roster spots stream free agents at the replacement rating into open slots. Adds let you pick streamers who play on the days you need, so they fill open slots anywhere in the week, up to the games 3 average players would play that week.
+  - So a player whose games fall on nights your roster is already full adds less, and one who plays on nights your core is idle adds more. With a typical roster this moves Fit by about ±1.5, and by up to about 5 for teams with very crowded or very light schedules. The player panel shows **Starts**: the share of his games that would make your lineup.
+  - Positions are ignored: any player can fill any starting slot.
 
 **Ours and Edge don't change with your team.** They price players against the market, and the room doesn't care what you've drafted. Fit is for choosing between players during the draft. **Fit $** converts Fit to dollars at the league's rate: roughly what that player is worth *to you*. **Fit edge = Fit $ − Avg paid**, the bargain for your team, where Edge is the bargain for anyone. Fit edge usually runs below Edge, because fading only ever takes value away.
 

@@ -270,7 +270,7 @@ const BASE_COLS = [
   { key: "delta", label: "Δ", title: "Change in per-game rating points (100 = average player), e.g. +10. Spread across categories by scaling every counting stat and shot attempt." },
   { key: "projPg", label: "Per gm", title: "Projected per-game rating" },
   { key: "value", label: "Value", title: "Projected per-game rating over 82 games: Exp GP at his rating, the games he misses at the replacement rating (Settings)" },
-  { key: "fit", label: "Fit", title: "Value to your current team: how much he raises your weekly category win chances. Categories you're already winning count less, punted ones not at all. 100 = an average player." },
+  { key: "fit", label: "Fit", title: "Value to your current team: how much he raises your weekly category win chances. Categories you're already winning count less, punted ones not at all. Only games he'd start count, so games on nights your roster is already full add less. 100 = an average player." },
   { key: "avg", label: "Cost", title: "What he should cost: the average price in ESPN auction drafts, scaled to this league's budget, unless you set your own. Drag or type; clear to go back to ESPN's." },
   { key: "ours", label: "Ours", cls: "ours-h", title: "Our value before the draft" },
   { key: "edge", label: "Edge", cls: "ours-h", title: "Ours − Avg paid" },
@@ -446,7 +446,7 @@ function renderDetail() {
   const slotName = r.status === "mine" ? B.meta.slots[B.state.filled.indexOf(r.id)] : null;
   const espnHint = r.fromProj
     ? `No ${B.meta.statsLabel} games, so this uses ESPN's projection (${r.projGp} GP).`
-    : `Last season ${r.gp} GP, ${r.lastMin ?? "—"} min · ESPN projects ${r.projGp || "—"} GP, ${r.projMin ?? "—"} min${r.espnDelta ? `, ${signed(r.espnDelta)} rating beyond minutes` : ""}.${r.rateSource === "espn" ? " Small sample, so production uses ESPN's line." : ""}`;
+    : `Last season ${r.gp} GP, ${r.lastMin ?? "—"} min · ESPN projects ${r.projGp || "—"} GP, ${r.projMin ?? "—"} min${r.espnDelta ? `, ${signed(r.espnDelta)} rating beyond minutes` : ""}.${r.rateSource === "espn" ? (B.meta.projLine === "espn" ? " Production uses ESPN's per-game line." : " Small sample, so production uses ESPN's line.") : ""}`;
   el.innerHTML = `
     <div><h2>${esc(r.name)}</h2>
       <div class="dsub"><span>${esc(r.team)} · ${esc(r.pos)}</span><span class="num">${r.line.map((v) => fmt(v)).join(" / ")} pts/reb/ast</span>${injuryPill(r.inj, true)}</div></div>
@@ -465,7 +465,8 @@ function renderDetail() {
       <thead><tr><th scope="col">Rating</th><th scope="col">${B.meta.statsLabel}</th><th scope="col">${B.meta.seasonLabel}</th></tr></thead>
       <tbody>
         <tr><th scope="row">Per game</th><td>${fmt(r.lastPg)}</td><td>${fmt(r.projPg)}</td></tr>
-        <tr><th scope="row">Games</th><td>${r.fromProj ? "—" : r.gp}</td><td>${r.expGp}${r.gpDelta ? ` <span class="g">ESPN ${r.espnGp} ${signed(r.gpDelta)}</span>` : ""}</td></tr>
+        <tr><th scope="row">Games</th><td>${r.fromProj ? "—" : r.gp}</td><td>${r.expGp}${r.gpDelta ? ` <span class="g">ESPN ${r.espnGp} ${signed(r.gpDelta)}</span>` : ""}</td></tr>${B.meta.daily && r.starts != null ? `
+        <tr><th scope="row" title="Share of his ${r.teamGames ?? ""} scheduled games that fit in your ${B.meta.starters} daily starting slots, best players first. Fit counts only these games.">Starts</th><td>—</td><td>${Math.round(r.starts * 100)}%</td></tr>` : ""}
         <tr><th scope="row" title="(per game × games + ${B.meta.replacement} × missed games) ÷ ${B.meta.gamesInSeason}">Value</th><td>${r.fromProj ? "—" : fmt(r.lastValue)}</td><td><b>${fmt(r.value)}</b></td></tr>
       </tbody>
     </table>
@@ -544,7 +545,7 @@ function renderTeam() {
     ? ` Best-value help in <b>${esc(t.targets[0].cat)}</b>: ${t.targets.map((x) => `<button class="linkbtn" type="button" data-goto="${x.id}">${esc(x.name)}</button> (${x.rating}, worth ${money(x.ours)})`).join(" and ")}.`
     : "";
   $("ranks").innerHTML = `
-    <div><h3>Category ranks</h3><p class="sub">Projected ${m.seasonLabel} season totals from your best ${m.counted} of ${m.rosterSize}, against ${n - 1} simulated opponents who get the Taken players and the best remaining by value.${t.filled < m.rosterSize ? ` Your ${m.rosterSize - t.filled} empty slots count as replacement-level players.` : ""}</p></div>
+    <div><h3>Category ranks</h3><p class="sub">Projected ${m.seasonLabel} season totals from ${m.daily ? `daily lineups: your best ${m.counted} of ${m.rosterSize} fill ${m.starters} starting slots on the NBA schedule, and ${m.rosterSize - m.counted} streaming spots fill open slots,` : `your best ${m.counted} of ${m.rosterSize},`} against ${n - 1} simulated opponents who get the Taken players and the best remaining by value.${t.filled < m.rosterSize ? ` Your ${m.rosterSize - t.filled} empty slots count as replacement-level players.` : ""}</p></div>
     <div class="overall">
       <div><span class="lbl">Overall</span><span class="v">${ord(t.overall)}</span><span class="s">of ${n} by roto points</span></div>
       <div><span class="lbl">Roto points</span><span class="v">${t.roto}</span><span class="s">of ${t.rotoMax} possible</span></div>
@@ -981,7 +982,7 @@ function renderSettings() {
       <div class="set-c">
         <label class="inline" for="setCore">Pay for the best <select id="setCore">${Array.from({ length: m.rosterSize }, (_, i) => m.rosterSize - i)
           .map((n) => `<option value="${n}" ${n === core ? "selected" : ""}>${n}</option>`).join("")}</select> of ${m.rosterSize}</label>
-        <p class="hint">${m.pricedSize} players are priced above $1${streamers ? `; ${streamers} per team are $1 streamers` : ""}.${room.core != null ? ` <button class="linkbtn" type="button" id="setCoreReset">Use default (${d.core})</button>` : ""}</p>
+        <p class="hint">${m.pricingModel === "curve" ? `Ours uses the league's price curve (Rating model, below), so this only sets how many players the pool counter tracks.` : `${m.pricedSize} players are priced above $1${streamers ? `; ${streamers} per team are $1 streamers` : ""}.`}${room.core != null ? ` <button class="linkbtn" type="button" id="setCoreReset">Use default (${d.core})</button>` : ""}</p>
       </div>
     </section>
     <section class="set">
@@ -998,6 +999,28 @@ function renderSettings() {
         <label class="inline" for="setFadeEnd">Worth nothing past <input class="numin" type="text" inputmode="numeric" id="setFadeEnd" value="${m.fade[1]}" aria-label="Worth nothing past"></label>
         <p class="hint">${room.fadeStart != null || room.fadeEnd != null ? `<button class="linkbtn" type="button" id="setFadeReset">Use default (${d.fade[0]} to ${d.fade[1]})</button>` : "Default."} 100 is the average team.</p>`}
         ${m.punt.length ? `<p class="hint">Punted now: ${m.punt.map(esc).join(", ")}.</p>` : ""}
+      </div>
+    </section>
+    <section class="set">
+      <div class="set-t"><h3>Rating model</h3>
+        <p>How players are projected, rated and priced. Each default tested better than the alternative on this league's past seasons, measured by the category wins players actually added. See docs/BACKTEST_PLAN.md.</p></div>
+      <div class="set-c">
+        <span class="set-sub">Per-game line</span>
+        <div class="seg" role="group" aria-label="Per-game line">
+          <button type="button" data-rating-set="projLine:espn" aria-pressed="${m.projLine === "espn"}">ESPN projection</button>
+          <button type="button" data-rating-set="projLine:last" aria-pressed="${m.projLine === "last"}">Last season per minute</button></div>
+        <p class="hint">${m.projLine === "espn" ? "ESPN's projected per-game stats, scaled by Exp MIN. Predicted better in every season tested." : "Last season's per-minute production at Exp MIN; ESPN's line only for small samples."}</p>
+        <span class="set-sub">Category weights</span>
+        <div class="seg" role="group" aria-label="Category weights">
+          <button type="button" data-rating-set="catWeights:league" aria-pressed="${m.catWeights === "league"}">Weekly win impact</button>
+          <button type="button" data-rating-set="catWeights:equal" aria-pressed="${m.catWeights === "equal"}">Equal</button></div>
+        <p class="hint">${m.catWeights === "league" ? "Each category counts by how much a rating point in it moves weekly category wins in this league:" : "Every rated category counts the same. This overvalues blocks and undervalues FG% and FT%."}</p>
+        ${m.catWeights === "league" ? `<p class="hint spreads">${m.categories.map((c) => `${esc(c)} <b>${m.categoryWeights[c].toFixed(2)}</b>`).join(" · ")}</p>` : ""}
+        <span class="set-sub">Dollars</span>
+        <div class="seg" role="group" aria-label="Dollars">
+          <button type="button" data-rating-set="pricing:curve" aria-pressed="${m.pricingModel === "curve"}">League price curve</button>
+          <button type="button" data-rating-set="pricing:formula" aria-pressed="${m.pricingModel === "formula"}">Core formula</button></div>
+        <p class="hint">${m.pricingModel === "curve" ? `The Nth most valuable player is worth what this league pays for its Nth most expensive player (2020-21 to 2024-25 auctions), scaled to the budget. Top price $${m.curveTop}.` : "The core players share the money in proportion to their value above the last of them (Core players, above)."}</p>
       </div>
     </section>
     <section class="set">
@@ -1020,7 +1043,7 @@ function renderSettings() {
     </section>
     <section class="set">
       <div class="set-t"><h3>Players who count</h3>
-        <p>Team totals use your best players and drop the rest, as bench players rarely all play.</p></div>
+        <p>${m.daily ? `Team totals use your best players in daily lineups. The rest of the roster are streaming spots: free agents at the replacement rating, picked up to fill open starting slots, up to the games that many average players would play each week.` : "Team totals use your best players and drop the rest, as bench players rarely all play."}</p></div>
       <div class="set-c">
         <label class="inline" for="setCounted">Best <select id="setCounted">${Array.from({ length: m.rosterSize }, (_, i) => m.rosterSize - i)
           .map((n) => `<option value="${n}" ${n === counted ? "selected" : ""}>${n}</option>`).join("")}</select> of ${m.rosterSize} count</label>
@@ -1091,6 +1114,11 @@ setEl.addEventListener("change", (e) => {
 setEl.addEventListener("click", (e) => {
   const model = e.target.closest("[data-fit-model]");
   if (model) return act("settings", { fitModel: model.dataset.fitModel });
+  const ratingSet = e.target.closest("[data-rating-set]");
+  if (ratingSet) {
+    const [key, value] = ratingSet.dataset.ratingSet.split(":");
+    return act("settings", { [key]: value });
+  }
   const id = e.target.id;
   if (id === "setScaleAuto") act("settings", { marketScale: null });
   else if (id === "setCatsReset") act("settings", { rated: null });

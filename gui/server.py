@@ -55,7 +55,7 @@ def _actions(board: DraftBoard) -> Dict[str, Callable[[Dict[str, Any]], Optional
         "move": lambda b: board.move(pid(b), int(b["slot"]), opt(b, "price")),
         "clear-roster": lambda b: board.clear_roster(),
         "reset-draft": lambda b: board.reset_draft(),
-        "settings": lambda b: board.update_settings(**{k: b[k] for k in ("marketScale", "rated", "ignorePlayers", "replacement", "core", "fadeStart", "fadeEnd", "punt", "fitModel") if k in b}),
+        "settings": lambda b: board.update_settings(**{k: b[k] for k in ("marketScale", "rated", "ignorePlayers", "replacement", "core", "fadeStart", "fadeEnd", "punt", "fitModel", "projLine", "catWeights", "pricing") if k in b}),
         "state": lambda b: board.replace_state(b["state"]),
         "refresh": lambda b: board.load(refresh=True),
     }

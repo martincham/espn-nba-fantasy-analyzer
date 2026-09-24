@@ -25,6 +25,17 @@ class RatingTest(unittest.TestCase):
         avg = line()
         self.assertAlmostEqual(v.rate(avg, avg, CATS), 100.0)
 
+    def test_weighted_rating(self):
+        avg = line()
+        self.assertAlmostEqual(v.rate(avg, avg, CATS, v.CATEGORY_WEIGHTS), 100.0)  # average is still 100
+        blocker = line(blk=1.5)  # 3x the average blocks, everything else average
+        shooter = line(fgm=5.0)  # better FG% on the same attempts
+        equal = v.rate(blocker, avg, CATS), v.rate(shooter, avg, CATS)
+        weighted = v.rate(blocker, avg, CATS, v.CATEGORY_WEIGHTS), v.rate(shooter, avg, CATS, v.CATEGORY_WEIGHTS)
+        self.assertLess(weighted[0], equal[0])  # blocks count less
+        self.assertGreater(weighted[1], equal[1])  # FG% counts more
+        self.assertAlmostEqual(v.rate(blocker, avg, ["BLK", "PTS"], {"BLK": 1.0}), v.rate(blocker, avg, ["BLK", "PTS"]))
+
     def test_percent_stat_neutral_at_average_percentage(self):
         avg = line()
         # Same FG% on double the attempts is still exactly average.
@@ -180,6 +191,27 @@ class DraftValueTest(unittest.TestCase):
         self.assertGreater(filled_loss, 0)
         self.assertLess(filled_loss, plain_loss / 2)
 
+    def test_price_curve(self):
+        self.shape.price_curve = list(v.PRICE_CURVE)
+        rows = sorted(self.value().values(), key=lambda r: r.rank)
+        top = rows[: self.shape.pool_size]
+        self.assertAlmostEqual(sum(r.ours for r in top), self.shape.teams * self.shape.budget)
+        prices = [r.ours for r in rows]
+        self.assertEqual(prices, sorted(prices, reverse=True))  # never more for a lower value
+        self.assertGreaterEqual(min(prices), 1.0)
+        curve = v.league_curve(self.shape)
+        self.assertAlmostEqual(rows[0].ours, curve[0])
+        rate = v.pricing(list(self.value().values()), self.shape)
+        self.assertAlmostEqual(rate.dollars(rows[0].value + 50), curve[0])  # above the best: the top price
+        between = rate.dollars((rows[0].value + rows[1].value) / 2)
+        self.assertTrue(rows[1].ours <= between <= rows[0].ours)
+
+    def test_curve_dollars(self):
+        values, curve = [130.0, 120.0, 110.0], [60.0, 30.0, 10.0]
+        self.assertEqual(v.curve_dollars(140, values, curve), 60.0)
+        self.assertAlmostEqual(v.curve_dollars(125, values, curve), 45.0)
+        self.assertEqual(v.curve_dollars(100, values, curve), 1.0)  # past the curve: $1
+
     def test_core_players_share_the_money(self):
         self.shape.core = 2  # 2 teams × 2 core players are priced; the other 2 roster spots cost $1
         rows = sorted(self.value().values(), key=lambda r: r.rank)
@@ -214,6 +246,63 @@ class DraftValueTest(unittest.TestCase):
         worst = v.simulate_league(rows, [], [1, 2, 3, 4, 5, 6], self.shape)
         self.assertEqual(worst.filled, 0)
         self.assertGreaterEqual(worst.ranks["PTS"], 1)
+
+
+class LineupTest(unittest.TestCase):
+    """Daily lineups: games past the starting slots are lost; streamers fill open slots."""
+
+    def setUp(self):
+        # Two weeks. Team A plays days 1-4 of each week, team B days 5-7.
+        self.sched = v.Schedule({"A": [1, 2, 3, 4, 8, 9, 10, 11], "B": [5, 6, 7, 12, 13, 14]})
+        self.stats = line()
+
+    def member(self, team, rating=100.0, count=1):
+        return v.Member(v.scale(self.stats, v.GAMES_IN_SEASON), rating, team, count)
+
+    def test_schedule_shares_and_weeks(self):
+        self.assertEqual(self.sched.days, 14)
+        self.assertEqual(self.sched.weeks, 2)
+        self.assertEqual(self.sched.share, [0.5] * 14)  # one of two teams plays each day
+        self.assertEqual(self.sched.games("A"), 8)
+        self.assertEqual(self.sched.games(None), 7)  # average schedule
+
+    def test_games_past_the_slots_are_benched(self):
+        lineup = v.Lineup(counted=3, schedule=self.sched, starters=2)
+        weights = dict((m.rating, w) for m, w in lineup.weights([self.member("A", 120), self.member("A", 110), self.member("A", 90)]))
+        self.assertEqual(weights[120], 1.0)
+        self.assertEqual(weights[110], 1.0)
+        self.assertEqual(weights[90], 0.0)  # every game is on a full day
+        spread_out = dict((m.rating, w) for m, w in lineup.weights([self.member("A", 120), self.member("A", 110), self.member("B", 90)]))
+        self.assertEqual(spread_out[90], 1.0)
+
+    def test_streamers_fill_open_slots_up_to_a_weekly_cap(self):
+        streamer = self.member(None, 95, count=1)
+        lineup = v.Lineup(counted=1, schedule=self.sched, starters=1, streamer=streamer)
+        weights = lineup.weights([self.member("A", 120)])
+        # Team A fills days 1-4 of each week; days 5-7 are open (6 slot-days).
+        # One streaming spot plays like an average player: 3.5 games a week.
+        self.assertAlmostEqual(weights[-1][1], 6 / 7)
+
+    def test_without_a_schedule_the_best_count_in_full(self):
+        lineup = v.Lineup(counted=2)
+        self.assertEqual([w for _, w in lineup.weights([self.member("A", 120), self.member("A", 110, count=3)])], [1.0, 1.0])
+        self.assertEqual(lineup.size([self.member("A", 120, count=5)]), 2)
+
+    def test_fit_prefers_games_on_open_days(self):
+        shape = v.LeagueShape(teams=2, roster_size=3, ignore_players=0, categories=CATS, rated=CATS, starters=2)
+        players = [Player(1, line(pts=16), 82), Player(2, line(pts=16), 82), Player(3, line(pts=14), 82), Player(4, line(pts=14), 82)]
+        for p, team in zip(players, ["A", "A", "A", "B"]):
+            p.pro_team = team
+        base = v.compute_baseline(players, shape)
+        rows = v.value_players(players, base, shape, {})
+        sim = v.simulate_league(rows, [1, 2], [], shape, self.sched)
+        starts = {}
+        fits = v.team_fit(rows, [1, 2], shape, sim, base, CATS, v.fit_by_wins, starts)
+        # Same player; 3 plays on the days my two A players fill, 4 on open days.
+        self.assertEqual(rows[2].value, rows[3].value)
+        self.assertGreater(fits[4], fits[3])
+        self.assertEqual(starts[3], 0.0)
+        self.assertEqual(starts[4], 1.0)
 
 
 if __name__ == "__main__":

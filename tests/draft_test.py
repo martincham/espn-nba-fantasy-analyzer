@@ -37,13 +37,21 @@ class ParseTest(unittest.TestCase):
 
     def test_minutes_defaults(self):
         flagg = self.players["Cooper Flagg"]
-        self.assertEqual(flagg.rate_source, "last")  # a full season: his own per-minute rates
-        self.assertEqual(flagg.rate_min, flagg.last_pg["MIN"])
+        self.assertEqual(flagg.rate_source, "espn")  # default: ESPN's per-game line
+        self.assertIs(flagg.rate_line, flagg.proj_pg)
         self.assertEqual(flagg.default_exp_min, round(flagg.proj_pg["MIN"], 1))  # ESPN's minutes
-        kessler = self.players["Walker Kessler"]
-        self.assertLess(kessler.last_gp, draft.MIN_SAMPLE_GP)
-        self.assertEqual(kessler.rate_source, "espn")  # 5 games is too small a sample
-        self.assertIs(kessler.rate_line, kessler.proj_pg)
+        try:
+            flagg.line_source = "last"
+            self.assertEqual(flagg.rate_source, "last")  # a full season: his own per-minute rates
+            self.assertEqual(flagg.rate_min, flagg.last_pg["MIN"])
+            kessler = self.players["Walker Kessler"]
+            kessler.line_source = "last"
+            self.assertLess(kessler.last_gp, draft.MIN_SAMPLE_GP)
+            self.assertEqual(kessler.rate_source, "espn")  # 5 games is too small a sample
+            self.assertIs(kessler.rate_line, kessler.proj_pg)
+        finally:
+            flagg.line_source = "espn"
+            self.players["Walker Kessler"].line_source = "espn"
 
     def test_draft_costs(self):
         j = self.players["Nikola Jokic"]
@@ -69,10 +77,18 @@ class ParseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "pool.json")
             draft.save_pool(path, league, players)
-            loaded_league, loaded, _ = draft.load_pool(path)
+            loaded_league, loaded, _, _ = draft.load_pool(path)
         self.assertEqual(loaded_league.categories, league.categories)
         self.assertEqual([p.name for p in loaded], [p.name for p in players])
         self.assertEqual(loaded[0].last_pg, players[0].last_pg)
+
+    def test_parse_schedule(self):
+        days = draft.parse_schedule(fixture("espn_schedule_2027.json"))
+        self.assertEqual(len(days), 30)
+        self.assertNotIn("FA", days)
+        self.assertIn("LAL", days)  # keyed like DraftPlayer.pro_team
+        self.assertTrue(all(len(d) == 80 for d in days.values()))
+        self.assertEqual(days["BOS"], sorted(set(days["BOS"])))
 
     def test_placeholder_cookies_are_not_sent(self):
         self.assertIsNone(draft._cookie_header("456", "{123}"))
@@ -91,7 +107,10 @@ class BoardTest(unittest.TestCase):
             json.dump({"leagueId": 1, "draftSeason": 2027, "ignoredStats": ["TO"], "ignorePlayers": 3}, f)
         league = draft.parse_league(fixture("espn_league_2027.json"), 1, 2027)
         players = [p for p in (draft.parse_player(e, 2027) for e in fixture("espn_players_2027.json")["players"]) if p]
-        with mock.patch.object(draft, "fetch_league", return_value=league), mock.patch.object(draft, "fetch_pool", return_value=players):
+        schedule = draft.parse_schedule(fixture("espn_schedule_2027.json"))
+        with mock.patch.object(draft, "fetch_league", return_value=league), mock.patch.object(
+            draft, "fetch_pool", return_value=players
+        ), mock.patch.object(draft, "fetch_schedule", return_value=schedule):
             self.board = DraftBoard(settings, os.path.join(self.tmp.name, "pool.json"), os.path.join(self.tmp.name, "state.json"))
             self.board.load()
         self.ids = {p.name: p.id for p in players}
@@ -107,6 +126,8 @@ class BoardTest(unittest.TestCase):
         self.assertNotIn("TO", snap["meta"]["rated"])
         self.assertIn("TO", [c["cat"] for c in snap["team"]["categories"]])
         self.assertTrue(all("ours" in r and "edge" in r for r in snap["rows"]))
+        self.assertTrue(snap["meta"]["daily"])
+        self.assertEqual(snap["meta"]["starters"], 7)
 
     def test_roster_flow_and_persistence(self):
         b, ids = self.board, self.ids
@@ -182,6 +203,36 @@ class BoardTest(unittest.TestCase):
         again = DraftBoard(b.settings_path, b.pool_path, b.state_path)
         again.load()
         self.assertEqual(again.shape.ignore_players, 5)
+
+    def test_rating_model_settings(self):
+        from library import valuation
+
+        b = self.board
+        meta = b.snapshot()["meta"]
+        self.assertEqual((meta["projLine"], meta["catWeights"], meta["pricingModel"]), ("espn", "league", "curve"))
+        self.assertEqual(b.shape.weights, valuation.CATEGORY_WEIGHTS)
+        self.assertTrue(b.shape.price_curve)
+        self.assertTrue(all(p.line_source == "espn" for p in b.players))
+        top = max(r["ours"] for r in b.snapshot()["rows"])
+        self.assertLessEqual(top, meta["curveTop"] + 1)
+        # Switch everything back to the old model.
+        b.update_settings(projLine="last", catWeights="equal", pricing="formula")
+        meta = b.snapshot()["meta"]
+        self.assertEqual((meta["projLine"], meta["catWeights"], meta["pricingModel"]), ("last", "equal", "formula"))
+        self.assertEqual((b.shape.weights, b.shape.price_curve), ({}, []))
+        self.assertTrue(all(p.line_source == "last" for p in b.players))
+        self.assertIsNone(meta["curveTop"])
+        # Saved with the draft state, and reset to the defaults with None.
+        from gui.board import DraftBoard
+
+        again = DraftBoard(b.settings_path, b.pool_path, b.state_path)
+        again.load()
+        self.assertEqual((again.proj_line, again.cat_weights, again.pricing_model), ("last", "equal", "formula"))
+        b.update_settings(projLine=None, catWeights=None, pricing=None)
+        self.assertEqual((b.proj_line, b.cat_weights, b.pricing_model), ("espn", "league", "curve"))
+        b.update_settings(projLine="last")
+        b.update_settings(projLine="bogus")  # a bad value falls back to the default, like the Fit setting
+        self.assertEqual(b.proj_line, "espn")
 
     def test_replacement_and_core_settings(self):
         b = self.board

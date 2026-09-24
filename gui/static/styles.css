@@ -256,6 +256,8 @@ textarea{width:100%;min-height:60px;border:1px solid var(--line-strong);border-r
 .set-c{display:flex;flex-direction:column;gap:6px;align-items:flex-start;min-width:0}
 .set-c .hint{margin:0}
 .set-c .hint b{color:var(--ink);font-weight:600}
+.set-sub{font-size:12px;font-weight:600;color:var(--ink);margin-top:6px}
+.set-sub:first-child{margin-top:0}
 .range-row{display:flex;align-items:center;gap:var(--s3);width:100%}
 .range-row input{flex:1 1 auto;min-width:120px;accent-color:var(--accent)}
 .range-row output{font-family:var(--font-data);font-size:var(--fs-data);color:var(--ink);white-space:nowrap}

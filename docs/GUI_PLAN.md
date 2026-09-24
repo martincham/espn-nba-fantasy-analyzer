@@ -150,6 +150,7 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
    - Default (`fit_by_wins`): each team category rating counts as its weekly win utility, Φ((rating − 100) ÷ spread) with per-category spreads fitted on the league's 2025-26 matchups and shrunk toward 25. Below 100 it keeps its slope at 100, so weak categories are never faded.
    - Alternative (`fit_by_fade`): `Fade(start=110, end=140)`, full weight up to 110, weight falling linearly to 0 at 140.
    - Fit = 100 + (useful total with the player − useful total with an average player) × counted ÷ categories. Punted categories (team-row checkboxes, never automatic) are left out.
+   - With daily lineups, a player only adds on the days he'd start, and "counted" becomes the team's total starts in seasons (starts ÷ 82). The share of each player's games he'd start on my team is shown as **Starts**.
    - **Fit $** converts Fit at the league's $/point (`valuation.pricing`). **Fit edge** = Fit $ − Avg paid, a board column. **Fit rank** ranks Fit among players not taken.
 11. **During the draft** other teams' picks are marked taken with no price: only that a player is gone matters. There's no inflation tracking. Your own picks keep a price (default Avg paid) for your budget.
 
@@ -195,6 +196,7 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
   - My team's projected season totals (`stats × s × ExpGP`) are compared with 11 simulated opponents.
   - Opponents are dealt Taken players first, then the best remaining players by value, in snake order.
   - Only each team's best `teamSize − ignorePlayers` (9) players count, ranked by per-game rating like `schedule.py`. Empty slots count as the average of players ranked #133–144 by value.
+  - With the NBA schedule (`draft.fetch_schedule`, cached in `draftPool.json`), totals come from daily lineups (`valuation.Lineup`). Each day, the counted players with a game fill the starting slots (bench and IR excluded) by per-game rating, and the `ignorePlayers` streaming spots fill the open slots at the replacement line, up to the games that many average players would play each 7-day week. Positions are ignored. Without a schedule, each counted player's full season counts.
 - **The view shows:**
   - For each category: a strip with all 12 teams (mine highlighted), my rank, my total, and the difference from the league average.
   - Overall rank by roto points, and expected H2H categories won per week.

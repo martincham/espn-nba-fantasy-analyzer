@@ -103,6 +103,7 @@ To start over, stop the app and delete `draftState.json`.
   - Whenever a change moves a rating, a small +/− chip shows by how much for a few seconds. **Open My Team** in the row's first box shows the details.
   - **Punt** checkboxes: tick one to give up that category on purpose. The Fit column then ignores it. Nothing is ever punted unless you tick it.
 - **Fit:** each player's value to *your current team*, on the same scale as Value. It's how much he raises your weekly category win chances, so categories you're already winning count less. Steady categories (PTS, FG%, FT%) reach a sure win sooner than swingy ones (BLK, STL). Settings → Fit can switch to a simple fade instead: full weight up to 110, nothing past 140. Sort by Fit during the draft to find who helps you most.
+  - Fit follows the NBA schedule. Each day only 7 players start, so a player whose games fall on nights your roster is already full adds less, and one who plays on nights your core is idle adds more. Your streaming spots fill open slots at the replacement rating. The player panel shows **Starts**: the share of his games that would make your lineup.
   - **Fit edge** = Fit $ − Avg paid: the bargain *for your team*, where Edge is the bargain for anyone. **Fit $** (Fit converted to dollars) and **Fit rank** are in the player panel. ESPN's own suggested price is also in the panel now.
 - **Rearrange:** on **My Team**, drag between slots or click one slot and then another.
   - **×** removes a player and **Clear roster** empties every slot.
@@ -115,7 +116,7 @@ To start over, stop the app and delete `draftState.json`.
   - **Fit:** *Win chances* (default) or *Simple fade*, with the fade's start (110) and end (140).
   - **Avg paid scale:** Auto fits ESPN's prices to your league's budget. Drag the slider to set your own multiplier.
   - **Categories in player value:** starts from `ignoredStats` in settings.txt. Team ranks always show every category.
-  - **Players who count:** how many of your best players count toward team totals. Starts from `ignorePlayers`.
+  - **Players who count:** how many of your best players count toward team totals. The rest are streaming spots. Starts from `ignorePlayers`.
   - **Default expected games:** the blend of ESPN's projected games and last season's. Default ⅔ ESPN.
   - **Reset draft:** unmarks every taken player and empties your roster, with Undo.
   - Changes save to `draftState.json`; settings.txt is never edited.

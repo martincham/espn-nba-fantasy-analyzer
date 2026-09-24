@@ -223,6 +223,24 @@ class BoardTest(unittest.TestCase):
         b.update_settings(fadeStart=80, fadeEnd=81)
         self.assertLess(spread(), normal / 2)
 
+    def test_own_price(self):
+        b, jid = self.board, self.ids["Nikola Jokic"]
+        row = lambda: next(r for r in b.snapshot()["rows"] if r["id"] == jid)
+        espn = row()["avg"]
+        b.adjust(jid, cost=40)
+        r = row()
+        self.assertEqual((r["avg"], r["costSet"]), (40, True))
+        self.assertAlmostEqual(r["avgEspn"], espn, places=1)
+        self.assertAlmostEqual(r["edge"], r["ours"] - 40, places=1)
+        self.assertAlmostEqual(r["fitEdge"], r["fitDollars"] - 40, places=0)
+        self.assertIsNone(b.pick(jid, "mine"))
+        self.assertEqual(b.state["picks"][str(jid)]["price"], 40)  # my price is the default cost
+        b.pick(jid, None)
+        b.reset_adjustments()
+        self.assertTrue(row()["costSet"])  # Clear adjustments keeps my prices
+        b.adjust(jid, cost=None)
+        self.assertEqual((row()["avg"], row()["costSet"]), (espn, False))
+
     def test_category_columns(self):
         snap = self.board.snapshot()
         cats = snap["meta"]["categories"]

@@ -271,7 +271,7 @@ const BASE_COLS = [
   { key: "projPg", label: "Per gm", title: "Projected per-game rating" },
   { key: "value", label: "Value", title: "Projected per-game rating over 82 games: Exp GP at his rating, the games he misses at the replacement rating (Settings)" },
   { key: "fit", label: "Fit", title: "Value to your current team: how much he raises your weekly category win chances. Categories you're already winning count less, punted ones not at all. 100 = an average player." },
-  { key: "avg", label: "Avg paid", title: "Average price in ESPN auction drafts, scaled to this league's budget" },
+  { key: "avg", label: "Cost", title: "What he should cost: the average price in ESPN auction drafts, scaled to this league's budget, unless you set your own. Drag or type; clear to go back to ESPN's." },
   { key: "ours", label: "Ours", cls: "ours-h", title: "Our value before the draft" },
   { key: "edge", label: "Edge", cls: "ours-h", title: "Ours − Avg paid" },
   { key: "fitEdge", label: "Fit edge", cls: "ours-h", title: "Fit $ − Avg paid: the bargain for your current team. Fit $ converts Fit to dollars at the league's rate." },
@@ -301,7 +301,7 @@ function renderHead() {
   const c = `<tr>${cols().map((c) => {
     if (c.nosort) return `<th class="${c.cls || ""}" scope="col" title="${esc(c.title)}"><span class="sr">${c.sr}</span></th>`;
     const s = UI.sort.key === c.key ? ` aria-sort="${UI.sort.dir < 0 ? "descending" : "ascending"}"` : "";
-    const title = c.key === "avg" ? `${c.title} (ESPN average × ${B.meta.marketScale.toFixed(2)})` : c.title || "";
+    const title = c.title || "";
     return `<th class="${c.cls || ""}"${s} scope="col"><button type="button" data-sort="${c.key}" title="${esc(title)}">${c.label}</button></th>`;
   }).join("")}</tr>`;
   $("thead").innerHTML = g + c;
@@ -404,7 +404,7 @@ function rowHTML(r) {
     <td>${fmt(r.projPg)}</td>
     <td class="val">${fmt(r.value)}</td>
     <td class="fit">${r.status === "taken" ? "—" : fmt(r.fit)}</td>
-    <td>${money(r.avg)}</td>
+    <td><input class="cell ${r.costSet ? "edited" : ""}" type="text" inputmode="numeric" autocomplete="off" value="${Math.round(r.avg)}" title="ESPN: ${money(r.avgEspn)} (average ${money(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)})" aria-label="Cost of ${esc(r.name)}" data-cost="${r.id}" id="c-${r.id}"></td>
     <td class="ours">${money(r.ours)}</td>
     <td class="ours"><span class="edge ${ecls}">${signed(e)}</span></td>
     <td class="ours">${r.status === "taken" || r.fitEdge == null ? "—" : `<span class="edge ${edgeCls(r.fitEdge)}">${signed(r.fitEdge)}</span>`}</td>
@@ -459,7 +459,7 @@ function renderDetail() {
       <div title="Fit $ − Avg paid"><span class="lbl">Fit edge</span><span class="v ${r.fitEdge >= 3 ? "up" : r.fitEdge <= -3 ? "down" : ""}">${r.fitEdge == null ? "—" : signed(r.fitEdge)}</span></div>
       <div><span class="lbl">ESPN rank</span><span class="v">#${r.espnRank ?? "—"}</span></div>
       <div><span class="lbl">ESPN $</span><span class="v">${money(r.espn)}</span></div>
-      <div title="ESPN average $${fmt(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)} to fit this league's budget"><span class="lbl">Avg paid</span><span class="v">${money(r.avg)}</span></div>
+      <div title="${r.costSet ? `Your price. ESPN's: ${money(r.avgEspn)}` : `ESPN average $${fmt(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)} to fit this league's budget`}"><span class="lbl">${r.costSet ? "Your cost" : "Cost"}</span><span class="v">${money(r.avg)}</span></div>
     </div>
     <table class="rtab" aria-label="Ratings">
       <thead><tr><th scope="col">Rating</th><th scope="col">${B.meta.statsLabel}</th><th scope="col">${B.meta.seasonLabel}</th></tr></thead>
@@ -780,10 +780,10 @@ tb.addEventListener("click", (e) => {
   renderDetail();
 });
 tb.addEventListener("focusin", (e) => {
-  const i = e.target.closest("[data-delta],[data-gp],[data-min]");
+  const i = e.target.closest("[data-delta],[data-gp],[data-min],[data-cost]");
   if (!i) return;
   i.select();
-  const id = +(i.dataset.delta || i.dataset.gp || i.dataset.min);
+  const id = +(i.dataset.delta || i.dataset.gp || i.dataset.min || i.dataset.cost);
   if (UI.sel === id) return;
   UI.sel = id;
   tb.querySelectorAll("tr.sel").forEach((t) => t.classList.remove("sel"));
@@ -806,10 +806,13 @@ function saveCell(input) {
   } else if (input.dataset.gp) {
     if (Number.isNaN(v)) { toast("GP Δ needs a number of games, like -10 or +5."); return renderKeepFocus(); }
     act("adjust", { id: +input.dataset.gp, gpDelta: Math.round(v ?? 0) }); // empty box goes back to ESPN's games
+  } else if (input.dataset.cost) {
+    if (Number.isNaN(v) || (v != null && v < 0)) { toast(`Cost needs a dollar amount from $0 to $${B.meta.budget}.`); return renderKeepFocus(); }
+    act("adjust", { id: +input.dataset.cost, cost: v == null ? null : Math.round(v) }); // empty box goes back to ESPN's price
   }
 }
 tb.addEventListener("change", (e) => {
-  const cell = e.target.closest("[data-delta],[data-gp],[data-min]");
+  const cell = e.target.closest("[data-delta],[data-gp],[data-min],[data-cost]");
   if (cell) saveCell(cell);
 });
 tb.addEventListener("keydown", (e) => {
@@ -820,7 +823,7 @@ tb.addEventListener("keydown", (e) => {
   const v = parseNum(e.target.value);
   const step = SCRUB[cellKind(e.target)].step * (e.shiftKey ? 5 : 1) * (e.key === "ArrowUp" ? 1 : -1);
   const next = (Number.isNaN(v) || v == null ? 0 : v) + step;
-  e.target.value = e.target.dataset.min ? String(Math.max(0, next)) : signedInput(next);
+  e.target.value = e.target.dataset.min || e.target.dataset.cost ? String(Math.max(0, next)) : signedInput(next);
   saveCell(e.target);
 });
 
@@ -830,9 +833,10 @@ const SCRUB = {
   gp: { key: "gpDelta", px: 4, step: 1, min: -82, max: 82 },
   min: { key: "expMin", px: 6, step: 0.5, min: 0, max: 48 },
   delta: { key: "delta", px: 4, step: 1, min: -60, max: 60 },
+  cost: { key: "cost", px: 5, step: 1, min: 0, max: 200 },
 };
-const cellKind = (el) => (el.dataset.delta ? "delta" : el.dataset.min ? "min" : "gp");
-const cellId = (el) => +(el.dataset.delta || el.dataset.min || el.dataset.gp);
+const cellKind = (el) => (el.dataset.delta ? "delta" : el.dataset.min ? "min" : el.dataset.cost ? "cost" : "gp");
+const cellId = (el) => +(el.dataset.delta || el.dataset.min || el.dataset.gp || el.dataset.cost);
 let scrub = null;
 
 // Update one row's numbers in place, leaving the input being dragged alone.
@@ -889,8 +893,8 @@ document.addEventListener("pointermove", (e) => {
   const v = Math.max(lo, Math.min(hi, scrub.start + Math.round(dx / c.px) * c.step * (e.shiftKey ? 5 : 1)));
   if (v === scrub.last) return;
   scrub.last = v;
-  scrub.cell.value = scrub.kind === "min" ? v.toFixed(1) : signedInput(v);
-  scrub.cell.classList.toggle("edited", scrub.kind === "min" || v !== 0);
+  scrub.cell.value = scrub.kind === "min" ? v.toFixed(1) : scrub.kind === "cost" ? String(v) : signedInput(v);
+  scrub.cell.classList.toggle("edited", scrub.kind === "min" || scrub.kind === "cost" || v !== 0);
   sendScrub({ id: scrub.id, [c.key]: v });
 });
 function endScrub(e) {
@@ -940,7 +944,7 @@ det.addEventListener("click", (e) => {
 
 $("resetBtn").addEventListener("click", () => {
   const prev = snapshotState();
-  act("reset-adjustments").then((ok) => ok && toast("Cleared all Δ and expected-games edits. Notes were kept.", undoTo(prev)));
+  act("reset-adjustments").then((ok) => ok && toast("Cleared all Δ, games and minutes edits. Notes and your prices were kept.", undoTo(prev)));
 });
 $("refreshBtn").addEventListener("click", async () => {
   const b = $("refreshBtn");

@@ -259,7 +259,7 @@ class DraftBoard:
         return max(-base, min(draft.MAX_GP - base, int(round(float(gp_delta)))))
 
     def adjust(self, player_id: int, **fields: Any) -> None:
-        """Set delta, gpDelta (games over ESPN's projection), expMin (None resets it) and/or note."""
+        """Set delta, gpDelta (games over ESPN's projection), expMin, cost (None resets either) and/or note."""
         with self.lock:
             if player_id not in self.by_id:
                 raise ValueError("Unknown player.")
@@ -271,9 +271,13 @@ class DraftBoard:
             if "expMin" in fields:
                 mins = fields["expMin"]
                 adj["expMin"] = None if mins is None else max(0.0, min(float(draft.MAX_MIN), round(float(mins) * 2) / 2))
+            if "cost" in fields:
+                cost = fields["cost"]
+                adj["cost"] = None if cost is None else max(0, min(self.shape.budget, int(round(float(cost)))))
             if "note" in fields:
                 adj["note"] = str(fields["note"] or "")[:1000]
-            if not adj.get("delta") and not adj.get("gpDelta") and adj.get("expMin") is None and not adj.get("note"):
+            if (not adj.get("delta") and not adj.get("gpDelta") and adj.get("expMin") is None
+                    and adj.get("cost") is None and not adj.get("note")):
                 self.state["adjustments"].pop(str(player_id), None)
             else:
                 self.state["adjustments"][str(player_id)] = adj
@@ -297,10 +301,9 @@ class DraftBoard:
 
     def reset_adjustments(self) -> None:
         with self.lock:
-            # Notes are kept; Δ, expected games and expected minutes are cleared.
-            self.state["adjustments"] = {
-                k: {"note": v["note"]} for k, v in self.state["adjustments"].items() if v.get("note")
-            }
+            # Notes and my own prices are kept; Δ, games and minutes are cleared.
+            kept = {k: {f: v[f] for f in ("note", "cost") if v.get(f) not in (None, "")} for k, v in self.state["adjustments"].items()}
+            self.state["adjustments"] = {k: v for k, v in kept.items() if v}
             self._save()
 
     def _names(self) -> Dict[int, str]:
@@ -344,6 +347,11 @@ class DraftBoard:
         return max(1, int(round(self._market(player)))) if player else 1
 
     def _market(self, player: draft.DraftPlayer) -> float:
+        """What a player should cost: my own price if I set one, else ESPN's scaled average."""
+        own = (self.state["adjustments"].get(str(player.id)) or {}).get("cost")
+        return float(own) if own is not None else self._espn_market(player)
+
+    def _espn_market(self, player: draft.DraftPlayer) -> float:
         """ESPN's average price, scaled to this league's budget."""
         return player.avg_paid * self.market_scale
 
@@ -451,6 +459,8 @@ class DraftBoard:
                 "espn": _r(p.espn_value, 0),
                 "avg": _r(self._market(p)),
                 "avgRaw": _r(p.avg_paid),
+                "avgEspn": _r(self._espn_market(p)),
+                "costSet": (adjustments.get(str(r.id)) or {}).get("cost") is not None,
                 "adp": _r(p.adp),
                 "ours": _r(r.ours, 2),
                 "edge": _r(r.ours - self._market(p), 2),

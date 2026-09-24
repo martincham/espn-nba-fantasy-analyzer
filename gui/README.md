@@ -93,6 +93,7 @@ To start over, stop the app and delete `draftState.json`.
   - Edited values are highlighted in marigold. They save the moment you press Enter or leave the box.
   - Clear the GP Δ cell to go back to ESPN's games.
   - **Use ESPN's** copies ESPN's projection.
+- **Cost:** what a player should cost. It starts at ESPN's Avg paid, scaled to your league. If you disagree, type your own price or drag the cell. Your price is highlighted, and it drives Edge, Fit edge, "Only affordable" and the default price when you add him to your team. Clear the cell to go back to ESPN's. **Clear adjustments** keeps your prices.
 - **Value** is the player's per-game rating across an 82-game season. His expected games count at his rating, and the games he misses count at the **replacement rating** (default 95): the free agent you pick up while he's out. The ideas behind the model are in [`docs/PHILOSOPHY.md`](../docs/PHILOSOPHY.md).
 - **Add players:** drag a player's name onto a slot in the **My roster** strip. You can also use **Add to my team** in the side panel, or select a player and click an empty slot.
   - New players are priced at **Avg paid** by default. You can edit the price in the side panel or on the My Team tab.

@@ -61,6 +61,7 @@ def _actions(board: DraftBoard) -> Dict[str, Callable[[Dict[str, Any]], Optional
         "state": lambda b: board.replace_state(b["state"]),
         "refresh": lambda b: board.load(refresh=True),
         "plan": lambda b: board.build_plan(),
+        "avoid": lambda b: board.set_avoid(pid(b), bool(b.get("avoid", True))),
     }
 
 

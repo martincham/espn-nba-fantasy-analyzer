@@ -487,7 +487,8 @@ function renderDetail() {
         ? `<div class="draftrow">${r.status === "mine" ? `<span class="pill mine">Mine · ${esc(slotName || "?")} $${r.price}</span>` : `<span class="pill taken">Taken</span>`}
            <button class="btn" type="button" id="undoPick">${r.status === "mine" ? "Remove from team" : "Undo"}</button></div>`
         : `<div class="draftrow"><label for="priceIn" title="Defaults to the average paid in ESPN auctions">Price</label><input id="priceIn" type="text" inputmode="numeric" autocomplete="off" value="${Math.round(Math.max(1, r.avg))}">
-           <button class="btn primary" type="button" data-pick="mine">Add to my team</button><button class="btn" type="button" data-pick="taken">Mark taken</button></div>`}
+           <button class="btn primary" type="button" data-pick="mine">Add to my team</button><button class="btn" type="button" data-pick="taken">Mark taken</button></div>
+           <p class="hint">${B.state.avoid.includes(r.id) ? `Left out of the Plan tab. <button class="linkbtn" type="button" id="avoidBtn">Allow in plan</button>` : `<button class="linkbtn" type="button" id="avoidBtn">Leave out of plan</button>: the Plan tab won't recommend him.`}</p>`}
     </div>`;
 }
 
@@ -932,6 +933,11 @@ det.addEventListener("click", (e) => {
     return;
   }
   if (!r) return;
+  if (e.target.id === "avoidBtn") {
+    const on = !B.state.avoid.includes(r.id);
+    act("avoid", { id: r.id, avoid: on }).then((ok) => ok && toast(on ? `The plan will leave out ${r.name}.` : `${r.name} can be in the plan again.`));
+    return;
+  }
   if (e.target.id === "undoPick") {
     if (r.status === "mine") removeMine(r.id);
     else act("pick", { id: r.id, status: null });
@@ -969,6 +975,8 @@ function renderPlan() {
   let h = `<div class="plan-head"><div><h3>Recommended team</h3>
       <p class="sub">The players to buy that win the most categories per week at expected prices: Avg paid, or your own cost where you set one. It starts from your roster and budget, skips taken players, and ignores categories you punt.</p></div>
       <button class="btn primary ${building ? "busy" : ""}" type="button" id="planBuild" ${building ? "disabled" : ""}>${building ? "Building…" : P ? "Rebuild" : "Build plan"}</button></div>`;
+  const avoided = B.state.avoid.map((id) => byId.get(id)).filter(Boolean);
+  if (avoided.length) h += `<p class="plan-avoid"><span class="lbl">Left out</span> ${avoided.map((r) => `<span class="av">${esc(r.name)} <button class="x" type="button" data-unavoid="${r.id}" aria-label="Allow ${esc(r.name)} in the plan" title="Allow in the plan">×</button></span>`).join("")}</p>`;
   if (!P) {
     h += `<p class="plan-empty">Build a plan to see the best team you can still make, with the best alternative for every player. Takes about 5–15 seconds.</p>`;
   } else if (building) {
@@ -1005,7 +1013,8 @@ function renderPlan() {
       if (!r) continue;
       h += `<tr><td class="l">${who(id)}${r.inj && r.inj !== "ACTIVE" ? ` <span class="pill inj">${esc(r.inj.replace(/_/g, " "))}</span>` : ""}</td><td class="l">${esc(r.team)} · ${esc(r.pos)}</td>
         <td><b>$${cost(id)}</b></td><td>${money(r.ours)}</td><td>${fmt(r.projPg)}</td><td>${r.expGp}</td><td>${fmt(r.value)}</td>
-        <td class="l">${alts.length ? `<button class="linkbtn" type="button" data-alt="${id}" aria-expanded="${open}">${open ? "Hide" : `${alts.length} alternative${alts.length > 1 ? "s" : ""}`}</button>` : `<span class="muted">none affordable</span>`}</td></tr>`;
+        <td class="l">${alts.length ? `<button class="linkbtn" type="button" data-alt="${id}" aria-expanded="${open}">${open ? "Hide" : `${alts.length} alternative${alts.length > 1 ? "s" : ""}`}</button>` : `<span class="muted">none affordable</span>`}
+          · <button class="linkbtn quiet" type="button" data-avoid="${id}" title="Don't recommend ${esc(r.name)}, and rebuild">Leave out</button></td></tr>`;
       if (open) {
         h += `<tr class="alts"><td colspan="8"><ul>${alts.map((a) => `<li>${who(a.id)} <span class="muted">${esc(byId.get(a.id)?.team || "")} · ${esc(byId.get(a.id)?.pos || "")}</span>
           <span class="num">$${cost(a.id)} <span class="muted">(${a.costChange === 0 ? "same price" : signed(a.costChange) + " $"})</span></span>
@@ -1046,6 +1055,12 @@ async function pollPlan() {
 }
 $("planPanel").addEventListener("click", (e) => {
   if (e.target.closest("#planBuild")) { PLAN.open.clear(); return act("plan"); }
+  const av = e.target.closest("[data-avoid]"), unav = e.target.closest("[data-unavoid]");
+  if (av || unav) {
+    const id = +(av || unav).dataset[av ? "avoid" : "unavoid"], name = byId.get(id)?.name;
+    PLAN.open.clear();
+    return act("avoid", { id, avoid: !!av }).then((ok) => ok && act("plan")).then((ok) => ok && toast(av ? `Left out ${name}. Rebuilding the plan.` : `${name} can be in the plan again. Rebuilding.`));
+  }
   const alt = e.target.closest("[data-alt]");
   if (alt) { const id = +alt.dataset.alt; PLAN.open.has(id) ? PLAN.open.delete(id) : PLAN.open.add(id); return renderPlan(); }
   const g = e.target.closest("[data-goto]");

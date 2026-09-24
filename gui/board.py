@@ -98,7 +98,7 @@ class DraftBoard:
 
     @staticmethod
     def _empty_state() -> Dict[str, Any]:
-        return {"adjustments": {}, "picks": {}, "filled": [], "settings": dict(DEFAULT_ROOM_SETTINGS)}
+        return {"adjustments": {}, "picks": {}, "filled": [], "settings": dict(DEFAULT_ROOM_SETTINGS), "avoid": []}
 
     def load(self, refresh: bool = False) -> None:
         with self.lock:
@@ -219,6 +219,7 @@ class DraftBoard:
                 if gp is not None and not adj.get("gpDelta"):
                     adj["gpDelta"] = self._clamp_gp_delta(int(k), gp - known[int(k)].default_exp_gp)
         state["picks"] = {k: v for k, v in state.get("picks", {}).items() if int(k) in known}
+        state["avoid"] = sorted({int(x) for x in state.get("avoid") or [] if int(x) in known})  # left out of the plan
         filled = [int(x) if x is not None and int(x) in known else None for x in state.get("filled", [])]
         if len(filled) != len(self.slots):
             mine = [x for x in filled if x is not None]
@@ -380,6 +381,17 @@ class DraftBoard:
             self._save()
             return None
 
+    def set_avoid(self, player_id: int, avoid: bool = True) -> Optional[str]:
+        """Leave a player out of the Plan tab's recommendations (or let him back in)."""
+        with self.lock:
+            if player_id not in self.by_id:
+                return "Unknown player."
+            avoided = set(self.state["avoid"])
+            avoided.add(player_id) if avoid else avoided.discard(player_id)
+            self.state["avoid"] = sorted(avoided)
+            self._save()
+            return None
+
     def _default_price(self, player_id: int) -> int:
         """A player's cost when no price is given: the average paid in ESPN auctions."""
         player = self.by_id.get(player_id)
@@ -447,7 +459,7 @@ class DraftBoard:
     def _plan_stamp(self) -> str:
         """Everything a plan depends on; when it changes, the plan is out of date."""
         s = self.state
-        return json.dumps([s["picks"], s["filled"], s["adjustments"], s["settings"], self.fetched_at], sort_keys=True)
+        return json.dumps([s["picks"], s["filled"], s["adjustments"], s["settings"], s["avoid"], self.fetched_at], sort_keys=True)
 
     def _plan_cost(self, p: draft.DraftPlayer, row: Optional[valuation.Valued]) -> int:
         """What a player should cost: my price, else ESPN's scaled average, else our value when ESPN has none."""
@@ -474,6 +486,7 @@ class DraftBoard:
                 "taken": [pid for pid, v in picks.items() if v["status"] == TAKEN],
                 "budget_left": self._me(picks, mine)["budgetLeft"],
                 "punt": list(self.punt),
+                "avoid": list(self.state["avoid"]),
             }
             stamp = self._plan_stamp()
             self.plan = {"status": "building", "stamp": stamp, "started": time.time()}

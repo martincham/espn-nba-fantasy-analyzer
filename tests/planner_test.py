@@ -92,6 +92,30 @@ class BoardPlanTest(unittest.TestCase):
         b.pick(ranked[1].id, "taken", None)
         self.assertTrue(b.snapshot()["plan"]["stale"])
 
+    def test_left_out_players_are_never_recommended(self):
+        b = self.board
+        for p in sorted(self.players, key=lambda p: -p.avg_paid)[12:]:
+            b.adjust(p.id, cost=4)
+        b.build_plan()
+        first = self.wait()["result"]["best"]["ids"]
+        out = first[:2]
+        for pid in out:
+            b.set_avoid(pid)
+        self.assertTrue(b.snapshot()["plan"]["stale"])
+        b.build_plan()
+        r = self.wait()["result"]
+        everywhere = set(r["best"]["ids"]) | {s["id"] for opts in r["swaps"].values() for s in opts}
+        everywhere |= {i for build in r["builds"] for i in build["ids"]}
+        self.assertFalse(everywhere & set(out))
+        # Saved with the draft, and undone one at a time.
+        from gui.board import DraftBoard
+
+        again = DraftBoard(b.settings_path, b.pool_path, b.state_path)
+        again.load()
+        self.assertEqual(again.state["avoid"], sorted(out))
+        b.set_avoid(out[0], False)
+        self.assertEqual(b.state["avoid"], [out[1]])
+
     def test_too_expensive_buys_what_it_can(self):
         b = self.board  # the fixture's cheapest player costs $13: nine won't fit in $200
         b.build_plan()

@@ -109,6 +109,7 @@ To start over, stop the app and delete `draftState.json`.
 - **Plan tab:** click **Build plan** for the team that wins the most categories per week at expected prices (Cost: Avg paid or your own price). It keeps the players already on your roster, skips taken players, fits your budget, and ignores categories you punt. Only your best 9 count, so it buys up to 9 and leaves $1 streaming spots. It takes about 5–15 seconds.
   - Each recommended player has **alternatives**: the best players who could take his spot within your budget, and how many categories per week you'd gain or lose.
   - **Other builds** are different rosters that finished close behind, with what goes in and out and which categories move.
+  - **Leave out** a player you won't buy (say, one whose games you don't trust): click **Leave out** on his Plan row, which rebuilds right away, or **Leave out of plan** in his side panel. The plan never recommends him, but the simulated opponents can still draft him. The **Left out** list at the top of the tab brings players back with ×.
   - The plan doesn't update by itself. When you mark a pick or change a price or setting, it says it's out of date: click **Rebuild**.
 - **Rearrange:** on **My Team**, drag between slots or click one slot and then another.
   - **×** removes a player and **Clear roster** empties every slot.

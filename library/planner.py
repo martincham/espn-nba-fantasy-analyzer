@@ -170,6 +170,7 @@ def plan_team(
     taken: Iterable[int],
     budget_left: int,
     punt: Iterable[str] = (),
+    avoid: Iterable[int] = (),
     pool: int = 140,
     starts: int = 6,
     alternatives: int = 3,
@@ -177,7 +178,11 @@ def plan_team(
     distinct: int = 3,
     seed: int = 7,
 ) -> Optional[Plan]:
-    """The best players to buy for the rest of the draft; None when there's nothing to plan."""
+    """The best players to buy for the rest of the draft; None when there's nothing to plan.
+
+    `avoid` are players I won't buy: never recommended, but still in the
+    simulated league, where other teams draft them.
+    """
     mine = [i for i in mine]
     open_spots = shape.roster_size - len(mine)
     if open_spots <= 0:
@@ -191,7 +196,8 @@ def plan_team(
         empty = _build(env, [], costs)
         return Plan(empty, [], {}, mine, budget_left, streamers, 0, env.evaluated)
 
-    ranked = [r for r in sorted(rows, key=lambda r: -r.value) if r.id not in taken_set]
+    skip = taken_set | set(avoid)
+    ranked = [r for r in sorted(rows, key=lambda r: -r.value) if r.id not in skip]
     # Buy as many counted players as the budget allows; any spot left over streams at $1.
     first: List[int] = []
     while picks > 0:

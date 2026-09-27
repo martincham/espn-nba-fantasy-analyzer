@@ -8,13 +8,15 @@ math runs here, so the frontend only renders.
 from __future__ import annotations
 
 import copy
+import functools
 import json
 import os
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from types import SimpleNamespace
+from typing import Any, Dict, List, Optional, Tuple
 
-from library import draft, planner, roster, valuation
+from library import availability, draft, planner, roster, valuation
 from library.valuation import Adjustment, LeagueShape
 
 DEFAULT_SETTINGS = {
@@ -64,6 +66,17 @@ def season_label(season: int) -> str:
 
 def _r(x: Optional[float], digits: int = 1) -> Optional[float]:
     return None if x is None else round(x, digits)
+
+
+@functools.lru_cache(maxsize=8192)
+def _ranges(espn_gp: int, gp_delta: int, proj_pg: float, replacement: float) -> Tuple[Tuple[int, int, int], float, Tuple[float, float, float], float]:
+    """Games (p10, p50, p90), P(under 41 games), season value (p10, p50, p90) and mean value.
+
+    Cached: a player's inputs change only when you adjust him (see library/availability.py).
+    """
+    games = availability.games_range(espn_gp, shift=gp_delta)
+    value = availability.value_range(proj_pg, games, replacement)
+    return (tuple(availability.quantiles(games)), games.p_half, tuple(availability.quantiles(value)), value.mean)
 
 
 class DraftBoard:
@@ -556,6 +569,11 @@ class DraftBoard:
         starts: Dict[int, float] = {}
         fits = valuation.team_fit(rows, mine, shape, sim, base, fit_cats, useful, starts)
         rate = valuation.pricing(rows, shape)
+        # Ranges: games and season value when both games and the per-game rating are uncertain.
+        # Their dollars are priced against every player's mean outcome, so the ranges share a scale.
+        ranges = {r.id: _ranges(self.by_id[r.id].default_exp_gp, r.gp_delta, round(r.proj_pg, 1), float(shape.replacement))
+                  for r in rows}
+        range_rate = valuation.pricing([SimpleNamespace(value=x[3]) for x in ranges.values()], shape)
         # Fit rank among players I can still get (and my own).
         fit_order = sorted((pid for pid in fits if picks.get(pid, {}).get("status") != TAKEN), key=lambda pid: -fits[pid])
         fit_rank = {pid: i + 1 for i, pid in enumerate(fit_order)}
@@ -568,6 +586,7 @@ class DraftBoard:
             cat_last = valuation.category_ratings(p.base_pg, base.per_game, shape.rated)
             cat_proj = valuation.category_ratings(r.proj_stats, base.per_game, shape.rated)
             cat_all = valuation.category_ratings(r.proj_stats, base.per_game, shape.categories)
+            gp_range, risk, value_range, _mean = ranges[r.id]
             out_rows.append({
                 "id": r.id,
                 "name": p.name,
@@ -584,6 +603,11 @@ class DraftBoard:
                 "expGp": r.exp_gp,
                 "espnGp": p.default_exp_gp,
                 "gpDelta": r.gp_delta,
+                "gpRange": list(gp_range),  # games p10, p50, p90
+                "gpLow": gp_range[0],
+                "risk": round(risk, 3),  # chance of fewer than 41 games
+                "valueRange": [_r(x) for x in value_range],
+                "dollarRange": [_r(range_rate.dollars(x), 0) for x in value_range],
                 "expMin": round(r.exp_min, 1),
                 "minSet": r.min_set,
                 "lastMin": _r(p.last_pg.get("MIN")),

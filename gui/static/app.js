@@ -254,7 +254,7 @@ const GROUPS = () => [
   { label: "", span: 3, toggle: true },
   ...(showCats ? [{ label: "Categories · per game", span: B.meta.categories.length + 1, cls: "g-cats" }] : []),
   { label: B.meta.statsLabel, span: 3 },
-  { label: `${B.meta.seasonLabel} outlook`, span: 7, cls: "g-out" },
+  { label: `${B.meta.seasonLabel} outlook`, span: 9, cls: "g-out" },
   { label: "Auction $", span: 4, cls: "g-ours" },
 ];
 const BASE_COLS = [
@@ -266,6 +266,8 @@ const BASE_COLS = [
   { key: "lastValue", label: "Value", title: "Per-game rating over the season, with missed games filled by a replacement free agent" },
   { key: "gpDelta", label: "GP Δ", title: "Games more or fewer than ESPN projects, e.g. -10. Drag or type; clear to reset." },
   { key: "expGp", label: "Exp GP", title: "Expected games: ESPN's projection + GP Δ" },
+  { key: "gpLow", label: "GP 80%", title: "Games he plays in 8 seasons out of 10 (10th to 90th percentile), from ESPN's projection and how far those have missed since 2018-19, moved by GP Δ. Sorts by the low end." },
+  { key: "risk", label: "Risk", title: "Chance he plays fewer than 41 games (loses half the season), from ESPN's projection moved by GP Δ" },
   { key: "expMin", label: "Exp MIN", title: "Expected minutes per game. Default: ESPN's projection. Production scales with minutes. Drag or type; clear to reset." },
   { key: "delta", label: "Δ", title: "Change in per-game rating points (100 = average player), e.g. +10. Spread across categories by scaling every counting stat and shot attempt." },
   { key: "projPg", label: "Per gm", title: "Projected per-game rating" },
@@ -386,6 +388,7 @@ function catCells(r) {
   return `<td class="catv mix">${mix == null ? "" : Math.round(mix)}</td>` + cells.join("");
 }
 const edgeCls = (e) => (e >= 3 ? "pos" : e <= -3 ? "neg" : "");
+const riskCls = (p) => (p >= 0.25 ? "hi" : p >= 0.15 ? "mid" : "");
 
 function rowHTML(r) {
   const e = r.edge, ecls = edgeCls(e);
@@ -399,6 +402,8 @@ function rowHTML(r) {
     <td>${r.fromProj ? "—" : fmt(r.lastValue)}</td>
     <td><input class="cell ${r.gpDelta ? "edited" : ""}" type="text" inputmode="text" autocomplete="off" value="${signedInput(r.gpDelta)}" placeholder="0" title="ESPN projects ${r.espnGp} games" aria-label="Games more or fewer than ESPN projects for ${esc(r.name)}" data-gp="${r.id}" id="g-${r.id}"></td>
     <td class="${r.gpDelta ? "edited-v" : ""}">${r.expGp}</td>
+    <td class="rng" title="Median ${r.gpRange[1]} games">${r.gpRange[0]}–${r.gpRange[2]}</td>
+    <td class="risk ${riskCls(r.risk)}">${Math.round(r.risk * 100)}%</td>
     <td><input class="cell ${r.minSet ? "edited" : ""}" type="text" inputmode="decimal" autocomplete="off" value="${fmt(r.expMin)}" title="Last season ${r.lastMin ?? "—"} min · ESPN projects ${r.projMin ?? "—"}" aria-label="Expected minutes for ${esc(r.name)}" data-min="${r.id}" id="m-${r.id}"></td>
     <td><input class="cell ${r.delta ? "edited" : ""}" type="text" inputmode="text" autocomplete="off" value="${signedInput(r.delta)}" placeholder="0" aria-label="Δ rating points for ${esc(r.name)}" data-delta="${r.id}" id="d-${r.id}"></td>
     <td>${fmt(r.projPg)}</td>
@@ -468,6 +473,15 @@ function renderDetail() {
         <tr><th scope="row">Games</th><td>${r.fromProj ? "—" : r.gp}</td><td>${r.expGp}${r.gpDelta ? ` <span class="g">ESPN ${r.espnGp} ${signed(r.gpDelta)}</span>` : ""}</td></tr>${B.meta.daily && r.starts != null ? `
         <tr><th scope="row" title="Share of his ${r.teamGames ?? ""} scheduled games that fit in your ${B.meta.starters} daily starting slots, best players first. Fit counts only these games.">Starts</th><td>—</td><td>${Math.round(r.starts * 100)}%</td></tr>` : ""}
         <tr><th scope="row" title="(per game × games + ${B.meta.replacement} × missed games) ÷ ${B.meta.gamesInSeason}">Value</th><td>${r.fromProj ? "—" : fmt(r.lastValue)}</td><td><b>${fmt(r.value)}</b></td></tr>
+      </tbody>
+    </table>
+    <table class="rtab" aria-label="Range of outcomes">
+      <thead><tr><th scope="col" title="8 seasons out of 10 land between the low and high ends">Range</th><th scope="col">Low</th><th scope="col">Median</th><th scope="col">High</th></tr></thead>
+      <tbody>
+        <tr><th scope="row" title="10th, 50th and 90th percentile of games played">Games</th><td>${r.gpRange[0]}</td><td>${r.gpRange[1]}</td><td>${r.gpRange[2]}</td></tr>
+        <tr><th scope="row" title="Season value when both games and the per-game rating can miss: ESPN's per-game rating misses by about 9 points either way, and runs low in seasons with missed games">Value</th><td>${fmt(r.valueRange[0])}</td><td>${fmt(r.valueRange[1])}</td><td>${fmt(r.valueRange[2])}</td></tr>
+        <tr><th scope="row" title="Each value priced on the league's curve against every player's average outcome">Worth</th><td>${money(r.dollarRange[0])}</td><td>${money(r.dollarRange[1])}</td><td>${money(r.dollarRange[2])}</td></tr>
+        <tr><th scope="row" title="Chance he plays fewer than 41 games: loses half the season">Under 41 GP</th><td colspan="3" class="risk ${riskCls(r.risk)}">${Math.round(r.risk * 100)}%</td></tr>
       </tbody>
     </table>
     <div class="bars"><span class="lbl sec-t">Δ ${signed(r.delta)} rating across categories · per game</span>${bars(r.catLast, r.catProj, B.meta.rated)}

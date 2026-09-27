@@ -191,6 +191,9 @@ p{margin:0}
 .board td.rk{color:var(--muted);font-size:12px;width:40px}
 .board td.ours{background:color-mix(in srgb,var(--accent-soft) 50%,transparent)}
 .board td.val{font-weight:500;color:var(--ink)}
+.board td.rng{color:var(--ink-2);white-space:nowrap}
+.risk.mid{color:var(--bad)}
+.risk.hi{color:var(--bad);background:var(--bad-soft);font-weight:500}
 .pcell{display:flex;flex-direction:column;gap:1px;font-family:var(--font-ui)}
 .pcell[draggable="true"]{cursor:grab}
 .pname{display:flex;align-items:center;gap:6px;font-weight:600;font-size:14px}

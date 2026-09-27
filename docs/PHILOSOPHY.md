@@ -149,8 +149,8 @@ The **Fit** column rates each player by how much he'd help *your current team*. 
   - Below 100, a category keeps the value per point it has at 100.
   - The raw win-chance curve would flatten for very weak categories, which amounts to punting them automatically. Punting is your choice.
 - **Only games he'd start count.** Team totals come from daily lineups on the 2026-27 NBA schedule:
-  - Each day, your best 9 players with a game fill the 7 starting slots, best per-game rating first. Games past the 7th are lost on the bench.
-  - The other 3 roster spots stream free agents at the replacement rating into open slots. Adds let you pick streamers who play on the days you need, so they fill open slots anywhere in the week, up to the games 3 average players would play that week.
+  - Each day, all 12 of your players with a game compete for the 7 starting slots, best per-game rating first. Games past the 7th are lost on the bench.
+  - Settings → Players who count can count only your best few instead. The spots left over stream free agents at the replacement rating into open slots. Adds let you pick streamers who play on the days you need, so they fill open slots anywhere in the week, up to the games that many average players would play that week.
   - So a player whose games fall on nights your roster is already full adds less, and one who plays on nights your core is idle adds more. With a typical roster this moves Fit by about ±1.5, and by up to about 5 for teams with very crowded or very light schedules. The player panel shows **Starts**: the share of his games that would make your lineup.
   - Positions are ignored: any player can fill any starting slot.
 

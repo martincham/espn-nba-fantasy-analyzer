@@ -36,7 +36,6 @@ Everything runs on your computer. The app listens on `127.0.0.1` only, so other 
    | `leagueId` | Your ESPN league: team count, budget, categories and roster slots |
    | `espn_s2`, `SWID` | **Private leagues only.** Your ESPN login cookies (see the [project Wiki](https://github.com/martincham/espn-nba-fantasy-analyzer/wiki)) |
    | `ignoredStats` | Categories left out of player values (e.g. `"TO"`). You can change this on the Settings tab |
-   | `ignorePlayers` | How many of your worst players don't count toward team totals (default 3). You can change this on the Settings tab |
    | `draftSeason` | *Optional.* Force a season, e.g. `2027` for 2026-27. By default it uses the season ESPN is currently set up for |
 
    Without a `settings.txt`, the app uses ESPN's default 12-team league. It never creates or edits `settings.txt`.
@@ -123,7 +122,7 @@ To start over, stop the app and delete `draftState.json`.
   - **Fit:** *Win chances* (default) or *Simple fade*, with the fade's start (110) and end (140).
   - **Avg paid scale:** Auto fits ESPN's prices to your league's budget. Drag the slider to set your own multiplier.
   - **Categories in player value:** starts from `ignoredStats` in settings.txt. Team ranks always show every category.
-  - **Players who count:** how many of your best players count toward team totals. The rest are streaming spots. Starts from `ignorePlayers`.
+  - **Players who count:** how many of your best players count toward team totals. The rest are streaming spots. Starts at your whole roster; settings.txt's `ignorePlayers` isn't used here.
   - **Default expected games:** the blend of ESPN's projected games and last season's. Default ⅔ ESPN.
   - **Reset draft:** unmarks every taken player and empties your roster, with Undo.
   - Changes save to `draftState.json`; settings.txt is never edited.

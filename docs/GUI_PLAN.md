@@ -195,8 +195,8 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
 - **Category ranks:**
   - My team's projected season totals (`stats × s × ExpGP`) are compared with 11 simulated opponents.
   - Opponents are dealt Taken players first, then the best remaining players by value, in snake order.
-  - Only each team's best `teamSize − ignorePlayers` (9) players count, ranked by per-game rating like `schedule.py`. Empty slots count as the average of players ranked #133–144 by value.
-  - With the NBA schedule (`draft.fetch_schedule`, cached in `draftPool.json`), totals come from daily lineups (`valuation.Lineup`). Each day, the counted players with a game fill the starting slots (bench and IR excluded) by per-game rating, and the `ignorePlayers` streaming spots fill the open slots at the replacement line, up to the games that many average players would play each 7-day week. Positions are ignored. Without a schedule, each counted player's full season counts.
+  - Every player on each team counts by default. Settings → Players who count can drop the worst few, ranked by per-game rating like `schedule.py`; settings.txt's `ignorePlayers` isn't used. Empty slots count as the average of players ranked #133–144 by value.
+  - With the NBA schedule (`draft.fetch_schedule`, cached in `draftPool.json`), totals come from daily lineups (`valuation.Lineup`). Each day, the counted players with a game fill the starting slots (bench and IR excluded) by per-game rating, and any dropped spots stream free agents to fill the open slots at the replacement line, up to the games that many average players would play each 7-day week. Positions are ignored. Without a schedule, each counted player's full season counts.
 - **The view shows:**
   - For each category: a strip with all 12 teams (mine highlighted), my rank, my total, and the difference from the league average.
   - Overall rank by roto points, and expected H2H categories won per week.

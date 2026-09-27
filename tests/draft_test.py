@@ -196,6 +196,9 @@ class BoardTest(unittest.TestCase):
         self.assertNotEqual(row("Nikola Jokic")["lastPg"], before)
         b.update_settings(rated=[])
         self.assertNotIn("TO", b.snapshot()["meta"]["rated"])
+        # Every player counts by default (settings.txt's ignorePlayers is for the spreadsheet).
+        meta = b.snapshot()["meta"]
+        self.assertEqual(meta["counted"], meta["rosterSize"])
         # Bench players not counted, and the expected-games blend.
         b.update_settings(ignorePlayers=5)
         self.assertEqual(b.snapshot()["meta"]["counted"], 7)

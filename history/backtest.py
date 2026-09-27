@@ -244,9 +244,9 @@ BOARD_CATS = ["PTS", "BLK", "STL", "AST", "REB", "3PM", "TO", "FT%", "FG%"]  # l
 
 
 def board_shape(**overrides):
-    """The Draft Room as saved: all 9 categories rated, 95 replacement, 7-player core."""
+    """The Draft Room as saved: all 9 categories rated, 95 replacement, 7-player core, every player counted."""
     from library.valuation import LeagueShape
-    shape = LeagueShape(teams=12, budget=200, roster_size=12, ignore_players=3, categories=list(BOARD_CATS),
+    shape = LeagueShape(teams=12, budget=200, roster_size=12, ignore_players=0, categories=list(BOARD_CATS),
                         reverse=["TO"], rated=list(BOARD_CATS), core=7, replacement=95.0, starters=7)
     for k, x in overrides.items():
         setattr(shape, k, x)

@@ -27,7 +27,6 @@ DEFAULT_SETTINGS = {
     "ignoredStats": ["FTM", "FTA", "FGA", "FGM", "GP", "MIN", "TO"],
     "rosterPositions": ["PG", "F", "F", "SG/SF", "SG/SF", "C", "UT"],
     "teamSize": 12,
-    "ignorePlayers": 3,
 }
 MINE, TAKEN = "mine", "taken"
 MAX_DELTA = 60  # rating points
@@ -38,6 +37,9 @@ DEFAULT_REPLACEMENT = 95  # per-game rating of a top free agent, who fills a hur
 DEFAULT_FILL_RATE = 60
 MAX_REPLACEMENT = 150
 DEFAULT_CORE = 7  # players per team worth paying for; the rest are $1 streamers
+# Roster spots left out of team totals. The draft counts every player you roster;
+# settings.txt's ignorePlayers is for the in-season spreadsheet, not the Draft Room.
+DEFAULT_IGNORE = 0
 # Draft Room settings saved in draftState.json. None means "use the default"
 # (settings.txt, the league on ESPN, the computed price scale, or the constants above).
 DEFAULT_FADE = (110, 140)  # team category rating where extra strength starts to stop helping, and stops
@@ -113,7 +115,6 @@ class DraftBoard:
         self.plan: Optional[Dict[str, Any]] = None  # the Plan tab's last result (not saved)
         self._team_range: "tuple[str, Optional[Dict[str, Any]]]" = ("", None)  # (inputs, result) of the last team range
         self.default_rated: List[str] = []
-        self.default_ignore = 0
         self.state = self._empty_state()
 
     # ------------------------------------------------------------------ load
@@ -187,13 +188,12 @@ class DraftBoard:
             self.slots = roster.slots_from_positions(s["rosterPositions"], int(s["teamSize"]))
         ignored = set(s.get("ignoredStats") or [])
         self.default_rated = [c for c in league.categories if c not in ignored]
-        self.default_ignore = int(s.get("ignorePlayers") or 0)
         self.schedule = valuation.Schedule(self.team_days) if self.team_days else None
         self.shape = LeagueShape(
             teams=league.teams,
             budget=league.budget,
             roster_size=len(self.slots),
-            ignore_players=self.default_ignore,
+            ignore_players=DEFAULT_IGNORE,
             categories=list(league.categories),
             reverse=list(league.reverse),
             rated=list(self.default_rated),
@@ -212,7 +212,7 @@ class DraftBoard:
         """Apply the Draft Room settings on top of the league's defaults."""
         room = self.state["settings"]
         self.shape.rated = list(room["rated"]) if room["rated"] is not None else list(self.default_rated)
-        self.shape.ignore_players = room["ignorePlayers"] if room["ignorePlayers"] is not None else self.default_ignore
+        self.shape.ignore_players = room["ignorePlayers"] if room["ignorePlayers"] is not None else DEFAULT_IGNORE
         self.market_scale = room["marketScale"] if room["marketScale"] is not None else self.auto_market_scale
         self.shape.replacement = float(room["replacement"] if room["replacement"] is not None else DEFAULT_REPLACEMENT)
         self.shape.fill_rate = (room.get("fillRate") if room.get("fillRate") is not None else DEFAULT_FILL_RATE) / 100
@@ -742,7 +742,7 @@ class DraftBoard:
             "maxReplacement": MAX_REPLACEMENT,
             "defaults": {
                 "rated": self.default_rated,
-                "ignorePlayers": self.default_ignore,
+                "ignorePlayers": DEFAULT_IGNORE,
                 "replacement": DEFAULT_REPLACEMENT,
                 "fillRate": DEFAULT_FILL_RATE,
                 "core": min(DEFAULT_CORE, len(self.slots)),

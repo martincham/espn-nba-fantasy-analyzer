@@ -85,28 +85,20 @@ def linear_percent(player_stats, averages, stat):
     return 1 + 2 * (makes - avg_pct * attempts) / (avg_pct * avg_att)
 
 
+def cfg_shape(cfg, **overrides):
+    """The board's shape for a config: its rated categories and category weights (none = equal)."""
+    return board_shape(rated=list(cfg["rated"]), weights=dict(cfg["weights"] or {}), **overrides)
+
+
 @contextlib.contextmanager
 def rating_patch(cfg):
-    orig_rate, orig_pct = v.rate, v.rate_percent_stat
+    orig_pct = v.rate_percent_stat
     if cfg["linear_pct"]:
         v.rate_percent_stat = linear_percent
-    if cfg["weights"]:
-        weights = cfg["weights"]
-
-        def weighted(player_stats, averages, categories):
-            if player_stats is None:
-                return 0
-            ratings = v.category_ratings(player_stats, averages, categories)
-            if not ratings:
-                return 0
-            den = sum(weights.get(c, 1.0) for c in ratings)
-            return sum(weights.get(c, 1.0) * r for c, r in ratings.items()) / den * 100
-
-        v.rate = weighted
     try:
         yield
     finally:
-        v.rate, v.rate_percent_stat = orig_rate, orig_pct
+        v.rate_percent_stat = orig_pct
 
 
 # --------------------------------------------------------------------------
@@ -130,7 +122,7 @@ def measured_gp_scale(train):
 
 
 def actual_baseline(season, cfg):
-    shape = board_shape(rated=list(cfg["rated"]))
+    shape = cfg_shape(cfg)
     pool = [SimpleNamespace(id=pid, base_pg=pg, base_gp=int(pg["GP"]), espn_rank=None)
             for pid, pg in actual_lines(season).items()]
     with rating_patch(cfg):
@@ -149,7 +141,7 @@ def measured_replacement(train, cfg):
                 if gp <= 0 or lg.drafted_by.get(pid) == team:
                     continue
                 line = v.with_percentages({k: tot[k] / gp for k in NEEDED})
-                total += v.rate(line, baseline.per_game, shape.rated) * gp
+                total += v.rate(line, baseline.per_game, shape.rated, shape.weights) * gp
                 games += gp
     return total / games
 
@@ -220,7 +212,7 @@ def proxies(season, cfg):
 
 def run(season, cfg):
     players = proxies(season, cfg)
-    shape = board_shape(rated=list(cfg["rated"]), replacement=float(cfg["replacement"]))
+    shape = cfg_shape(cfg, replacement=float(cfg["replacement"]))
     with rating_patch(cfg):
         history = [p for p in players if not p.base_is_projection]
         baseline = v.compute_baseline(history, shape)

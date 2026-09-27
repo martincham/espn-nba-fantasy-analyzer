@@ -1196,7 +1196,7 @@ function renderSettings() {
       <div class="set-c">
         <label class="inline" for="setCounted">Best <select id="setCounted">${Array.from({ length: m.rosterSize }, (_, i) => m.rosterSize - i)
           .map((n) => `<option value="${n}" ${n === counted ? "selected" : ""}>${n}</option>`).join("")}</select> of ${m.rosterSize} count</label>
-        <p class="hint">${room.ignorePlayers != null ? `<button class="linkbtn" type="button" id="setCountedReset">Use settings.txt (best ${m.rosterSize - d.ignorePlayers})</button>` : "From settings.txt"}</p>
+        <p class="hint">${room.ignorePlayers != null ? `<button class="linkbtn" type="button" id="setCountedReset">Use the default (${d.ignorePlayers ? `best ${m.rosterSize - d.ignorePlayers}` : `all ${m.rosterSize}`})</button>` : "Default: your whole roster"}</p>
       </div>
     </section>
     <section class="set">

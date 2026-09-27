@@ -13,6 +13,7 @@ import json
 import os
 import threading
 import time
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -103,6 +104,7 @@ class DraftBoard:
         self.fit_model = FIT_MODELS[0]
         self.proj_line, self.cat_weights, self.pricing_model = PROJ_LINES[0], CAT_WEIGHTS[0], PRICING_MODELS[0]
         self.plan: Optional[Dict[str, Any]] = None  # the Plan tab's last result (not saved)
+        self._team_range: "tuple[str, Optional[Dict[str, Any]]]" = ("", None)  # (inputs, result) of the last team range
         self.default_rated: List[str] = []
         self.default_ignore = 0
         self.state = self._empty_state()
@@ -568,6 +570,9 @@ class DraftBoard:
         useful = valuation.fit_by_wins if self.fit_model == "wins" else valuation.fit_by_fade(self.fade)
         starts: Dict[int, float] = {}
         fits = valuation.team_fit(rows, mine, shape, sim, base, fit_cats, useful, starts)
+        # Fit of a player who plays no games (all of them filled at replacement): Fit's ± runs from here.
+        zero_games = replace(rows[0], id=-1, proj_stats={}, exp_gp=0, proj_pg=float(shape.replacement), team=None) if rows else None
+        zero_fit = valuation.team_fit([zero_games], mine, shape, sim, base, fit_cats, useful).get(-1, 100.0) if rows else 100.0
         rate = valuation.pricing(rows, shape)
         # Ranges: games and season value when both games and the per-game rating are uncertain.
         # Their dollars are priced against every player's mean outcome, so the ranges share a scale.
@@ -616,6 +621,7 @@ class DraftBoard:
                 "delta": r.delta,
                 "projPg": _r(r.proj_pg),
                 "value": _r(r.value, 2),
+                "valuePm": _r(availability.plus_minus(r.value, float(shape.replacement), r), 1),  # ± 1 SD of games
                 "rank": r.rank,
                 "espnRank": p.espn_rank,
                 "espn": _r(p.espn_value, 0),
@@ -627,6 +633,7 @@ class DraftBoard:
                 "ours": _r(r.ours, 2),
                 "edge": _r(r.ours - self._market(p), 2),
                 "fit": _r(fits.get(r.id)),
+                "fitPm": _r(availability.plus_minus(fits[r.id], zero_fit, r), 1) if r.id in fits else None,
                 "fitDollars": _r(rate.dollars(fits[r.id]), 2) if r.id in fits else None,
                 "fitRank": fit_rank.get(r.id),
                 "fitEdge": _r(rate.dollars(fits[r.id]) - self._market(p), 2) if r.id in fits else None,
@@ -655,7 +662,7 @@ class DraftBoard:
             "pricing": {"replacement": round(rate.replacement, 2), "perPoint": round(rate.per_point, 3)},
             "plan": self._plan_snapshot(),
             "me": self._me(picks, mine),
-            "team": self._team(sim, rows, picks),
+            "team": {**self._team(sim, rows, picks, mine), **self._team_range_for(rows, mine, taken)},
         }
 
     def _meta(self) -> Dict[str, Any]:
@@ -749,8 +756,33 @@ class DraftBoard:
         change = valuation.rate(p.proj_pg, avg, cats, weights) - valuation.rate(at_espn_minutes, avg, cats, weights)
         return max(-MAX_DELTA, min(MAX_DELTA, round(change)))
 
-    def _team(self, sim: valuation.LeagueSim, rows, picks) -> Dict[str, Any]:
+    def _team_range_for(self, rows, mine: List[int], taken: List[int]) -> Dict[str, Any]:
+        """My roster's season range in weekly category wins (library/availability.team_range).
+
+        Every player is set to the model's mean outcome to build the average
+        team, then my roster's season is drawn 300 times. Recomputed only when
+        the draft state or settings change.
+        """
+        key = json.dumps([self.state, sorted(mine), sorted(taken)], sort_keys=True, default=str)
+        if key == self._team_range[0]:
+            return self._team_range[1] or {}
+        result: Dict[str, Any] = {}
+        if mine:
+            shape, averages = self.shape, self.baseline.per_game
+            mean_rows = [availability.mean_row(r, averages, shape) for r in rows]
+            mean_sim = valuation.simulate_league(mean_rows, mine, taken, shape, self.schedule)
+            by_id = {r.id: r for r in rows}
+            tr = availability.team_range([by_id[i] for i in mine if i in by_id], mean_sim, averages, shape)
+            result = {"winsRange": [round(tr.quantile(q), 2) for q in (0.1, 0.5, 0.9)], "halfSeason": round(tr.half_season, 1)}
+        self._team_range = (key, result)
+        return result
+
+    def _team(self, sim: valuation.LeagueSim, rows, picks, mine: List[int]) -> Dict[str, Any]:
         cats = self.shape.categories
+        by_id = {r.id: r for r in rows}
+        # ± from my players' games alone (1 SD), around these ratings and the expected record.
+        spread = availability.team_spread([by_id[i] for i in mine if i in by_id], sim, self.shape) if mine else None
+        pm = spread.categories if spread else {}
         n = len(sim.teams)
         averages = {c: sum(t[c] for t in sim.teams) / n for c in cats}
         # Chance of beating the average team in each category in a given week.
@@ -785,6 +817,7 @@ class DraftBoard:
                     "reverse": c in self.shape.reverse,
                     "punt": c in self.punt,
                     "win": round(chances[c], 3),
+                    "pm": round(pm.get(c, 0.0), 1),
                     "inFit": c in self.fit_categories(),
                 }
                 for c in cats
@@ -793,6 +826,8 @@ class DraftBoard:
             "rotoMax": len(cats) * n,
             "overall": sim.overall,
             "expectedWins": round(sum(chances.values()), 2),
+            "winsPm": round(spread.wins, 2) if spread else 0.0,
+            "winningPm": round(spread.winning, 1) if spread else 0.0,  # ± categories won
             "matchupWin": round(valuation.matchup_win(list(chances.values())), 3),
             "filled": sim.filled,
             "strong": strong,

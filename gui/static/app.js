@@ -28,6 +28,7 @@ function parseNum(s) {
 }
 const signedInput = (n) => (n > 0 ? "+" + n : n ? String(n) : "");
 const lastName = (n) => { const w = n.split(" "); return /^(Jr\.|Sr\.|II|III|IV)$/.test(w[w.length - 1]) ? w[w.length - 2] : w[w.length - 1]; };
+const initialLast = (n) => (n.includes(" ") ? `${n[0]}. ${lastName(n)}` : n);
 
 // ------------------------------------------------------------------ api
 
@@ -178,7 +179,7 @@ function renderCatRow() {
         <span class="ctop"><span class="lbl">${esc(c.cat)}</span>
           <label class="punt" for="punt-${i}" title="Punt ${esc(c.cat)}: stop valuing it in Fit"><input type="checkbox" id="punt-${i}" data-punt="${esc(c.cat)}">Punt</label></span>
         <span class="col"><i></i></span>
-        <span class="nums"><span class="rv"></span><span class="meta"><span class="rt"></span><span class="rk"></span></span></span>
+        <span class="nums"><span class="rvl"><span class="rv"></span><span class="pm"></span></span><span class="meta"><span class="rt"></span><span class="rk"></span></span></span>
         <span class="dchip"></span></div>`).join("");
   }
   // Winning a category = better than the average team in it (within half a point is even).
@@ -187,18 +188,18 @@ function renderCatRow() {
   const losses = t.categories.filter((c) => outcome(c.rating) === "l").length;
   const even = t.categories.length - wins - losses;
   $("crLbl").textContent = `My team · ${ord(t.overall)} of ${n}`;
-  $("crOverall").textContent = `Winning ${wins} of ${t.categories.length}`;
-  $("crOverall").title = `Better than the average team in ${wins} categories, worse in ${losses}${even ? `, even in ${even}` : ""}`;
+  $("crOverall").innerHTML = `Winning ${wins} of ${t.categories.length}${t.winningPm ? ` <span class="pm">±${t.winningPm.toFixed(1)}</span>` : ""}`;
+  $("crOverall").title = `Better than the average team in ${wins} categories, worse in ${losses}${even ? `, even in ${even}` : ""}${t.winningPm ? `. ± ${t.winningPm.toFixed(1)} categories: one standard deviation from your players' games played` : ""}`;
   t.categories.forEach((c, i) => { $(`wl-${i}`).className = outcome(c.rating); $(`wl-${i}`).title = `${c.cat}: ${signed(c.rating - 100)}`; });
   // In "each category" leagues every category is a win or loss in the standings, so the
   // expected weekly record is what counts. Only "most categories" leagues score the matchup.
   const mostCats = B.meta.scoringType === "H2H_MOST_CATEGORIES";
   $("crOdds").innerHTML = t.expectedWins == null ? "" : mostCats && t.matchupWin != null
     ? `<b>${t.expectedWins.toFixed(1)}</b> cats a week · wins the week <b>${Math.round(t.matchupWin * 100)}%</b>`
-    : `Expected record <b>${t.expectedWins.toFixed(1)}–${(t.categories.length - t.expectedWins).toFixed(1)}</b> a week`;
+    : `Expected record <b>${t.expectedWins.toFixed(1)}–${(t.categories.length - t.expectedWins).toFixed(1)}</b> a week${t.winsPm ? ` <span class="rng">(${(t.expectedWins - t.winsPm).toFixed(1)}–${(t.expectedWins + t.winsPm).toFixed(1)} wins)</span>` : ""}`;
   $("crOdds").title = mostCats
     ? "Expected categories won per week, and the chance of winning more than half, against the average team"
-    : "Expected category wins and losses per week against the average team. Each category counts in the standings.";
+    : `Expected category wins and losses per week against the average team. Each category counts in the standings.${t.winsPm ? ` The range is ± ${t.winsPm.toFixed(2)} wins, one standard deviation from your players' games played.` : ""}`;
   $("crSub").textContent = `vs the average team${t.filled < B.meta.rosterSize ? ` · ${B.meta.rosterSize - t.filled} empty slots at replacement` : ""}`;
   const next = {};
   t.categories.forEach((c, i) => {
@@ -216,11 +217,12 @@ function renderCatRow() {
     bar.style.height = `${Math.min(Math.abs(r - 100), 40) / 40 * 50}%`;
     // The margin over the average team is the headline; the rating and rank sit under it.
     cell.querySelector(".rv").textContent = signed(r - 100);
+    cell.querySelector(".pm").textContent = c.pm ? `±${Math.round(c.pm)}` : "";
     cell.querySelector(".rt").textContent = c.win == null ? Math.round(r) : `${Math.round(c.win * 100)}%`;
     const rk = cell.querySelector(".rk");
     rk.textContent = ord(c.rank);
     rk.className = "rk " + (c.rank <= 3 ? "top" : c.rank >= n - 2 ? "low" : "mid");
-    cell.title = `${c.cat}: ${outcome(r) === "w" ? "winning" : outcome(r) === "l" ? "losing" : "even"} by ${Math.abs(Math.round(r - 100))} vs the average team (rating ${Math.round(r)})${c.win == null ? "" : `, wins ${Math.round(c.win * 100)}% of weeks`}, ${ord(c.rank)} of ${n}${c.reverse ? " (lower totals are better)" : ""}${c.punt ? ". Punted: Fit ignores it" : ""}`;
+    cell.title = `${c.cat}: ${outcome(r) === "w" ? "winning" : outcome(r) === "l" ? "losing" : "even"} by ${Math.abs(Math.round(r - 100))} vs the average team (rating ${Math.round(r)}${c.pm ? ` ±${fmt(c.pm)} from your players' games played` : ""})${c.win == null ? "" : `, wins ${Math.round(c.win * 100)}% of weeks`}, ${ord(c.rank)} of ${n}${c.reverse ? " (lower totals are better)" : ""}${c.punt ? ". Punted: Fit ignores it" : ""}`;
     const prev = prevRatings && prevRatings[c.cat];
     const d = prev == null ? 0 : Math.round(r) - Math.round(prev);
     if (d) {
@@ -271,8 +273,8 @@ const BASE_COLS = [
   { key: "expMin", label: "Exp MIN", title: "Expected minutes per game. Default: ESPN's projection. Production scales with minutes. Drag or type; clear to reset." },
   { key: "delta", label: "Δ", title: "Change in per-game rating points (100 = average player), e.g. +10. Spread across categories by scaling every counting stat and shot attempt." },
   { key: "projPg", label: "Per gm", title: "Projected per-game rating" },
-  { key: "value", label: "Value", title: "Projected per-game rating over 82 games: Exp GP at his rating, the games he misses at the replacement rating (Settings)" },
-  { key: "fit", label: "Fit", title: "Value to your current team: how much he raises your weekly category win chances. Categories you're already winning count less, punted ones not at all. Only games he'd start count, so games on nights your roster is already full add less. 100 = an average player." },
+  { key: "value", label: "Value", title: "Projected per-game rating over 82 games: Exp GP at his rating, the games he misses at the replacement rating (Settings). ± is one standard deviation from games played alone." },
+  { key: "fit", label: "Fit", title: "Value to your current team: how much he raises your weekly category win chances. Categories you're already winning count less, punted ones not at all. Only games he'd start count, so games on nights your roster is already full add less. 100 = an average player. ± is one standard deviation from games played alone." },
   { key: "avg", label: "Cost", title: "What he should cost: the average price in ESPN auction drafts, scaled to this league's budget, unless you set your own. Drag or type; clear to go back to ESPN's." },
   { key: "ours", label: "Ours", cls: "ours-h", title: "Our value before the draft" },
   { key: "edge", label: "Edge", cls: "ours-h", title: "Ours − Avg paid" },
@@ -389,6 +391,8 @@ function catCells(r) {
 }
 const edgeCls = (e) => (e >= 3 ? "pos" : e <= -3 ? "neg" : "");
 const riskCls = (p) => (p >= 0.25 ? "hi" : p >= 0.15 ? "mid" : "");
+// ± one standard deviation from games played alone (library/availability.py).
+const pm = (x) => (x == null ? "" : `<small class="pm">±${x < 10 ? x.toFixed(1) : Math.round(x)}</small>`);
 
 function rowHTML(r) {
   const e = r.edge, ecls = edgeCls(e);
@@ -407,8 +411,8 @@ function rowHTML(r) {
     <td><input class="cell ${r.minSet ? "edited" : ""}" type="text" inputmode="decimal" autocomplete="off" value="${fmt(r.expMin)}" title="Last season ${r.lastMin ?? "—"} min · ESPN projects ${r.projMin ?? "—"}" aria-label="Expected minutes for ${esc(r.name)}" data-min="${r.id}" id="m-${r.id}"></td>
     <td><input class="cell ${r.delta ? "edited" : ""}" type="text" inputmode="text" autocomplete="off" value="${signedInput(r.delta)}" placeholder="0" aria-label="Δ rating points for ${esc(r.name)}" data-delta="${r.id}" id="d-${r.id}"></td>
     <td>${fmt(r.projPg)}</td>
-    <td class="val">${fmt(r.value)}</td>
-    <td class="fit">${r.status === "taken" ? "—" : fmt(r.fit)}</td>
+    <td class="val">${fmt(r.value)}${pm(r.valuePm)}</td>
+    <td class="fit">${r.status === "taken" ? "—" : `${fmt(r.fit)}${pm(r.fitPm)}`}</td>
     <td><input class="cell ${r.costSet ? "edited" : ""}" type="text" inputmode="numeric" autocomplete="off" value="${Math.round(r.avg)}" title="ESPN: ${money(r.avgEspn)} (average ${money(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)})" aria-label="Cost of ${esc(r.name)}" data-cost="${r.id}" id="c-${r.id}"></td>
     <td class="ours">${money(r.ours)}</td>
     <td class="ours"><span class="edge ${ecls}">${signed(e)}</span></td>
@@ -515,7 +519,7 @@ function renderStrip() {
     const r = byId.get(filled[i]);
     const paid = r && r.price != null ? `<span class="cost" title="You paid $${r.price}; removing him frees $${r.price}">$${r.price}</span>` : "";
     return `<div class="sl ${r ? "filled" : ""} ${UI.pickSlot === i ? "pick" : ""}" data-slot="${i}" ${r ? `draggable="true" data-drag="${r.id}"` : ""} tabindex="0" role="button" aria-label="${s} slot${r ? `: ${esc(r.name)}${r.price != null ? `, paid $${r.price}` : ""}` : ", empty"}">
-      <span class="pos">${s === "BE" ? "Bench" : s}${paid}</span><span class="who ${r ? "" : "empty"}">${r ? esc(lastName(r.name)) : "Drop here"}</span>
+      <span class="pos">${s === "BE" ? "Bench" : s}${paid}</span><span class="who ${r ? "" : "empty"}"${r ? ` title="${esc(r.name)}"` : ""}>${r ? esc(initialLast(r.name)) : "Drop here"}</span>
       ${r ? `<button class="x" type="button" data-remove="${r.id}" aria-label="Remove ${esc(r.name)} from team" title="Remove from team">×</button>` : ""}</div>`;
   }).join("") + `<button class="btn danger clearbtn" type="button" data-clear ${filled.some((x) => x != null) ? "" : "disabled"}>Clear roster</button>`;
 }
@@ -566,7 +570,8 @@ function renderTeam() {
     <div class="overall">
       <div><span class="lbl">Overall</span><span class="v">${ord(t.overall)}</span><span class="s">of ${n} by roto points</span></div>
       <div><span class="lbl">Roto points</span><span class="v">${t.roto}</span><span class="s">of ${t.rotoMax} possible</span></div>
-      <div><span class="lbl">H2H cats won</span><span class="v">${t.expectedWins.toFixed(1)}–${(t.categories.length - t.expectedWins).toFixed(1)}</span><span class="s">expected record per week vs the average team${B.meta.scoringType === "H2H_MOST_CATEGORIES" && t.matchupWin != null ? ` · wins the week ${Math.round(t.matchupWin * 100)}%` : ""}</span></div>
+      <div><span class="lbl">H2H cats won</span><span class="v">${t.expectedWins.toFixed(1)}–${(t.categories.length - t.expectedWins).toFixed(1)}</span><span class="s">expected record per week vs the average team${t.winsPm ? ` · ${(t.expectedWins - t.winsPm).toFixed(1)}–${(t.expectedWins + t.winsPm).toFixed(1)} wins (±${t.winsPm.toFixed(2)} from games played)` : ""}${B.meta.scoringType === "H2H_MOST_CATEGORIES" && t.matchupWin != null ? ` · wins the week ${Math.round(t.matchupWin * 100)}%` : ""}</span></div>
+      ${t.winsRange ? `<div title="Your players' seasons drawn 300 times: each one's games from his range and his per-game rating's miss given those games, scored against the average team with every player at his average outcome"><span class="lbl">Season range</span><span class="v">${t.winsRange[0].toFixed(1)}–${t.winsRange[2].toFixed(1)}</span><span class="s">cats a week in 8 seasons of 10, counting per-game misses too (median ${t.winsRange[1].toFixed(1)}) · ${fmt(t.halfSeason)} of your players expected to miss half the season</span></div>` : ""}
     </div>
     <div class="catwrap"><table class="cattab" aria-label="Category ranks">
       <thead><tr><th class="l" scope="col">Cat</th><th class="l" scope="col">worse ← league → better</th><th scope="col">Rank</th><th scope="col">Yours</th><th scope="col">vs avg</th></tr></thead>

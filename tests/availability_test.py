@@ -74,5 +74,75 @@ class ValueRangeTest(unittest.TestCase):
         self.assertGreater(av.value_range(90, few, 95, still).mean, av.value_range(90, many, 95, still).mean)
 
 
+class LeagueCase(unittest.TestCase):
+    """A small league shared by the team-level tests."""
+
+    def setUp(self):
+        from tests.valuation_test import CATS, Player, line
+        self.shape = v.LeagueShape(teams=2, budget=100, roster_size=3, ignore_players=1,
+                                   categories=CATS + ["TO"], rated=CATS, replacement=95)
+        self.players = [Player(i, line(pts=30 - 2 * i, reb=10 - 0.5 * i), 70, exp_gp=exp)
+                        for i, exp in zip(range(1, 11), (78, 50, 72, 72, 72, 72, 72, 72, 72, 72))]
+        self.base = v.compute_baseline(self.players, self.shape)
+        self.rows = v.value_players(self.players, self.base, self.shape, {})
+
+    def team(self, mine):
+        mean_rows = [av.mean_row(r, self.base.per_game, self.shape) for r in self.rows]
+        sim = v.simulate_league(mean_rows, mine, [], self.shape)
+        by_id = {r.id: r for r in self.rows}
+        return av.team_range([by_id[i] for i in mine], sim, self.base.per_game, self.shape, draws=200)
+
+
+class TeamRangeTest(LeagueCase):
+    def test_quantiles_are_ordered_and_stable(self):
+        a, b = self.team([1, 3]), self.team([1, 3])
+        self.assertEqual(a.wins, b.wins)  # fixed seed
+        self.assertLessEqual(a.quantile(0.1), a.quantile(0.5))
+        self.assertLessEqual(a.quantile(0.5), a.quantile(0.9))
+        self.assertLess(a.quantile(0.1), a.quantile(0.9))
+
+    def test_better_roster_ranks_higher(self):
+        self.assertGreater(self.team([1, 3]).quantile(0.5), self.team([9, 10]).quantile(0.5))
+
+    def test_half_season_count_adds_up(self):
+        t = self.team([1, 2])
+        by_id = {r.id: r for r in self.rows}
+        expected = sum(av.games_range(av.center(by_id[i])[0], shift=av.center(by_id[i])[1]).p_half for i in (1, 2))
+        self.assertAlmostEqual(t.half_season, expected, places=9)
+
+    def test_mean_row_lowers_games_and_keeps_identity(self):
+        r = self.rows[0]
+        m = av.mean_row(r, self.base.per_game, self.shape)
+        self.assertEqual(m.id, r.id)
+        self.assertLess(m.exp_gp, r.exp_gp)
+
+
+class PlusMinusTest(LeagueCase):
+    def test_games_sd_is_wider_for_low_projections(self):
+        self.assertGreater(av.games_sd(55), av.games_sd(76))
+        self.assertGreater(av.games_sd(76), 0)
+
+    def test_value_at_replacement_has_no_spread(self):
+        r = self.rows[0]
+        self.assertEqual(av.plus_minus(95.0, 95.0, r), 0.0)
+        self.assertAlmostEqual(av.plus_minus(r.value, 95.0, r), abs(r.value - 95) * av.row_games_sd(r) / r.exp_gp)
+
+    def test_team_spread(self):
+        sim = v.simulate_league(self.rows, [1, 3], [], self.shape)
+        by_id = {r.id: r for r in self.rows}
+        spread = av.team_spread([by_id[1], by_id[3]], sim, self.shape)
+        self.assertEqual(set(spread.categories), set(self.shape.categories))
+        self.assertTrue(all(x >= 0 for x in spread.categories.values()))
+        self.assertGreater(spread.categories["PTS"], 0)
+        self.assertGreater(spread.wins, 0)
+        self.assertGreaterEqual(spread.winning, 0)
+        self.assertLessEqual(spread.winning, len(self.shape.categories) / 2)
+
+    def test_empty_roster_has_no_spread(self):
+        spread = av.team_spread([], v.simulate_league(self.rows, [], [], self.shape), self.shape)
+        self.assertTrue(all(x == 0 for x in spread.categories.values()))
+        self.assertEqual((spread.wins, spread.winning), (0.0, 0.0))
+
+
 if __name__ == "__main__":
     unittest.main()

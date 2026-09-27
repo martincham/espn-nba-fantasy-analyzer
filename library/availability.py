@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 FULL = 82
 HALF = 41  # "loses half the season": fewer games than this
@@ -170,3 +170,184 @@ def expected_value(rating: float, projected: float, replacement: float, out: int
     """Mean season value: what the player is worth on average once both uncertainties are counted."""
     params = params or PARAMS
     return value_range(rating, games_range(projected, out, shift, params), replacement, params).mean
+
+
+# --------------------------------------------------------------------------
+# Team level
+# --------------------------------------------------------------------------
+# A roster's season is its players' seasons drawn together: each player's
+# games from his GamesRange and his per-game rating error given those games,
+# independently of the others. Each draw goes through the board's lineup
+# (daily starts, streamers) and is scored like the board scores a team:
+# expected category wins a week against the average team. The average team
+# is built with every player at the model's mean outcome, so the model's
+# lower games and ratings apply to every team, not just mine.
+
+import bisect  # noqa: E402
+import random  # noqa: E402
+from dataclasses import replace  # noqa: E402
+
+from library import valuation as v  # noqa: E402
+
+
+def center(row: "v.Valued") -> "tuple[int, int]":
+    """(ESPN's projected games, your GP delta) behind a board row."""
+    return row.exp_gp - row.gp_delta, row.gp_delta
+
+
+def rating_slope(row: "v.Valued", averages: "v.Stats", shape: "v.LeagueShape") -> float:
+    """Rating points per 1.0 of volume scale: turns a rating error into a stat line."""
+    base = v.rate(row.proj_stats, averages, shape.rated, shape.weights or None)
+    up = v.rate(v.scale(row.proj_stats, 1.1), averages, shape.rated, shape.weights or None)
+    return max((up - base) / 0.1, 1.0)
+
+
+def mean_row(row: "v.Valued", averages: "v.Stats", shape: "v.LeagueShape", params: Params = PARAMS) -> "v.Valued":
+    """The row at the model's mean outcome: mean games, and the rating error expected at them."""
+    espn, delta = center(row)
+    games = games_range(espn, shift=delta, params=params)
+    mean_games = games.mean
+    error = params.rating_bias + params.rating_slope * (mean_games - games.projected)
+    factor = max(0.0, 1 + error / rating_slope(row, averages, shape))
+    return replace(row, exp_gp=mean_games, proj_stats=v.scale(row.proj_stats, factor), proj_pg=row.proj_pg + error)
+
+
+@dataclass
+class TeamRange:
+    wins: List[float]  # expected category wins a week in each draw, sorted
+    half_season: float  # expected number of my players who play fewer than 41 games
+
+    def quantile(self, q: float) -> float:
+        if not self.wins:
+            return 0.0
+        return self.wins[min(len(self.wins) - 1, int(q * len(self.wins)))]
+
+    @property
+    def mean(self) -> float:
+        return sum(self.wins) / len(self.wins) if self.wins else 0.0
+
+
+def team_range(my_rows: Sequence["v.Valued"], sim: "v.LeagueSim", averages: "v.Stats", shape: "v.LeagueShape",
+               draws: int = 300, seed: int = 7, params: Params = PARAMS) -> TeamRange:
+    """Weekly category wins across draws of my roster's season.
+
+    `sim` is simulate_league run on mean_row() rows: it supplies the average
+    team to beat, the lineup, the fill for missed games and my open slots
+    (sim.mine after my players).
+    """
+    rng = random.Random(seed)
+    players = []
+    for r in my_rows:
+        espn, delta = center(r)
+        games = games_range(espn, shift=delta, params=params)
+        cdf, total = [], 0.0
+        for p in games.pmf:
+            total += p
+            cdf.append(total)
+        players.append((r, games, cdf, rating_slope(r, averages, shape)))
+    open_slots = list(sim.mine[len(my_rows):])
+    cats = shape.categories
+    wins = []
+    for _ in range(draws):
+        members = []
+        for r, games, cdf, slope in players:
+            g = min(FULL, bisect.bisect_left(cdf, rng.random() * cdf[-1]))
+            error = rng.gauss(params.rating_bias + params.rating_slope * (g - games.projected),
+                              math.sqrt(params.rating_var[0] + params.rating_var[1] / max(g, 1)))
+            line = v.scale(r.proj_stats, max(0.0, 1 + error / slope))
+            members.append(v.Member(v.with_fill(v.scale(line, g), g, sim.fill), r.proj_pg, r.team))
+        totals = sim.lineup.totals(members + open_slots)
+        ratings = v.team_ratings(totals, sim.average_team, cats, shape.reverse)
+        wins.append(sum(v.win_chance(ratings.get(c, 100.0), c) for c in cats))
+    wins.sort()
+    half = sum(games.p_half for _, games, _, _ in players)
+    return TeamRange(wins=wins, half_season=half)
+
+
+# --------------------------------------------------------------------------
+# ± from games played alone
+# --------------------------------------------------------------------------
+# One standard deviation of games (GamesRange around ESPN + GP delta) carried
+# through to the board's numbers, around the board's own estimates. Value and
+# a player's share of a team total are straight lines in games (his games at
+# his line, the rest filled at replacement), so their ± follows directly.
+# Players' games are independent, so team spreads add in quadrature.
+
+import functools  # noqa: E402
+
+
+@functools.lru_cache(maxsize=4096)
+def games_sd(projected: int, shift: int = 0) -> float:
+    """Standard deviation of games played for ESPN's projection moved by `shift`."""
+    g = games_range(projected, shift=shift)
+    mean = g.mean
+    return math.sqrt(sum(p * (k - mean) ** 2 for k, p in enumerate(g.pmf)))
+
+
+def row_games_sd(row: "v.Valued") -> float:
+    espn, delta = center(row)
+    return games_sd(int(round(espn)), int(delta))
+
+
+def plus_minus(value: float, zero_games: float, row: "v.Valued") -> float:
+    """± of a number that runs in a straight line from `zero_games` (0 games) to `value` (his expected games)."""
+    if row.exp_gp <= 0:
+        return 0.0
+    return abs(value - zero_games) * row_games_sd(row) / row.exp_gp
+
+
+WINNING = 100.5  # a category rating the board counts as winning (within half a point is even)
+
+
+@dataclass
+class TeamSpread:
+    categories: Dict[str, float]  # ± of each category rating
+    wins: float  # ± of expected weekly category wins
+    winning: float  # ± of how many categories I'm winning (better than the average team)
+
+
+def team_spread(my_rows: Sequence["v.Valued"], sim: "v.LeagueSim", shape: "v.LeagueShape",
+                draws: int = 2000, seed: int = 11) -> TeamSpread:
+    """± of my team's category ratings, expected weekly category wins and categories won, from games alone.
+
+    For each of my players, move his games up one standard deviation and see
+    how every category rating changes (through the daily lineup, missed games
+    filled at replacement). Rating and expected-wins spreads add in quadrature
+    over players. Categories won is a count, so it's drawn: each player's
+    games move all his categories together by a standard normal times his
+    changes, and the count is taken per draw.
+    """
+    cats = shape.categories
+    base_members = list(sim.mine)
+    base = v.team_ratings(sim.lineup.totals(base_members), sim.average_team, cats, shape.reverse)
+    base_wins = {c: v.win_chance(base.get(c, 100.0), c) for c in cats}
+    var = {c: 0.0 for c in cats}
+    wins_var = 0.0
+    deltas = []  # per player: each category's rating change for +1 SD of games
+    for k, r in enumerate(my_rows):
+        sd = row_games_sd(r)
+        # Move one SD up, or down when he's already near 82; the change is scaled back to one SD.
+        games = r.exp_gp + sd if r.exp_gp + sd <= FULL else max(0.0, r.exp_gp - sd)
+        step = abs(games - r.exp_gp)
+        if step <= 0:
+            continue
+        members = list(base_members)
+        members[k] = base_members[k]._replace(stats=v.member_totals(replace(r, exp_gp=games), sim.fill))
+        ratings = v.team_ratings(sim.lineup.totals(members), sim.average_team, cats, shape.reverse)
+        scale_ = sd / step
+        d = {c: (ratings.get(c, 100.0) - base.get(c, 100.0)) * scale_ for c in cats}
+        deltas.append(d)
+        for c in cats:
+            var[c] += d[c] ** 2
+        wins_var += sum(v.win_chance(base.get(c, 100.0) + d[c], c) - base_wins[c] for c in cats) ** 2
+    winning = 0.0
+    if deltas:
+        rng = random.Random(seed)
+        counts = []
+        for _ in range(draws):
+            z = [rng.gauss(0, 1) for _ in deltas]
+            counts.append(sum(1 for c in cats
+                              if base.get(c, 100.0) + sum(zi * d[c] for zi, d in zip(z, deltas)) >= WINNING))
+        mean = sum(counts) / len(counts)
+        winning = math.sqrt(sum((x - mean) ** 2 for x in counts) / len(counts))
+    return TeamSpread({c: math.sqrt(x) for c, x in var.items()}, math.sqrt(wins_var), winning)

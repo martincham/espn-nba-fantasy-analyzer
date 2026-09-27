@@ -691,6 +691,7 @@ class LeagueSim:
     overall: int
     expected_wins: float
     filled: int
+    mine: List[Member] = field(default_factory=list)  # my roster as simulated: my players in order, then open slots
 
 
 def simulate_league(
@@ -767,6 +768,7 @@ def simulate_league(
         overall=overall,
         expected_wins=expected,
         filled=len(my_rows),
+        mine=me,
     )
 
 

@@ -6,6 +6,7 @@ Run with python3.12 (needs numpy):
     python3.12 history/games_model.py evaluate    leave-one-season-out: baselines vs the model
     python3.12 history/games_model.py fit         fit on every season; prints library/availability.py's Params
     python3.12 history/games_model.py value       leave-one-season-out: does the season-value range cover the actual value?
+    python3.12 history/games_model.py team        do fragile drafted rosters do worse than their value says?
 
 Data: history/games/<season>.json, history/bios.json and history/standings.json,
 all from history/fetch_games.py. Seasons are ESPN seasonIds (2026 = 2025-26).
@@ -642,6 +643,77 @@ def cmd_value():
 
 COMMANDS["fit"] = cmd_fit
 COMMANDS["value"] = cmd_value
+
+# ---------------------------------------------------------------- team level
+
+LEAGUE_SEASONS = (2021, 2022, 2024, 2025, 2026)  # league drafts with a usable preseason projection
+
+
+def team_draws(players, params, draws=2000, seed=3):
+    """Draws of a roster's summed season value: each player's games and rating error, independently."""
+    rng = np.random.default_rng(seed)
+    total = np.zeros(draws)
+    for proj82, rating in players:
+        games = av.games_range(proj82, params=params)
+        g = rng.choice(FULL + 1, size=draws, p=np.array(games.pmf) / sum(games.pmf))
+        sd = np.sqrt(params.rating_var[0] + params.rating_var[1] / np.maximum(g, 1))
+        error = params.rating_bias + params.rating_slope * (g - games.projected) + rng.normal(0, 1, draws) * sd
+        total += REPLACEMENT + (rating + error - REPLACEMENT) * g / FULL
+    return total
+
+
+def cmd_team():
+    """Does a fragile drafted roster do worse than its expected value says? (all-play category wins)"""
+    import analyze
+    all_rows = build_table()
+    by_key = {(r["id"], r["season"]): r for r in add_ratings([r for r in all_rows if r["season"] in LEAGUE_SEASONS], all_rows)}
+    scored = sample(all_rows)
+    out = []
+    for season in LEAGUE_SEASONS:
+        params = params_for(add_ratings([r for r in scored if r["season"] != season], all_rows))  # held out
+        d = analyze.season_data(season)
+        analyze.score_stints(d)
+        analyze.all_play(d)
+        teams = []
+        for t in d.teams.values():
+            players = []
+            for pick in t.picks:
+                r = by_key.get((pick["playerId"], season))
+                if r and r["projRating"] is not None:
+                    players.append((r["proj82"], r["projRating"]))
+            point = sum(v.season_value(rt, g, REPLACEMENT) for g, rt in players)
+            draws = team_draws(players, params)
+            teams.append({"season": season, "allplay": t.allplay, "point": point, "mean": draws.mean(),
+                          "gap": draws.mean() - np.percentile(draws, 10),
+                          "half": sum(av.games_range(g, params=params).p_half for g, _ in players), "n": len(players)})
+        for key in ("allplay", "point", "mean", "gap", "half"):  # compare within a season
+            m = np.mean([x[key] for x in teams])
+            for x in teams:
+                x[key + "C"] = x[key] - m
+        out += teams
+    y = np.array([x["allplayC"] for x in out])
+    print(f"{len(out)} team-seasons ({', '.join(map(str, LEAGUE_SEASONS))}); drafted players matched: "
+          f"{np.mean([x['n'] for x in out]):.1f} per team")
+    for key, label in (("point", "board value (ESPN games)"), ("mean", "model mean value"), ("gap", "downside (mean - p10)"),
+                       ("half", "expected half-season losses")):
+        print(f"  r(all-play wins, {label:28s}) = {np.corrcoef([x[key + 'C'] for x in out], y)[0, 1]:+.2f}")
+    # beyond draft-day value: residual after the board's value
+    point = np.array([x["pointC"] for x in out])
+    slope = np.polyfit(point, y, 1)
+    resid = y - np.polyval(slope, point)
+    rng = np.random.default_rng(5)
+    for key, label in (("gap", "downside"), ("half", "half-season losses")):
+        f = np.array([x[key + "C"] for x in out])
+        f = f - np.polyval(np.polyfit(point, f, 1), point)  # the part not explained by value
+        r = np.corrcoef(f, resid)[0, 1]
+        boot = []
+        for _ in range(2000):
+            i = rng.integers(0, len(out), len(out))
+            boot.append(np.corrcoef(f[i], resid[i])[0, 1])
+        print(f"  partial r({label}, all-play | board value) = {r:+.2f}  [95% CI {np.percentile(boot, 2.5):+.2f}, {np.percentile(boot, 97.5):+.2f}]")
+
+
+COMMANDS["team"] = cmd_team
 
 if __name__ == "__main__":
     COMMANDS[(sys.argv[1:2] or ["table"])[0]]()

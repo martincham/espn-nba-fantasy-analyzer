@@ -4,7 +4,7 @@ Branch: `gui` · Data: `history/` (fetched by `history/fetch_history.py` and `hi
 
 ## Status and results (2026-09-27)
 
-Steps 1–4 and the board part of step 6 are built. Step 5 (team level) and the Plan tab are not.
+Steps 1–5 and the board part of step 6 are built. The Plan tab doesn't use the ranges, and by the step 5 test it shouldn't get a risk setting.
 
 **Data** (`history/fetch_games.py`):
 - **Game logs:** ESPN's per-game logs for 2017-18 to 2025-26 list every team game, including the ones a player missed (2017-18 lists only games played). That gives each player's team games, games played and longest run of missed games.
@@ -53,7 +53,42 @@ Steps 1–4 and the board part of step 6 are built. Step 5 (team level) and the 
 - **Value and Ours are unchanged.**
 - Code: `library/availability.py` (fitted constants from `python3.12 history/games_model.py fit`), `tests/availability_test.py`.
 
-**Not built yet:** team-level ranges and the fragility test (step 5), the Plan tab, the "out until" control in the UI (`games_range(out=...)` supports it), a settings switch, and the frozen 2026-27 forecast (step 7, to do right before the draft).
+**Team level** (`library/availability.team_range`, `python3.12 history/games_model.py team`):
+
+How it works:
+- Every player's games and per-game rating are drawn together, independently between players, 300 times.
+- Each draw goes through the board's daily lineup and is scored as expected category wins a week against the average team.
+- The average team is built with every player at the model's mean outcome (`mean_row`), so the model's lower games and ratings apply to every team, not just mine.
+- It takes about 0.1 s and is recomputed only when the draft state changes.
+
+On the board:
+- The team header shows the 80% range next to the expected record.
+- The My Team tab has a Season range card: the range, its median, and how many of my players are expected to miss half the season.
+
+**Does fragility predict results?** 60 drafted rosters from the league's history (2020-21, 2021-22 and 2023-24 to 2025-26). The model was fitted without the tested season each time, and all-play category wins are compared within each season:
+
+| Draft-day measure | r with all-play category wins |
+|---|---|
+| Board value (ESPN games) | +0.30 |
+| Model mean value | +0.29 |
+| Downside (mean − p10 of summed value) | −0.01 |
+| Expected half-season losses | +0.36 |
+| Downside, once board value is known | −0.18 (95% CI −0.41 to +0.06) |
+| Expected half-season losses, once board value is known | +0.27 (95% CI −0.04 to +0.53) |
+
+- Neither fragility measure predicts worse results once value is known.
+- If anything, rosters with more expected half-season losses did better. Plausibly that's because injured players come at a discount, but it isn't significant.
+- By the plan's rule, **the planner gets no risk setting**, and Value/Ours stay on ESPN's games. The range is shown for information.
+- Caveat: rosters change a lot after the draft (pickups are about 25% of production), so draft-day fragility is a weak lever on results.
+
+**± from games played alone** (`availability.games_sd`, `plus_minus`, `team_spread`):
+- Every ± is one standard deviation of games (ESPN's projection moved by GP Δ), carried through to the board's own estimates.
+- **Value and Fit** are straight lines in games. His games count at his line and the rest are filled at replacement. So ± = |number − its value at 0 games| × SD of games ÷ Exp GP. Value is replacement (95) at 0 games. Fit at 0 games comes from one extra team-fit run on a player with no games.
+- **Team categories:** each of my players' games moves up one SD, through the daily lineup. The rating changes add in quadrature across players, since players' games are independent.
+- **Expected record:** the same per-player changes are turned into win-chance changes, summed across categories for each player, then added in quadrature. The header shows the record ± as a range of wins.
+- These cover games only. The My Team "Season range" card also counts per-game misses, so it's wider.
+
+**Not built yet:** the "out until" control in the UI (`games_range(out=...)` supports it), a settings switch, and the frozen 2026-27 forecast (step 7, to do right before the draft).
 
 ## Goal
 

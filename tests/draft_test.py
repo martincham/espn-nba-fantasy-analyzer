@@ -110,7 +110,9 @@ class BoardTest(unittest.TestCase):
         schedule = draft.parse_schedule(fixture("espn_schedule_2027.json"))
         with mock.patch.object(draft, "fetch_league", return_value=league), mock.patch.object(
             draft, "fetch_pool", return_value=players
-        ), mock.patch.object(draft, "fetch_schedule", return_value=schedule):
+        ), mock.patch.object(draft, "fetch_schedule", return_value=schedule), mock.patch.object(
+            draft, "fetch_past", return_value={}
+        ):
             self.board = DraftBoard(settings, os.path.join(self.tmp.name, "pool.json"), os.path.join(self.tmp.name, "state.json"))
             self.board.load()
         self.ids = {p.name: p.id for p in players}
@@ -334,9 +336,10 @@ class BoardTest(unittest.TestCase):
         r = row()
         self.assertEqual((r["delta"], r["gpDelta"], r["expGp"], r["note"]), (5, -10, espn_gp - 10, "healthy"))
         self.assertAlmostEqual(r["projPg"], before + 5, places=0)  # Δ is rating points
-        # Value is per-game rating × games, with missed games filled at the replacement rating.
-        rep = b.shape.replacement
-        self.assertAlmostEqual(r["value"], (r["projPg"] * r["expGp"] + rep * (82 - r["expGp"])) / 82, places=0)
+        # Value is per-game rating × games; the filled share of missed games counts at the replacement rating.
+        rep, fill = b.shape.replacement, b.shape.fill_rate
+        self.assertLess(fill, 1.0)  # the measured default: not every missed game gets filled
+        self.assertAlmostEqual(r["value"], (r["projPg"] * r["expGp"] + rep * fill * (82 - r["expGp"])) / 82, places=0)
         b.adjust(kid, gpDelta=200)
         self.assertEqual(row()["expGp"], 82)  # capped at a full season
         b.adjust(kid, gpDelta=0)
@@ -391,3 +394,23 @@ class ServerTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PastSeasonsTest(unittest.TestCase):
+    def test_parse_past(self):
+        data = {"players": [
+            {"player": {"id": 1, "stats": [
+                {"id": "002026", "stats": {"42": 61.0}, "averageStats": {"40": 33.5}},
+                {"id": "102026", "averageStats": {"40": 34.0}},
+            ]}},
+            {"player": {"id": 2, "stats": [{"id": "102026", "averageStats": {"40": 30.0}}]}},  # hurt all season
+            {"player": {"id": 3, "stats": [{"id": "002025", "stats": {"42": 50.0}}]}},  # another season only
+        ]}
+        self.assertEqual(draft.parse_past(data, 2026), {1: [2026, 61.0, 33.5, 34.0], 2: [2026, 0.0, 0.0, 30.0]})
+
+    def test_cache_is_per_season(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "history.json")
+            draft.save_past(path, 2027, {5: [[2026, 70, 30.0, 31.0]]})
+            self.assertEqual(draft.load_past(path, 2027), {5: [[2026, 70, 30.0, 31.0]]})
+            self.assertIsNone(draft.load_past(path, 2028))

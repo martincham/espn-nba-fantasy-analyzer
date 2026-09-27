@@ -7,6 +7,7 @@ Run with python3.12 (needs numpy):
     python3.12 history/games_model.py fit         fit on every season; prints library/availability.py's Params
     python3.12 history/games_model.py value       leave-one-season-out: does the season-value range cover the actual value?
     python3.12 history/games_model.py team        do fragile drafted rosters do worse than their value says?
+    python3.12 history/games_model.py fill        how many of a rostered player's missed games get covered
 
 Data: history/games/<season>.json, history/bios.json and history/standings.json,
 all from history/fetch_games.py. Seasons are ESPN seasonIds (2026 = 2025-26).
@@ -584,15 +585,22 @@ def fit_rating_error(rows):
     return float(bias), float(slope), (float(max(v0, 1.0)), float(max(v1, 0.0)))
 
 
+MODEL_INPUTS = ("histAvail",)  # beyond ESPN's projection; the user chose to keep past availability (2026-09-27)
+
+
 def params_for(rows):
-    """library.availability.Params fitted on these rows (ESPN projection only)."""
-    m = TwoPart().fit(rows)
+    """library.availability.Params fitted on these rows (ESPN's projection and MODEL_INPUTS)."""
+    m = TwoPart(MODEL_INPUTS).fit(rows)
     bias, slope, var = fit_rating_error(rows)
     return av.Params(
-        proj_mean=float(m.mean[0]), proj_sd=float(m.sd[0]), major=tuple(float(x) for x in m.a),
-        normal_mean=tuple(float(x) for x in m.b), normal_phi=float(m.phi_n),
+        proj_mean=float(m.mean[0]), proj_sd=float(m.sd[0]), hist_mean=float(m.mean[1]), hist_sd=float(m.sd[1]),
+        major=tuple(float(x) for x in m.a), normal_mean=tuple(float(x) for x in m.b), normal_phi=float(m.phi_n),
         major_mean=tuple(float(x) for x in m.c), major_phi=float(m.phi_m),
         rating_bias=bias, rating_slope=slope, rating_var=var)
+
+
+def row_hist(r):
+    return hist_avail(r)[0]
 
 
 def cmd_fit():
@@ -604,9 +612,9 @@ def cmd_fit():
         shown = tuple(round(x, 4) for x in value) if isinstance(value, tuple) else round(value, 4)
         print(f"    {name} = {shown}")
     # the library must reproduce the fitted model
-    m = TwoPart().fit(rows)
+    m = TwoPart(MODEL_INPUTS).fit(rows)
     diff = max(abs(a - b) for r, row in zip(m.pmf(rows[:50]), rows[:50])
-               for a, b in zip(r, av.games_range(row["proj82"], params=params).pmf))
+               for a, b in zip(r, av.games_range(row["proj82"], hist=row_hist(row), params=params).pmf))
     print(f"\nlargest difference, library vs fitted model: {diff:.2e}")
 
 
@@ -626,7 +634,7 @@ def cmd_value():
         row_hits = defaultdict(list)
         for r in test:
             actual = v.season_value(r["actualRating"], r["g82"], REPLACEMENT)
-            games = av.games_range(r["proj82"], params=params)
+            games = av.games_range(r["proj82"], hist=row_hist(r), params=params)
             for label, p in (("full", params), ("games", still)):
                 lo10, lo25, hi75, hi90 = av.quantiles(av.value_range(r["projRating"], games, REPLACEMENT, p), (.1, .25, .75, .9))
                 row_hits[label + "80"].append(lo10 <= actual <= hi90)
@@ -653,8 +661,8 @@ def team_draws(players, params, draws=2000, seed=3):
     """Draws of a roster's summed season value: each player's games and rating error, independently."""
     rng = np.random.default_rng(seed)
     total = np.zeros(draws)
-    for proj82, rating in players:
-        games = av.games_range(proj82, params=params)
+    for proj82, rating, hist in players:
+        games = av.games_range(proj82, hist=hist, params=params)
         g = rng.choice(FULL + 1, size=draws, p=np.array(games.pmf) / sum(games.pmf))
         sd = np.sqrt(params.rating_var[0] + params.rating_var[1] / np.maximum(g, 1))
         error = params.rating_bias + params.rating_slope * (g - games.projected) + rng.normal(0, 1, draws) * sd
@@ -680,12 +688,12 @@ def cmd_team():
             for pick in t.picks:
                 r = by_key.get((pick["playerId"], season))
                 if r and r["projRating"] is not None:
-                    players.append((r["proj82"], r["projRating"]))
-            point = sum(v.season_value(rt, g, REPLACEMENT) for g, rt in players)
+                    players.append((r["proj82"], r["projRating"], row_hist(r)))
+            point = sum(v.season_value(rt, g, REPLACEMENT) for g, rt, _ in players)
             draws = team_draws(players, params)
             teams.append({"season": season, "allplay": t.allplay, "point": point, "mean": draws.mean(),
                           "gap": draws.mean() - np.percentile(draws, 10),
-                          "half": sum(av.games_range(g, params=params).p_half for g, _ in players), "n": len(players)})
+                          "half": sum(av.games_range(g, hist=h, params=params).p_half for g, _, h in players), "n": len(players)})
         for key in ("allplay", "point", "mean", "gap", "half"):  # compare within a season
             m = np.mean([x[key] for x in teams])
             for x in teams:
@@ -714,6 +722,173 @@ def cmd_team():
 
 
 COMMANDS["team"] = cmd_team
+
+# ---------------------------------------------------------------- how often a missed game gets covered
+
+FILL_SEASONS = (2025, 2026)  # box scores that list each week's days
+
+
+def fill_events(season):
+    """Each rostered player's weeks, with his team's counted games against that week's league average.
+
+    Per (team, player, week): his team's games that week, his games played and
+    counted, and the team's counted games minus the league average that week.
+    """
+    logs = {p["id"]: p for p in load_json(os.path.join(GAMES_DIR, f"{season}.json"))["players"]}
+    days = team_days(logs.values())
+    played = {pid: {d for d, t, m in p["games"] if m > 0} for pid, p in logs.items()}
+    team_on = {pid: {d: t for d, t, m in p["games"]} for pid, p in logs.items()}
+    league = load_json(os.path.join(HERE, str(season), "league.json"))
+    regular = league["settings"]["scheduleSettings"]["matchupPeriodCount"]
+    sides = [b for b in load_json(os.path.join(HERE, str(season), "boxscores.json"))
+             if b["matchupPeriodId"] <= regular and b.get("pointsByScoringPeriod")]
+    counted_line = lambda e: next((x.get("stats") or {} for x in e["playerPoolEntry"]["player"].get("stats", [])
+                                   if x.get("statSourceId") == 0), {})
+    team_counted = {(b["teamId"], b["matchupPeriodId"]): sum(counted_line(e).get("42", 0.0)
+                                                             for e in b["rosterForMatchupPeriod"]["entries"]) for b in sides}
+    week_mean = defaultdict(list)
+    for (team, period), c in team_counted.items():
+        week_mean[period].append(c)
+    week_mean = {k: sum(v) / len(v) for k, v in week_mean.items()}
+    windows = {b["matchupPeriodId"]: [int(d) for d in b["pointsByScoringPeriod"]] for b in sides}
+
+    def team_games(pid, window):
+        return [d for d in window if d in team_on[pid] and d in days.get(team_on[pid][d], ())]
+
+    out = []
+    present = defaultdict(set)  # (team, player) -> weeks he's in the box score (only players who counted are listed)
+    for b in sides:
+        period, team = b["matchupPeriodId"], b["teamId"]
+        for e in b["rosterForMatchupPeriod"]["entries"]:
+            pid = e["playerId"]
+            if pid not in logs:
+                continue
+            games = team_games(pid, windows[period])
+            if not games:
+                continue
+            present[(team, pid)].add(period)
+            out.append({"season": season, "team": team, "player": pid, "period": period, "games": len(games),
+                        "played": sum(1 for d in games if d in played[pid]), "counted": counted_line(e).get("42", 0.0),
+                        "teamC": team_counted[(team, period)] - week_mean[period]})
+    # Weeks out: between his first and last week on a team he's missing from its box score and played no games.
+    for (team, pid), weeks in present.items():
+        for period in range(min(weeks) + 1, max(weeks)):
+            if period in weeks or period not in windows or (team, period) not in team_counted:
+                continue
+            games = team_games(pid, windows[period])
+            if len(games) >= 2 and not any(d in played[pid] for d in games):
+                out.append({"season": season, "team": team, "player": pid, "period": period, "games": len(games),
+                            "played": 0, "counted": 0.0, "teamC": team_counted[(team, period)] - week_mean[period]})
+    return out
+
+
+def fill_estimate(events, kind):
+    """Share of a player's lost counted games that his team covered, pooled over players.
+
+    For each (team, player) with both full weeks and weeks of the given kind:
+    lost = his counted games per week when fully playing x the share of games
+    he missed; drop = his team's counted games (vs league average) in full
+    weeks minus in those weeks. Fill = 1 - total drop / total lost.
+    """
+    by = defaultdict(list)
+    for ev in events:
+        by[(ev["season"], ev["team"], ev["player"])].append(ev)
+    drop = lost = 0.0
+    n = 0
+    for evs in by.values():
+        full = [x for x in evs if x["played"] == x["games"]]
+        if kind == "long":
+            hit = [x for x in evs if x["played"] == 0 and x["games"] >= 2]
+        else:
+            hit = [x for x in evs if 0 < x["played"] < x["games"]]
+        if len(full) < 3 or not hit:
+            continue
+        his = sum(x["counted"] for x in full) / sum(x["games"] for x in full)  # counted per team game when healthy
+        if his < 0.3:
+            continue  # a bench player: his absence changes little either way
+        base = sum(x["teamC"] for x in full) / len(full)
+        for x in hit:
+            missed = x["games"] - x["played"]
+            lost += his * missed
+            drop += base - x["teamC"]
+            n += 1
+    return (1 - drop / lost if lost else float("nan")), n
+
+
+def cmd_fill():
+    """How many of a rostered player's lost games his team covers: short absences and whole weeks out."""
+    events = [e for s in FILL_SEASONS for e in fill_events(s)]
+    rng = np.random.default_rng(1)
+    keys = sorted({(e["season"], e["team"]) for e in events})
+    by_team = defaultdict(list)
+    for e in events:
+        by_team[(e["season"], e["team"])].append(e)
+    print(f"{len(events)} player-weeks on rosters ({', '.join(map(str, FILL_SEASONS))})")
+    for kind, label in (("short", "short absences (missed part of the week)"), ("long", "out the whole week")):
+        f, n = fill_estimate(events, kind)
+        boots = []
+        for _ in range(500):
+            pick = [keys[i] for i in rng.integers(0, len(keys), len(keys))]
+            sample_ = [e for k in pick for e in by_team[k]]
+            boots.append(fill_estimate(sample_, kind)[0])
+        lo, hi = np.nanpercentile(boots, [2.5, 97.5])
+        print(f"  {label:42s} fill {f:5.2f}  [95% CI {lo:.2f}, {hi:.2f}]  ({n} player-weeks)")
+    missed = [e["games"] - e["played"] for e in events]
+    long_missed = sum(e["games"] - e["played"] for e in events if e["played"] == 0 and e["games"] >= 2)
+    print(f"  share of missed games in whole weeks out: {long_missed / sum(missed):.2f}")
+
+
+COMMANDS["fill"] = cmd_fill
+
+FILL_RATE = 0.60  # measured by cmd_fill: 0.53 of short absences, 0.69 of whole weeks out, weighted 57/43
+
+
+def cmd_fillcheck():
+    """Backtest: board values with every missed game filled vs the measured fill rate, against a target that uses it.
+
+    The target is backtest.py's category wins added (CWA), minus what the
+    unfilled share of each missed game would have added at the replacement
+    level (League.volume_cwa): a lost game costs the team a replacement game.
+    """
+    import backtest as bt
+
+    def board(season, fill):
+        """The Draft Room's defaults: ESPN's per-game line, category weights, the league price curve."""
+        players = bt.preseason_players(season)
+        for p in players:
+            p.line_source = "espn"
+        shape = bt.board_shape(weights=dict(v.CATEGORY_WEIGHTS), price_curve=list(v.PRICE_CURVE), fill_rate=fill)
+        return bt.board_values(season, players, shape)
+
+    print(f"target fill {FILL_RATE:.2f}; drafted players, Spearman r with CWA (higher is better) and dollar error on $5+ picks")
+    print("season   board fill 1.00        board fill {:.2f}".format(FILL_RATE))
+    gains = []
+    for season in bt.PROJECTION_TUNING + (bt.LOCKBOX,):
+        lg = bt.League(season)
+        games = bt.SEASON_GAMES.get(season, FULL)
+        raw = bt.load(season, "cwa.json")["players"]
+        target = {int(k): x["cwa"] - (1 - FILL_RATE) * lg.volume_cwa(max(0.0, games - x["gp"])) for k, x in raw.items()}
+        picks = bt.load(season, "draft.json")["draftDetail"]["picks"]
+        prices = bt.price_curve(season)
+        ranked = sorted(target, key=lambda pid: -target[pid])
+        dollars = {pid: (prices[i] if i < len(prices) else 0) for i, pid in enumerate(ranked)}
+        line = f"{season}  "
+        rhos = []
+        for fill in (1.0, FILL_RATE):
+            values = board(season, fill)
+            drafted = [pk for pk in picks if pk["playerId"] in values]
+            never = -(1 - FILL_RATE) * lg.volume_cwa(games)  # drafted, never played
+            rho = bt.spearman([values[pk["playerId"]].value for pk in drafted], [target.get(pk["playerId"], never) for pk in drafted])
+            big = [pk for pk in drafted if pk["bidAmount"] >= 5]
+            err = sum(abs(values[pk["playerId"]].ours - dollars.get(pk["playerId"], 0)) for pk in big) / len(big)
+            rhos.append(rho)
+            line += f"   r {rho:.3f}  $ err {err:5.2f}   "
+        gains.append(rhos[1] - rhos[0])
+        print(line + ("  (lockbox, already opened)" if season == bt.LOCKBOX else ""))
+    print(f"r change with the measured fill: {' '.join(f'{g:+.3f}' for g in gains)}")
+
+
+COMMANDS["fillcheck"] = cmd_fillcheck
 
 if __name__ == "__main__":
     COMMANDS[(sys.argv[1:2] or ["table"])[0]]()

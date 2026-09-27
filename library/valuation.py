@@ -231,6 +231,7 @@ class LeagueShape:
     rated: List[str] = field(default_factory=list)  # categories counted in ratings
     core: Optional[int] = None  # players per team worth paying for; the rest cost $1 (None = whole roster)
     replacement: float = 0.0  # per-game rating of the free agent who fills a missed game
+    fill_rate: float = 1.0  # share of a player's missed games that actually get filled (bench, IR pickups)
     starters: int = 0  # daily starting slots (bench and IR excluded); 0 = no daily lineups
     weights: Dict[str, float] = field(default_factory=dict)  # category weights in ratings; empty = equal
     price_curve: List[float] = field(default_factory=list)  # $ by value rank (PRICE_CURVE); empty = the formula
@@ -272,6 +273,7 @@ class Valued:
     value: float
     proj_stats: Stats
     team: Optional[str] = None  # NBA team, for its schedule
+    hist: Optional[float] = None  # past availability, games on an 82-game basis (library/availability.py)
     rank: int = 0
     ours: float = 1.0
     edge: float = 0.0
@@ -287,15 +289,16 @@ class Baseline:
     avg_gp: float = 1.0  # average games played in the pool
 
 
-def season_value(rating: float, games: float, replacement: float = 0.0) -> float:
+def season_value(rating: float, games: float, replacement: float = 0.0, fill_rate: float = 1.0) -> float:
     """A roster spot's average per-game rating over a full season.
 
-    The player's games count at his rating, and the games he misses at the
-    replacement rating (the free agent picked up while he's out or on IR).
+    The player's games count at his rating. Of the games he misses, the
+    share `fill_rate` gets filled at the replacement rating (a bench player
+    or a free agent picked up while he's out or on IR); the rest are lost.
     With replacement 0 this is simply rating × games / 82.
     """
     games = max(0.0, min(float(GAMES_IN_SEASON), games))
-    return (rating * games + replacement * (GAMES_IN_SEASON - games)) / GAMES_IN_SEASON
+    return (rating * games + replacement * fill_rate * (GAMES_IN_SEASON - games)) / GAMES_IN_SEASON
 
 
 def compute_baseline(players: Sequence, shape: LeagueShape) -> Baseline:
@@ -362,11 +365,12 @@ def value_players(
                 exp_min=exp_min,
                 min_set=adj.exp_min is not None,
                 last_pg=last_pg,
-                last_value=season_value(last_pg, p.base_gp, shape.replacement),
+                last_value=season_value(last_pg, p.base_gp, shape.replacement, shape.fill_rate),
                 proj_pg=proj_pg,
-                value=season_value(proj_pg, exp_gp, shape.replacement),
+                value=season_value(proj_pg, exp_gp, shape.replacement, shape.fill_rate),
                 proj_stats=proj,
                 team=getattr(p, "pro_team", None),
+                hist=getattr(p, "hist_avail", None),
             )
         )
     price(rows, shape)
@@ -682,7 +686,7 @@ def make_lineup(shape: LeagueShape, schedule: Optional[Schedule], fill: Stats) -
 @dataclass
 class LeagueSim:
     average_team: Stats  # the average simulated team's season totals
-    fill: Stats  # per-game line that fills a player's missed games (empty: not filled)
+    fill: Stats  # per-game line that fills a player's missed games, times shape.fill_rate (empty: not filled)
     lineup: Lineup  # how rosters become team totals
     teams: List[Stats]  # category values per team; index 0 is my team
     ranks: Dict[str, int]
@@ -720,7 +724,8 @@ def simulate_league(
     rep_stats, rep_rating = with_percentages(rep_totals), sum(r.proj_pg for r in reps) / len(reps)
 
     fill = replacement_fill(rows, shape)
-    lineup = make_lineup(shape, schedule, fill)
+    lineup = make_lineup(shape, schedule, fill)  # streaming spots are real pickups: the full replacement line
+    fill = scale(fill, shape.fill_rate) if fill else fill  # missed games: only the share that gets filled
 
     def member(r: Valued) -> Member:
         return Member(member_totals(r, fill), r.proj_pg, r.team)

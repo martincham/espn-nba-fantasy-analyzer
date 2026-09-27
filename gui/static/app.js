@@ -273,7 +273,7 @@ const BASE_COLS = [
   { key: "expMin", label: "Exp MIN", title: "Expected minutes per game. Default: ESPN's projection. Production scales with minutes. Drag or type; clear to reset." },
   { key: "delta", label: "Δ", title: "Change in per-game rating points (100 = average player), e.g. +10. Spread across categories by scaling every counting stat and shot attempt." },
   { key: "projPg", label: "Per gm", title: "Projected per-game rating" },
-  { key: "value", label: "Value", title: "Projected per-game rating over 82 games: Exp GP at his rating, the games he misses at the replacement rating (Settings). ± is one standard deviation from games played alone." },
+  { key: "value", label: "Value", title: "Projected per-game rating over 82 games: Exp GP at his rating; of the games he misses, the filled share at the replacement rating and the rest lost (Settings). ± is one standard deviation from games played alone." },
   { key: "fit", label: "Fit", title: "Value to your current team: how much he raises your weekly category win chances. Categories you're already winning count less, punted ones not at all. Only games he'd start count, so games on nights your roster is already full add less. 100 = an average player. ± is one standard deviation from games played alone." },
   { key: "avg", label: "Cost", title: "What he should cost: the average price in ESPN auction drafts, scaled to this league's budget, unless you set your own. Drag or type; clear to go back to ESPN's." },
   { key: "ours", label: "Ours", cls: "ours-h", title: "Our value before the draft" },
@@ -476,7 +476,7 @@ function renderDetail() {
         <tr><th scope="row">Per game</th><td>${fmt(r.lastPg)}</td><td>${fmt(r.projPg)}</td></tr>
         <tr><th scope="row">Games</th><td>${r.fromProj ? "—" : r.gp}</td><td>${r.expGp}${r.gpDelta ? ` <span class="g">ESPN ${r.espnGp} ${signed(r.gpDelta)}</span>` : ""}</td></tr>${B.meta.daily && r.starts != null ? `
         <tr><th scope="row" title="Share of his ${r.teamGames ?? ""} scheduled games that fit in your ${B.meta.starters} daily starting slots, best players first. Fit counts only these games.">Starts</th><td>—</td><td>${Math.round(r.starts * 100)}%</td></tr>` : ""}
-        <tr><th scope="row" title="(per game × games + ${B.meta.replacement} × missed games) ÷ ${B.meta.gamesInSeason}">Value</th><td>${r.fromProj ? "—" : fmt(r.lastValue)}</td><td><b>${fmt(r.value)}</b></td></tr>
+        <tr><th scope="row" title="(per game × games + ${B.meta.replacement} × ${B.meta.fillRate}% of missed games) ÷ ${B.meta.gamesInSeason}">Value</th><td>${r.fromProj ? "—" : fmt(r.lastValue)}</td><td><b>${fmt(r.value)}</b></td></tr>
       </tbody>
     </table>
     <table class="rtab" aria-label="Range of outcomes">
@@ -987,12 +987,20 @@ $("refreshBtn").addEventListener("click", async () => {
 const PLAN = { open: new Set(), polling: false };
 function renderPlan() {
   const el = $("planPanel"), P = B.plan, m = B.meta;
+  const floorOf = (b) => (m.planObjective === "floor20" ? b.floor20 : b.floor10);
   const building = P?.status === "building";
   const R = P?.status === "ready" ? P.result : null;
   const cost = (id) => R?.costs[id] ?? byId.get(id)?.avg;
   const who = (id) => { const r = byId.get(id); return r ? `<button class="linkbtn" type="button" data-goto="${id}">${esc(r.name)}</button>` : "?"; };
+  const floorMode = m.planObjective !== "wins", odds = m.planObjective === "floor20" ? 20 : 10;
   let h = `<div class="plan-head"><div><h3>Recommended team</h3>
-      <p class="sub">The players to buy that win the most categories per week at expected prices: Avg paid, or your own cost where you set one. It starts from your roster and budget, skips taken players, and ignores categories you punt.</p></div>
+      <p class="sub">${floorMode
+        ? `The players to buy whose <b>bad season</b> wins the most categories per week: the season only 1 in ${odds} is worse, from simulated seasons of your players' games and per-game ratings,`
+        : "The players to buy that win the most categories per week"} at expected prices: Avg paid, or your own cost where you set one. It starts from your roster and budget, skips taken players, and ignores categories you punt.</p>
+      <div class="seg" role="group" aria-label="Plan for">
+        <button type="button" data-plan-objective="wins" aria-pressed="${!floorMode}" title="Maximize expected category wins per week">Most wins</button>
+        <button type="button" data-plan-objective="floor" aria-pressed="${m.planObjective === "floor"}" title="Maximize wins in a 1-in-10 bad season, trading some expected wins for less risk">Floor · 1 in 10</button>
+        <button type="button" data-plan-objective="floor20" aria-pressed="${m.planObjective === "floor20"}" title="Maximize wins in a 1-in-20 bad season: more cautious still">Floor · 1 in 20</button></div></div>
       <button class="btn primary ${building ? "busy" : ""}" type="button" id="planBuild" ${building ? "disabled" : ""}>${building ? "Building…" : P ? "Rebuild" : "Build plan"}</button></div>`;
   const avoided = B.state.avoid.map((id) => byId.get(id)).filter(Boolean);
   if (avoided.length) h += `<p class="plan-avoid"><span class="lbl">Left out</span> ${avoided.map((r) => `<span class="av">${esc(r.name)} <button class="x" type="button" data-unavoid="${r.id}" aria-label="Allow ${esc(r.name)} in the plan" title="Allow in the plan">×</button></span>`).join("")}</p>`;
@@ -1012,7 +1020,8 @@ function renderPlan() {
     const mine = R.mine.map((id) => byId.get(id)).filter(Boolean);
     const spend = best.cost + R.streamers;
     h += `<div class="overall">
-      <div><span class="lbl">Cats won per week</span><span class="v">${best.wins.toFixed(1)}–${(n - best.wins).toFixed(1)}</span><span class="s">expected vs the average team</span></div>
+      <div><span class="lbl">Cats won per week</span><span class="v">${best.wins.toFixed(1)}–${(n - best.wins).toFixed(1)}</span><span class="s">expected vs the average team · ±${best.winsSd.toFixed(2)} from games played</span></div>
+      ${floorOf(best) == null ? "" : `<div title="From ${m.planFloorDraws || 600} simulated seasons of your players' games and per-game ratings: 1 season in ${odds} is worse"><span class="lbl">Floor</span><span class="v">${floorOf(best).toFixed(2)}</span><span class="s">cats a week in a bad season (1 in ${odds})</span></div>`}
       <div><span class="lbl">Spend</span><span class="v">$${spend}</span><span class="s">of $${R.budgetLeft} left${R.budgetLeft - spend ? `, $${R.budgetLeft - spend} to spare` : ""}</span></div>
       <div><span class="lbl">Buy</span><span class="v">${best.ids.length}</span><span class="s">players${R.streamers ? ` + ${R.streamers} $1 streaming spot${R.streamers > 1 ? "s" : ""}` : ""}${mine.length ? `, with your ${mine.length}` : ""}</span></div>
     </div>
@@ -1049,13 +1058,13 @@ function renderPlan() {
         const drops = b.drops.map((id) => esc(byId.get(id)?.name || "?")).join(", ");
         const moved = cats.map((c) => [c, b.chances[c] - best.chances[c]]).filter(([, d]) => Math.abs(d) >= 0.05).sort((x, y) => y[1] - x[1]);
         h += `<div class="build"><div class="build-t"><b>Build ${String.fromCharCode(66 + i)}</b>
-            <span class="num">${b.wins.toFixed(2)} cats/week (${signed(b.wins - best.wins, 2)})</span><span class="num">$${b.cost + R.streamers}</span></div>
+            <span class="num">${b.wins.toFixed(2)} cats/week (${signed(b.wins - best.wins, 2)})</span>${floorOf(b) == null || floorOf(best) == null ? "" : `<span class="num">floor ${floorOf(b).toFixed(2)} (${signed(floorOf(b) - floorOf(best), 2)})</span>`}<span class="num">$${b.cost + R.streamers}</span></div>
           <p><span class="lbl">In</span> ${adds}</p><p><span class="lbl">Out</span> ${drops}</p>
           ${moved.length ? `<p class="muted">${moved.map(([c, d]) => `${esc(c)} ${signed(d * 100)}%`).join(" · ")} weekly win chance</p>` : ""}</div>`;
       });
       h += `</div>`;
     }
-    h += `<p class="callout">Win chances are against the average of ${m.teams - 1} simulated opponents who get the taken players and the best remaining by value. The cheapest picks are often players the market discounts for injury risk. Built in ${P.seconds}s from ${R.searched} starting rosters.</p>`;
+    h += `<p class="callout">Win chances are against the average of ${m.teams - 1} simulated opponents who get the taken players and the best remaining by value. The cheapest picks are often players the market discounts for injury risk.${R.objective !== "wins" ? " A floor plan gives up expected wins only where it buys a better bad season. In this league's past drafts, rosters with more injury risk didn't finish worse than their value said, so treat it as a preference, not an edge." : ""} Built in ${P.seconds}s from ${R.searched} starting rosters.</p>`;
   }
   el.innerHTML = h;
   if (building) pollPlan();
@@ -1074,6 +1083,12 @@ async function pollPlan() {
 }
 $("planPanel").addEventListener("click", (e) => {
   if (e.target.closest("#planBuild")) { PLAN.open.clear(); return act("plan"); }
+  const objective = e.target.closest("[data-plan-objective]");
+  if (objective) {
+    if (objective.dataset.planObjective === B.meta.planObjective) return;
+    PLAN.open.clear();
+    return act("settings", { planObjective: objective.dataset.planObjective }).then((ok) => ok && act("plan"));
+  }
   const av = e.target.closest("[data-avoid]"), unav = e.target.closest("[data-unavoid]");
   if (av || unav) {
     const id = +(av || unav).dataset[av ? "avoid" : "unavoid"], name = byId.get(id)?.name;
@@ -1099,12 +1114,15 @@ function renderSettings() {
   el.innerHTML = `
     <section class="set">
       <div class="set-t"><h3>Replacement player</h3>
-        <p>The per-game rating of the free agent you pick up when a player is hurt or on IR. His games fill the ones your player misses, so a missed game only costs the gap between them. Set 0 to count missed games as lost.</p></div>
+        <p>The per-game rating of the bench player or free agent who plays when one of yours is hurt or on IR, and how often that actually happens. A filled game costs only the gap between them; an unfilled one is lost.</p></div>
       <div class="set-c">
         <div class="range-row"><input type="range" id="setRep" min="0" max="${m.maxReplacement}" step="1" value="${rep}" aria-label="Replacement player rating">
           <output id="setRepOut">${rep}</output></div>
         <p class="hint">${room.replacement != null ? `<button class="linkbtn" type="button" id="setRepReset">Use default (${d.replacement})</button>` : `Default: a top free agent. The average one is about 86.`}</p>
-        <p class="hint" id="setRepEx">${repExample(rep)}</p>
+        <div class="range-row"><span class="lbl">Missed games filled</span><input type="range" id="setFill" min="0" max="100" step="5" value="${m.fillRate}" aria-label="Percent of missed games that get filled">
+          <output id="setFillOut">${m.fillRate}%</output></div>
+        <p class="hint">${room.fillRate != null ? `<button class="linkbtn" type="button" id="setFillReset">Use default (${d.fillRate}%)</button>` : `Default: measured in this league's box scores. Teams filled 53% of the games lost to short absences and 69% of whole weeks out.`}</p>
+        <p class="hint" id="setRepEx">${repExample(rep, m.fillRate)}</p>
       </div>
     </section>
     <section class="set">
@@ -1203,10 +1221,10 @@ function winAt(rating, spread) {
   const erf = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(z * z) / 2);
   return Math.round(50 * (1 + Math.sign(z) * erf));
 }
-// A 140-rated star who plays 50 games, valued at a given replacement rating.
-function repExample(rep) {
-  const g = B.meta.gamesInSeason, v = (140 * 50 + rep * (g - 50)) / g;
-  return `A 140-rated player who plays 50 games is worth <b>${fmt(v)}</b>. Each missed game costs ${fmt((140 - rep) / g, 2)}.`;
+// A 140-rated star who plays 50 games, valued at a given replacement rating and fill rate.
+function repExample(rep, fill = 100) {
+  const g = B.meta.gamesInSeason, missed = rep * fill / 100, v = (140 * 50 + missed * (g - 50)) / g;
+  return `A 140-rated player who plays 50 games is worth <b>${fmt(v)}</b>. Each missed game costs ${fmt((140 - missed) / g, 2)}.`;
 }
 function scaleSamples(rows, k) {
   return rows.map((r) => `${esc(lastName(r.name))} $${Math.round(r.avgRaw)} → <b>$${Math.round(r.avgRaw * k)}</b>`).join(" · ");
@@ -1221,13 +1239,17 @@ setEl.addEventListener("input", (e) => {
     sendSettings({ marketScale: k });
   } else if (e.target.id === "setRep") {
     $("setRepOut").textContent = e.target.value;
-    $("setRepEx").innerHTML = repExample(+e.target.value);
+    $("setRepEx").innerHTML = repExample(+e.target.value, B.meta.fillRate);
     sendSettings({ replacement: +e.target.value });
+  } else if (e.target.id === "setFill") {
+    $("setFillOut").textContent = e.target.value + "%";
+    $("setRepEx").innerHTML = repExample(B.meta.replacement, +e.target.value);
+    sendSettings({ fillRate: +e.target.value });
   }
 });
 setEl.addEventListener("change", (e) => {
   const t = e.target;
-  if (t.id === "setScale" || t.id === "setRep") return renderKeepFocus(); // full redraw once the drag ends
+  if (t.id === "setScale" || t.id === "setRep" || t.id === "setFill") return renderKeepFocus(); // full redraw once the drag ends
   if (t.dataset.cat) {
     const rated = [...setEl.querySelectorAll("[data-cat]")].filter((c) => c.checked).map((c) => c.dataset.cat);
     if (!rated.length) { t.checked = true; return toast("At least one category has to count."); }
@@ -1255,6 +1277,7 @@ setEl.addEventListener("click", (e) => {
   else if (id === "setCatsReset") act("settings", { rated: null });
   else if (id === "setCountedReset") act("settings", { ignorePlayers: null });
   else if (id === "setRepReset") act("settings", { replacement: null });
+  else if (id === "setFillReset") act("settings", { fillRate: null });
   else if (id === "setCoreReset") act("settings", { core: null });
   else if (id === "setFadeReset") act("settings", { fadeStart: null, fadeEnd: null });
   else if (id === "resetDraft") {

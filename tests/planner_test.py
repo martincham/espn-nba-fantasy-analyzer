@@ -40,7 +40,9 @@ class BoardPlanTest(unittest.TestCase):
         schedule = draft.parse_schedule(fixture("espn_schedule_2027.json"))
         with mock.patch.object(draft, "fetch_league", return_value=league), mock.patch.object(
             draft, "fetch_pool", return_value=players
-        ), mock.patch.object(draft, "fetch_schedule", return_value=schedule):
+        ), mock.patch.object(draft, "fetch_schedule", return_value=schedule), mock.patch.object(
+            draft, "fetch_past", return_value={}
+        ):
             self.board = DraftBoard(settings, os.path.join(self.tmp.name, "pool.json"), os.path.join(self.tmp.name, "state.json"))
             self.board.load()
         self.players = players
@@ -124,6 +126,28 @@ class BoardPlanTest(unittest.TestCase):
         self.assertGreater(len(r["best"]["ids"]), 0)
         self.assertEqual(len(r["best"]["ids"]) + r["streamers"], b.shape.roster_size)
         self.assertLessEqual(r["best"]["cost"] + r["streamers"], b.shape.budget)
+
+    def test_floor_objective(self):
+        b = self.board
+        for p in sorted(self.players, key=lambda p: -p.avg_paid)[12:]:
+            b.adjust(p.id, cost=4)
+        results = {}
+        for objective in ("wins", "floor", "floor20"):
+            b.update_settings(planObjective=objective)
+            b.build_plan()
+            results[objective] = self.wait()["result"]
+            self.assertEqual(results[objective]["objective"], objective)
+        for r in results.values():
+            best = r["best"]
+            self.assertGreater(best["winsSd"], 0)
+            self.assertLessEqual(best["floor20"], best["floor10"])  # a 1-in-20 season is worse than a 1-in-10 one
+            self.assertLess(best["floor10"], best["wins"] + 0.5)
+        # Aiming for a floor doesn't give a worse floor, and aiming for wins doesn't give fewer wins.
+        self.assertGreaterEqual(results["floor"]["best"]["floor10"], results["wins"]["best"]["floor10"] - 0.02)
+        self.assertGreaterEqual(results["floor20"]["best"]["floor20"], results["wins"]["best"]["floor20"] - 0.02)
+        self.assertGreaterEqual(results["wins"]["best"]["wins"], results["floor"]["best"]["wins"] - 0.02)
+        b.update_settings(planObjective="bogus")
+        self.assertEqual(b.snapshot()["meta"]["planObjective"], "wins")
 
     def test_full_roster_has_nothing_to_plan(self):
         b = self.board

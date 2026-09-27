@@ -304,6 +304,60 @@ def fetch_schedule(season: int) -> Dict[str, List[int]]:
 
 
 # --------------------------------------------------------------------------
+# Past seasons (for the games-played model)
+# --------------------------------------------------------------------------
+
+PAST_SEASONS = 3
+
+
+def parse_past(data: dict, season: int) -> Dict[int, List[float]]:
+    """id -> [season, games played, minutes per game, ESPN's preseason minutes] from a season's player pool."""
+    out: Dict[int, List[float]] = {}
+    for entry in data.get("players", []):
+        pl = entry.get("player") or {}
+        splits = {s.get("id"): s for s in pl.get("stats", [])}
+        actual, proj = splits.get(f"00{season}") or {}, splits.get(f"10{season}") or {}
+        if not actual and not proj:
+            continue
+        gp = (actual.get("stats") or {}).get("42", 0.0)
+        minutes = (actual.get("averageStats") or {}).get("40", 0.0)
+        proj_min = (proj.get("averageStats") or {}).get("40", 0.0)
+        out[pl["id"]] = [season, float(gp), float(minutes), float(proj_min)]
+    return out
+
+
+def fetch_past(season: int, ids: List[int]) -> Dict[int, List[List[float]]]:
+    """Each player's last PAST_SEASONS seasons: id -> [[season, games, minutes, ESPN's preseason minutes], ...]."""
+    out: Dict[int, List[List[float]]] = {}
+    for past in range(season - 1, season - 1 - PAST_SEASONS, -1):
+        player_filter = {"players": {"filterIds": {"value": list(ids)}}}  # ESPN rejects a limit with filterIds
+        url = f"{BASE_URL}/seasons/{past}/segments/0/leaguedefaults/3?view=kona_player_info"
+        data = _get_json(url, headers={"x-fantasy-filter": json.dumps(player_filter)}, timeout=120)
+        for pid, row in parse_past(data, past).items():
+            out.setdefault(pid, []).append(row)
+    return out
+
+
+def save_past(path: str, season: int, past: Dict[int, List[List[float]]]) -> None:
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump({"season": season, "players": {str(k): v for k, v in past.items()}}, f)
+    os.replace(tmp, path)
+
+
+def load_past(path: str, season: int) -> Optional[Dict[int, List[List[float]]]]:
+    """The cached past seasons, or None when missing or for another season."""
+    try:
+        with open(path) as f:
+            payload = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+    if payload.get("season") != season:
+        return None
+    return {int(k): v for k, v in payload.get("players", {}).items()}
+
+
+# --------------------------------------------------------------------------
 # Cache
 # --------------------------------------------------------------------------
 

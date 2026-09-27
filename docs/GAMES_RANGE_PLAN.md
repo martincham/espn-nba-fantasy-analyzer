@@ -50,7 +50,7 @@ Steps 1–5 and the board part of step 6 are built. The Plan tab doesn't use the
 - **Detail panel:** a Range table with games, value and worth (low / median / high) and the under-41-games chance.
 - **GP Δ** shifts the whole range. It isn't treated as a projection, because a low ESPN projection means a known long injury and your −10 doesn't.
 - **Worth** prices each value on the league's curve against every player's mean outcome.
-- **Value and Ours are unchanged.**
+- **Value and Ours:** unchanged by the ranges, but see the fill rate below (2026-09-27).
 - Code: `library/availability.py` (fitted constants from `python3.12 history/games_model.py fit`), `tests/availability_test.py`.
 
 **Team level** (`library/availability.team_range`, `python3.12 history/games_model.py team`):
@@ -87,6 +87,42 @@ On the board:
 - **Team categories:** each of my players' games moves up one SD, through the daily lineup. The rating changes add in quadrature across players, since players' games are independent.
 - **Expected record:** the same per-player changes are turned into win-chance changes, summed across categories for each player, then added in quadrature. The header shows the record ± as a range of wins.
 - These cover games only. The My Team "Season range" card also counts per-game misses, so it's wider.
+
+**Changes made at the user's request (2026-09-27)**, after they pointed out that a Wembanyama/Davis/Embiid roster can't have a safe floor, and neither can LaMelo:
+
+*1. Missed games are only partly filled* (`python3.12 history/games_model.py fill`, `fillcheck`):
+- **How it's measured:** for each regular on a roster in 2024-25 and 2025-26, his team's counted games in weeks he missed games are compared with weeks he played them all, against the league average each week. The box scores only list players who counted, so a week fully out shows up as a gap between his first and last weeks on the team, with no games in his log.
+
+| Absence | Lost games the team covered | 95% CI | Share of missed games |
+|---|---|---|---|
+| Short (part of a week) | 53% | 32–71% | 57% |
+| Whole week out | 69% | 53–87% | 43% |
+
+- **The board's default is now 60%** (`LeagueShape.fill_rate`, Settings → Replacement player → Missed games filled). Before, every missed game was filled at 95.
+- **What it changes:** in `season_value`, only 60% of missed games count at the replacement rating. The league simulation's fill for missed games is scaled the same way. Streaming spots stay at the full replacement line, because those are real pickups.
+- **Backtest:** the target is CWA minus what each unfilled missed game would have added at replacement level (`League.volume_cwa`). Against it, a 60% board ranks drafted players better than a 100% board in all 5 seasons: +0.038, +0.025, +0.010, +0.010, and +0.033 on the opened lockbox. Dollar error is mixed: better in 3 seasons, worse in 2.
+- **Effect:** Anthony Davis (with the user's −15 games) goes from $43 to $14, Embiid from $31 to $15, Kawhi from $30 to $22. Derrick White goes from $33 to $45 and Mikal Bridges from $11 to $21.
+
+*2. Past availability is in the games model.*
+- **The test:** it didn't pass the significance rule (+0.018 CRPS, 5 of 7 seasons, CI includes 0). The user chose to keep it. It matters most for players ESPN projects above their record.
+- **Fitted coefficients:** P(major absence) −0.16 per SD of history, normal-season mean +0.08.
+- **Runtime:** each pool player's last three seasons (games, minutes, ESPN's preseason minutes) come from ESPN's league-independent pool (`draft.fetch_past`). They're cached in `draftPoolHistory.json` next to the pool. 326 of 440 players have history; the rest get the average, which is the ESPN-only answer.
+- **Chance of losing half the season, before → after:** Embiid 41% → 54%, Davis 26% → 33%, LaMelo 15% → 18%, Markkanen 14% → 18%, Derrick White 7% → 6%.
+
+*3. Floors come from simulated seasons.*
+- The Plan tab has **Most wins**, **Floor · 1 in 10** and **Floor · 1 in 20**.
+- The search uses the quick games-only stand-in: score − z·SD, with z = 1.28 or 1.64. In floor modes it starts from twice as many rosters.
+- The distinct end points are then drawn 600 times each with `team_range` (games and per-game rating, same seed for every roster). The best 10th or 5th percentile of weekly category wins decides.
+- Every build shows its simulated floors.
+- With the user's 3 players, $107 left and nobody left out, the three modes chose:
+
+| Mode | Buys | Expected | 1 in 10 | 1 in 20 |
+|---|---|---|---|---|
+| Most wins | Towns, Curry, White, Murphy, Clingan, Miller | 5.34 | 4.62 | 4.39 |
+| Floor · 1 in 10 | Towns, Curry, White, Markkanen, Clingan, Buzelis | 5.30 | 4.63 | 4.38 |
+| Floor · 1 in 20 | Towns, White, Knueppel, Porter Jr., Holmgren, Clingan | 5.27 | 4.65 | 4.43 |
+
+- None of them buys Wembanyama, Davis, Embiid or LaMelo any more. The biggest change came from the fill rate, not the floor objective.
 
 **Not built yet:** the "out until" control in the UI (`games_range(out=...)` supports it), a settings switch, and the frozen 2026-27 forecast (step 7, to do right before the draft).
 

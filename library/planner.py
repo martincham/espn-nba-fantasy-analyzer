@@ -16,15 +16,31 @@ simulated team, within the budget I have left.
 - Search: a knapsack start (most value above replacement for the money), plus
   seeded random starts, each improved by the best single swap until none
   helps. Distinct end points are the alternative builds.
+- Objectives "floor" and "floor20" (your choice, never the default)
+  maximise a bad season instead: the 1-in-10 or 1-in-20 season.
+  - The search uses a quick stand-in: the score minus z standard deviations
+    from games played. Each player's effect on the category ratings for one
+    SD of games is worked out once against the average team, scaled by the
+    share of his games that start, and added in quadrature.
+  - The distinct end points are then scored on the real thing:
+    library/availability.team_range draws the roster's seasons (games and
+    per-game rating), and the best simulated bad season wins.
+  - Every build reports its simulated floors either way.
 """
 
 from __future__ import annotations
 
+import math
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
-from library import valuation as v
+from library import availability, valuation as v
+
+OBJECTIVES = ("wins", "floor", "floor20")  # most expected wins (default), the best 1-in-10 or 1-in-20 bad season
+FLOOR_Q = {"floor": 0.10, "floor20": 0.05}  # the bad season each floor objective maximises
+FLOOR_Z = {"floor": 1.2816, "floor20": 1.6449}  # the search's stand-in: standard deviations below the mean
+FLOOR_DRAWS = 600  # simulated seasons per finalist (same seed for every roster, so they compare fairly)
 
 
 @dataclass
@@ -35,6 +51,12 @@ class Build:
     wins: float  # expected category wins per week vs the average team, every category
     ratings: Dict[str, float]  # team category ratings, 100 = the average team
     chances: Dict[str, float]  # weekly win chance per category
+    wins_sd: float = 0.0  # ± of wins from the players' games played (1 SD)
+    floor10: Optional[float] = None  # simulated weekly category wins in a 1-in-10 bad season (games and per-game)
+    floor20: Optional[float] = None  # ... and a 1-in-20 one
+
+    def floor(self, objective: str = "floor") -> Optional[float]:
+        return self.floor20 if objective == "floor20" else self.floor10
 
 
 @dataclass
@@ -55,15 +77,17 @@ class Plan:
     streamers: int  # open spots left for $1 streaming players
     searched: int  # starting points
     evaluated: int  # rosters scored
+    objective: str = "wins"
 
 
 class _Env:
     """The simulated league, fixed for one plan, and a fast scorer for my roster."""
 
     def __init__(self, rows: Sequence[v.Valued], shape: v.LeagueShape, schedule: Optional[v.Schedule],
-                 mine: Sequence[int], taken: Sequence[int], punt: Iterable[str]):
+                 mine: Sequence[int], taken: Sequence[int], punt: Iterable[str], objective: str = "wins"):
         self.by_id = {r.id: r for r in rows}
         self.shape = shape
+        self.objective = objective if objective in OBJECTIVES else OBJECTIVES[0]
         sim = v.simulate_league(list(rows), list(mine), list(taken), shape, schedule)
         self.lineup, self.fill, self.average = sim.lineup, sim.fill, sim.average_team
         self.cats = list(shape.categories)
@@ -79,8 +103,10 @@ class _Env:
                     totals[k] = totals.get(k, 0.0) + x / len(reps)
         self.rep_stats = v.with_percentages(totals)
         self.rep_rating = sum(r.proj_pg for r in reps) / len(reps)
-        self.mine = [self.member(i) for i in mine if i in self.by_id]
+        self.mine_ids = [i for i in mine if i in self.by_id]
+        self.mine = [self.member(i) for i in self.mine_ids]
         self._members: Dict[int, v.Member] = {}
+        self._deltas: Dict[int, Dict[str, float]] = {}
         self.evaluated = 0
 
     def member(self, pid: int) -> v.Member:
@@ -93,16 +119,59 @@ class _Env:
             m = self._members[pid] = self.member(pid)
         return m
 
-    def score(self, ids: Sequence[int]) -> Tuple[float, float, Dict[str, float], Dict[str, float]]:
+    def delta(self, pid: int) -> Dict[str, float]:
+        """Category rating change, against the average team, when he plays one SD more games (all started)."""
+        d = self._deltas.get(pid)
+        if d is None:
+            r = self.by_id[pid]
+            sd = availability.row_games_sd(r)
+            moved = v.member_totals(replace(r, exp_gp=r.exp_gp + sd), self.fill)
+            base = v.member_totals(r, self.fill)
+            team = v.with_percentages({k: self.average.get(k, 0.0) + moved.get(k, 0.0) - base.get(k, 0.0)
+                                       for k in v.VOLUME_STATS if k in self.average})
+            before = v.team_ratings(self.average, self.average, self.cats, self.shape.reverse)
+            after = v.team_ratings(team, self.average, self.cats, self.shape.reverse)
+            d = self._deltas[pid] = {c: after.get(c, 100.0) - before.get(c, 100.0) for c in self.cats}
+        return d
+
+    def score(self, ids: Sequence[int]) -> Tuple[float, float, Dict[str, float], Dict[str, float], float]:
+        """(search score, expected wins, ratings, win chances, ± of wins from games played)."""
         self.evaluated += 1
         members = self.mine + [self.cached(i) for i in ids]
+        pids = self.mine_ids + list(ids)
         if len(members) < self.shape.roster_size:
             members.append(v.Member(self.rep_stats, self.rep_rating, None, self.shape.roster_size - len(members)))
-        totals = self.lineup.totals(members)
+        weights = self.lineup.weights(members)
+        totals = v.add_totals((m.stats, w) for m, w in weights)
         ratings = v.team_ratings(totals, self.average, self.cats, self.shape.reverse)
         chances = {c: v.win_chance(ratings[c], c) for c in self.cats}
         utility = sum(v.win_utility(ratings[c], c) for c in self.scored)
-        return utility, sum(chances.values()), ratings, chances
+        # Spread from games played: slopes of win chance and win utility at these ratings.
+        share = {id(m): w for m, w in weights}
+        slope_w = {c: _win_slope(ratings[c], c) for c in self.cats}
+        slope_u = {c: _utility_slope(ratings[c], c) for c in self.scored}
+        var_w = var_u = 0.0
+        for pid, m in zip(pids, members):
+            w = share.get(id(m), 0.0)
+            if w <= 0:
+                continue
+            d = self.delta(pid)
+            var_w += (w * sum(slope_w[c] * d[c] for c in self.cats)) ** 2
+            var_u += (w * sum(slope_u[c] * d[c] for c in self.scored)) ** 2
+        score = utility - FLOOR_Z[self.objective] * math.sqrt(var_u) if self.objective in FLOOR_Z else utility
+        return score, sum(chances.values()), ratings, chances, math.sqrt(var_w)
+
+
+def _win_slope(rating: float, cat: str) -> float:
+    """d win_chance / d rating."""
+    s = v.spread(cat)
+    z = (rating - 100) / s
+    return math.exp(-z * z / 2) / (s * math.sqrt(2 * math.pi))
+
+
+def _utility_slope(rating: float, cat: str) -> float:
+    """d win_utility / d rating: the win-chance slope above 100, constant below (see valuation.win_utility)."""
+    return _win_slope(rating, cat) if rating >= 100 else 1 / (v.spread(cat) * math.sqrt(2 * math.pi))
 
 
 def _knapsack(cands: Sequence[v.Valued], costs: Dict[int, int], picks: int, budget: int, replacement: float) -> List[int]:
@@ -156,9 +225,9 @@ def _improve(env: _Env, ids: List[int], cands: Sequence[int], costs: Dict[int, i
 
 
 def _build(env: _Env, ids: List[int], costs: Dict[int, int]) -> Build:
-    utility, wins, ratings, chances = env.score(ids)
+    score, wins, ratings, chances, wins_sd = env.score(ids)
     order = sorted(ids, key=lambda i: -costs[i])
-    return Build(order, sum(costs[i] for i in ids), utility, wins, ratings, chances)
+    return Build(order, sum(costs[i] for i in ids), score, wins, ratings, chances, wins_sd)
 
 
 def plan_team(
@@ -171,6 +240,8 @@ def plan_team(
     budget_left: int,
     punt: Iterable[str] = (),
     avoid: Iterable[int] = (),
+    objective: str = "wins",
+    averages: Optional[v.Stats] = None,
     pool: int = 140,
     starts: int = 6,
     alternatives: int = 3,
@@ -181,7 +252,11 @@ def plan_team(
     """The best players to buy for the rest of the draft; None when there's nothing to plan.
 
     `avoid` are players I won't buy: never recommended, but still in the
-    simulated league, where other teams draft them.
+    simulated league, where other teams draft them. `objective` is "wins"
+    (most expected wins), "floor" or "floor20" (the best 1-in-10 or 1-in-20
+    season). `averages` (the pool's per-game averages) turns a per-game
+    rating miss into stats for the simulated floors; without it builds get
+    no floor and floor objectives rank by the stand-in.
     """
     mine = [i for i in mine]
     open_spots = shape.roster_size - len(mine)
@@ -191,10 +266,10 @@ def plan_team(
     streamers = open_spots - picks
     budget = budget_left - streamers  # $1 for every streaming spot
     taken_set: Set[int] = set(taken) | set(mine)
-    env = _Env(rows, shape, schedule, mine, list(set(taken)), punt)
+    env = _Env(rows, shape, schedule, mine, list(set(taken)), punt, objective)
     if picks == 0 or budget < picks:
         empty = _build(env, [], costs)
-        return Plan(empty, [], {}, mine, budget_left, streamers, 0, env.evaluated)
+        return Plan(empty, [], {}, mine, budget_left, streamers, 0, env.evaluated, env.objective)
 
     skip = taken_set | set(avoid)
     ranked = [r for r in sorted(rows, key=lambda r: -r.value) if r.id not in skip]
@@ -209,9 +284,11 @@ def plan_team(
         picks -= 1
     streamers = open_spots - picks
     if not first:
-        return Plan(_build(env, [], costs), [], {}, mine, budget_left, streamers, 0, env.evaluated)
+        return Plan(_build(env, [], costs), [], {}, mine, budget_left, streamers, 0, env.evaluated, env.objective)
     ids = [r.id for r in cands]
 
+    if env.objective in FLOOR_Z:
+        starts *= 2  # more distinct end points for the simulation to choose from
     starts_list: List[List[int]] = [first]
     rng = random.Random(seed)
     spread = ids[: max(picks * 8, 60)]
@@ -226,18 +303,32 @@ def plan_team(
     for team in starts_list:
         ends.append(_improve(env, team, ids, costs, budget))
     ends.sort(key=lambda x: -x[0])
-    best = _build(env, ends[0][1], costs)
+    finalists: List[Build] = []
+    for _, team in ends:
+        if not any(set(team) == set(b.ids) for b in finalists):
+            finalists.append(_build(env, team, costs))
+    # The search holds the league fixed; the full simulation also takes the players
+    # I'd buy out of the opponents' pool. Report each build the way My Team would.
+    for b in finalists:
+        _exact(b, rows, shape, schedule, mine, taken_set - set(mine))
+    floors = _Floors(rows, shape, schedule, taken_set - set(mine), averages) if averages else None
+    if env.objective in FLOOR_Z and floors:
+        for b in finalists:
+            floors.score(b, mine)
+        finalists.sort(key=lambda b: -b.floor(env.objective))  # the simulated bad season decides
+    best = finalists[0]
 
     others: List[Build] = []
-    for _, team in ends[1:]:
+    for b in finalists[1:]:
         if len(others) >= builds:
             break
-        if all(len(set(team) - set(b.ids)) >= distinct for b in [best] + others):
-            others.append(_build(env, team, costs))
+        if all(len(set(b.ids) - set(o.ids)) >= distinct for o in [best] + others):
+            others.append(b)
 
     swaps: Dict[int, List[Swap]] = {}
     spent = best.cost
     chosen = set(best.ids)
+    base_wins = env.score(best.ids)[1]  # swaps compare on the search's fixed league, like for like
     for pos, out in enumerate(best.ids):
         room = budget - spent + costs[out]
         options = []
@@ -245,20 +336,38 @@ def plan_team(
             if j in chosen or costs[j] > room:
                 continue
             trial = best.ids[:pos] + [j] + best.ids[pos + 1:]
-            u, w, _, _ = env.score(trial)
+            u, w, _, _, _ = env.score(trial)
             options.append((u, w, j))
         options.sort(key=lambda x: -x[0])
-        swaps[out] = [Swap(out, j, costs[j] - costs[out], w - best.wins) for _, w, j in options[:alternatives]]
+        swaps[out] = [Swap(out, j, costs[j] - costs[out], w - base_wins) for _, w, j in options[:alternatives]]
 
-    # The search holds the league fixed; the full simulation also takes the players
-    # I'd buy out of the opponents' pool. Report each build the way My Team would.
-    for b in [best] + others:
-        _exact(b, rows, shape, schedule, mine, taken_set - set(mine))
-    return Plan(best, others, swaps, mine, budget_left, streamers, len(starts_list), env.evaluated)
+    if floors and env.objective not in FLOOR_Z:
+        for b in [best] + others:
+            floors.score(b, mine)
+    return Plan(best, others, swaps, mine, budget_left, streamers, len(starts_list), env.evaluated, env.objective)
+
+
+class _Floors:
+    """Simulated bad seasons for rosters, against the league with every player at his mean outcome."""
+
+    def __init__(self, rows, shape, schedule, taken, averages):
+        self.rows, self.shape, self.schedule, self.taken, self.averages = rows, shape, schedule, list(taken), averages
+        self.mean_rows = [availability.mean_row(r, averages, shape) for r in rows]
+        self.by_id = {r.id: r for r in rows}
+
+    def score(self, build: Build, mine: Sequence[int]) -> None:
+        roster = list(mine) + build.ids
+        sim = v.simulate_league(self.mean_rows, roster, self.taken, self.shape, self.schedule)
+        tr = availability.team_range([self.by_id[i] for i in roster if i in self.by_id], sim, self.averages,
+                                     self.shape, draws=FLOOR_DRAWS)
+        build.floor10, build.floor20 = tr.quantile(FLOOR_Q["floor"]), tr.quantile(FLOOR_Q["floor20"])
 
 
 def _exact(build: Build, rows, shape, schedule, mine, taken) -> None:
-    sim = v.simulate_league(list(rows), list(mine) + build.ids, list(taken), shape, schedule)
+    roster = list(mine) + build.ids
+    sim = v.simulate_league(list(rows), roster, list(taken), shape, schedule)
     build.ratings = dict(sim.ratings)
     build.chances = {c: v.win_chance(sim.ratings[c], c) for c in shape.categories}
     build.wins = sum(build.chances.values())
+    by_id = {r.id: r for r in rows}
+    build.wins_sd = availability.team_spread([by_id[i] for i in roster if i in by_id], sim, shape).wins

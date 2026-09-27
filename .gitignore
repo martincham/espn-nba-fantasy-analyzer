@@ -1,6 +1,7 @@
 login.txt
 # Draft GUI local data
 draftPool.json
+draftPoolHistory.json
 draftState.json
 *.json.tmp
 history/20*/

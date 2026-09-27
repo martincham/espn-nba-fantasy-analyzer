@@ -44,6 +44,28 @@ class GamesRangeTest(unittest.TestCase):
         self.assertEqual(av.games_range(-5).pmf, av.games_range(0).pmf)
 
 
+class HistoryTest(unittest.TestCase):
+    def test_weighted_toward_the_latest_rotation_seasons(self):
+        past = [[2026, 70, 32.0, 33.0], [2025, 40, 30.0, 31.0], [2024, 82, 34.0, 33.0]]
+        expect = (1.0 * 70 + 0.7 * 40 + 0.5 * 82) / 2.2
+        self.assertAlmostEqual(av.history_availability(past, 2027), expect)
+
+    def test_a_season_lost_to_injury_counts_but_a_bench_role_doesnt(self):
+        injured = [[2026, 0, 0.0, 30.0]]  # ESPN expected a starter; he never played
+        bench = [[2026, 20, 12.0, 14.0]]  # a bench role says nothing about health
+        self.assertEqual(av.history_availability(injured, 2027), 0.0)
+        self.assertIsNone(av.history_availability(bench, 2027))
+        self.assertIsNone(av.history_availability([], 2027))
+
+    def test_short_seasons_scale_to_82(self):
+        self.assertAlmostEqual(av.history_availability([[2021, 72, 30.0, 30.0]], 2022), 82.0)
+
+    def test_poor_history_raises_the_risk(self):
+        self.assertGreater(av.games_range(68, hist=40).p_half, av.games_range(68).p_half)
+        self.assertLess(av.games_range(68, hist=80).p_half, av.games_range(68).p_half)
+        self.assertEqual(av.games_range(68, hist=av.PARAMS.hist_mean).pmf, av.games_range(68).pmf)
+
+
 class ValueRangeTest(unittest.TestCase):
     def test_value_quantiles_are_ordered_and_wider_than_games_alone(self):
         g = av.games_range(72)

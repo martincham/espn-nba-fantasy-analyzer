@@ -9,9 +9,11 @@ rises. Fitted by history/games_model.py on 1,403 player-seasons (2018-19 to
 a time, 81% of actual games fell inside the 80% range.
 
 Age, height, weight, BMI, experience, position, a new team and the team's
-record the season before added nothing beyond ESPN's projection, and past
-availability only a little (not enough to pass), so the only input is the
-projection; the board's GP delta shifts the result.
+record the season before added nothing beyond ESPN's projection. Past
+availability (games over his last three rotation seasons, weighted toward the
+latest) helped a little in 5 of 7 held-out seasons; it's in by the user's
+choice (2026-09-27), mainly for players ESPN projects above their record. The
+board's GP delta shifts the result.
 
 Season value also depends on the per-game rating, which misses by about 9
 points either way, and misses low when games are missed:
@@ -29,13 +31,41 @@ FULL = 82
 HALF = 41  # "loses half the season": fewer games than this
 
 
+HIST_WEIGHTS = (1.0, 0.7, 0.5)  # last season counts most
+ROTATION_MIN, ROTATION_PROJ_MIN = 20.0, 24.0  # a season counts as history at these minutes (played, or ESPN's projection)
+SEASON_GAMES = {2020: 72, 2021: 72}  # shortened seasons (2019-20 varied by team)
+
+
+def history_availability(past: Sequence[Sequence[float]], season: int) -> Optional[float]:
+    """Weighted games (82-game basis) over his last three rotation seasons before `season`; None without any.
+
+    `past` rows are [season, games played, minutes per game, ESPN's projected minutes].
+    Matches history/games_model.py's hist_avail: a season counts when he averaged
+    20+ minutes or ESPN projected 24+ (so a season lost to injury still counts).
+    """
+    by_season = {int(row[0]): row for row in past}
+    pairs = []
+    for k, w in zip((1, 2, 3), HIST_WEIGHTS):
+        row = by_season.get(season - k)
+        if not row:
+            continue
+        _, gp, minutes, proj_min = row
+        if (minutes or 0) >= ROTATION_MIN or (proj_min or 0) >= ROTATION_PROJ_MIN:
+            pairs.append((w, FULL * gp / SEASON_GAMES.get(season - k, FULL)))
+    if not pairs:
+        return None
+    return sum(w * g for w, g in pairs) / sum(w for w, _ in pairs)
+
+
 @dataclass(frozen=True)
 class Params:
     proj_mean: float = 70.86  # ESPN projected games (82-game basis) of the players it was fitted on
     proj_sd: float = 8.125
-    major: tuple = (-2.7226, -0.7570)  # logit P(major absence) = a0 + a1 z, z = standardized projection
-    normal_mean: tuple = (1.2618, 0.4399)  # logit mean share of games in a normal season
-    normal_phi: float = 5.532  # its concentration (higher = tighter)
+    hist_mean: float = 65.90  # past availability of the players it was fitted on (a player without history gets this)
+    hist_sd: float = 12.43
+    major: tuple = (-2.7508, -0.6926, -0.1582)  # logit P(major absence) = a0 + a1 z_proj + a2 z_hist
+    normal_mean: tuple = (1.2671, 0.3631, 0.0809)  # logit mean share of games in a normal season, same inputs
+    normal_phi: float = 5.551  # its concentration (higher = tighter)
     major_mean: tuple = (-1.4728, 0.5472)  # logit mean share of games in a season with a major absence
     major_phi: float = 4.284
     rating_bias: float = -1.384  # per-game rating error when he plays his projected games
@@ -84,8 +114,11 @@ class GamesRange:
         return sum(self.pmf[:HALF])
 
 
-def games_range(projected: float, out: int = 0, shift: int = 0, params: Params = PARAMS) -> GamesRange:
+def games_range(projected: float, out: int = 0, shift: int = 0, hist: Optional[float] = None,
+                params: Params = PARAMS) -> GamesRange:
     """Distribution of games played for ESPN's projection, on 82 games.
+
+    `hist`: past availability (history_availability); None counts as average.
 
     `out`: games he's known to miss at the start of the season. He can play at
     most the rest, with the same chance of playing each of them.
@@ -97,9 +130,11 @@ def games_range(projected: float, out: int = 0, shift: int = 0, params: Params =
     projected = max(0.0, min(float(FULL), projected))
     out = max(0, min(FULL, int(out)))
     z = (projected - params.proj_mean) / params.proj_sd
-    p_major = _sigmoid(params.major[0] + params.major[1] * z)
+    zh = (hist - params.hist_mean) / params.hist_sd if hist is not None else 0.0
+    p_major = _sigmoid(params.major[0] + params.major[1] * z + params.major[2] * zh)
     n = FULL - out
-    normal = _betabinom(n, _sigmoid(params.normal_mean[0] + params.normal_mean[1] * z), params.normal_phi)
+    normal = _betabinom(n, _sigmoid(params.normal_mean[0] + params.normal_mean[1] * z + params.normal_mean[2] * zh),
+                        params.normal_phi)
     major = _betabinom(n, _sigmoid(params.major_mean[0] + params.major_mean[1] * z), params.major_phi)
     base = [(1 - p_major) * a + p_major * b for a, b in zip(normal, major)]
     pmf = [0.0] * (FULL + 1)
@@ -166,10 +201,10 @@ def quantiles(dist, qs: Sequence[float] = (0.1, 0.5, 0.9)) -> List[float]:
 
 
 def expected_value(rating: float, projected: float, replacement: float, out: int = 0, shift: int = 0,
-                   params: Optional[Params] = None) -> float:
+                   hist: Optional[float] = None, params: Optional[Params] = None) -> float:
     """Mean season value: what the player is worth on average once both uncertainties are counted."""
     params = params or PARAMS
-    return value_range(rating, games_range(projected, out, shift, params), replacement, params).mean
+    return value_range(rating, games_range(projected, out, shift, hist, params), replacement, params).mean
 
 
 # --------------------------------------------------------------------------
@@ -195,6 +230,12 @@ def center(row: "v.Valued") -> "tuple[int, int]":
     return row.exp_gp - row.gp_delta, row.gp_delta
 
 
+def row_games(row: "v.Valued", params: Params = PARAMS) -> GamesRange:
+    """A board row's games distribution: ESPN's projection, his past availability, moved by GP delta."""
+    espn, delta = center(row)
+    return games_range(espn, shift=delta, hist=row.hist, params=params)
+
+
 def rating_slope(row: "v.Valued", averages: "v.Stats", shape: "v.LeagueShape") -> float:
     """Rating points per 1.0 of volume scale: turns a rating error into a stat line."""
     base = v.rate(row.proj_stats, averages, shape.rated, shape.weights or None)
@@ -204,8 +245,7 @@ def rating_slope(row: "v.Valued", averages: "v.Stats", shape: "v.LeagueShape") -
 
 def mean_row(row: "v.Valued", averages: "v.Stats", shape: "v.LeagueShape", params: Params = PARAMS) -> "v.Valued":
     """The row at the model's mean outcome: mean games, and the rating error expected at them."""
-    espn, delta = center(row)
-    games = games_range(espn, shift=delta, params=params)
+    games = row_games(row, params)
     mean_games = games.mean
     error = params.rating_bias + params.rating_slope * (mean_games - games.projected)
     factor = max(0.0, 1 + error / rating_slope(row, averages, shape))
@@ -238,8 +278,7 @@ def team_range(my_rows: Sequence["v.Valued"], sim: "v.LeagueSim", averages: "v.S
     rng = random.Random(seed)
     players = []
     for r in my_rows:
-        espn, delta = center(r)
-        games = games_range(espn, shift=delta, params=params)
+        games = row_games(r, params)
         cdf, total = [], 0.0
         for p in games.pmf:
             total += p
@@ -276,17 +315,17 @@ def team_range(my_rows: Sequence["v.Valued"], sim: "v.LeagueSim", averages: "v.S
 import functools  # noqa: E402
 
 
-@functools.lru_cache(maxsize=4096)
-def games_sd(projected: int, shift: int = 0) -> float:
-    """Standard deviation of games played for ESPN's projection moved by `shift`."""
-    g = games_range(projected, shift=shift)
+@functools.lru_cache(maxsize=8192)
+def games_sd(projected: int, shift: int = 0, hist: Optional[int] = None) -> float:
+    """Standard deviation of games played for ESPN's projection (and past availability) moved by `shift`."""
+    g = games_range(projected, shift=shift, hist=hist)
     mean = g.mean
     return math.sqrt(sum(p * (k - mean) ** 2 for k, p in enumerate(g.pmf)))
 
 
 def row_games_sd(row: "v.Valued") -> float:
     espn, delta = center(row)
-    return games_sd(int(round(espn)), int(delta))
+    return games_sd(int(round(espn)), int(delta), None if row.hist is None else int(round(row.hist)))
 
 
 def plus_minus(value: float, zero_games: float, row: "v.Valued") -> float:

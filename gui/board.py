@@ -33,21 +33,25 @@ MINE, TAKEN = "mine", "taken"
 MAX_DELTA = 60  # rating points
 MARKET_SCALE_RANGE = (0.5, 3.0)
 DEFAULT_REPLACEMENT = 95  # per-game rating of a top free agent, who fills a hurt player's games
+# Percent of a player's missed games that actually get filled, measured on this league's 2024-25 and
+# 2025-26 box scores (history/games_model.py fill): 53% of short absences, 69% of whole weeks out.
+DEFAULT_FILL_RATE = 60
 MAX_REPLACEMENT = 150
 DEFAULT_CORE = 7  # players per team worth paying for; the rest are $1 streamers
 # Draft Room settings saved in draftState.json. None means "use the default"
 # (settings.txt, the league on ESPN, the computed price scale, or the constants above).
 DEFAULT_FADE = (110, 140)  # team category rating where extra strength starts to stop helping, and stops
 DEFAULT_ROOM_SETTINGS = {
-    "marketScale": None, "rated": None, "ignorePlayers": None, "replacement": None, "core": None,
+    "marketScale": None, "rated": None, "ignorePlayers": None, "replacement": None, "fillRate": None, "core": None,
     "fadeStart": None, "fadeEnd": None, "punt": [], "fitModel": None,
-    "projLine": None, "catWeights": None, "pricing": None,
+    "projLine": None, "catWeights": None, "pricing": None, "planObjective": None,
 }
 FIT_MODELS = ("wins", "fade")  # weekly win chances (default), or the simple 110-140 fade
 # Rating model choices; the first of each is the default, backtested in docs/BACKTEST_PLAN.md.
 PROJ_LINES = ("espn", "last")  # ESPN's per-game projection, or last season's per-minute rates
 CAT_WEIGHTS = ("league", "equal")  # valuation.CATEGORY_WEIGHTS, or every category equal
 PRICING_MODELS = ("curve", "formula")  # this league's price curve, or the core-share formula
+PLAN_OBJECTIVES = planner.OBJECTIVES  # what the Plan tab maximises: expected wins (default) or a bad season's wins
 
 
 def load_settings(path: str) -> Dict[str, Any]:
@@ -70,12 +74,12 @@ def _r(x: Optional[float], digits: int = 1) -> Optional[float]:
 
 
 @functools.lru_cache(maxsize=8192)
-def _ranges(espn_gp: int, gp_delta: int, proj_pg: float, replacement: float) -> Tuple[Tuple[int, int, int], float, Tuple[float, float, float], float]:
+def _ranges(espn_gp: int, gp_delta: int, hist: Optional[int], proj_pg: float, replacement: float) -> Tuple[Tuple[int, int, int], float, Tuple[float, float, float], float]:
     """Games (p10, p50, p90), P(under 41 games), season value (p10, p50, p90) and mean value.
 
     Cached: a player's inputs change only when you adjust him (see library/availability.py).
     """
-    games = availability.games_range(espn_gp, shift=gp_delta)
+    games = availability.games_range(espn_gp, shift=gp_delta, hist=hist)
     value = availability.value_range(proj_pg, games, replacement)
     return (tuple(availability.quantiles(games)), games.p_half, tuple(availability.quantiles(value)), value.mean)
 
@@ -84,6 +88,8 @@ class DraftBoard:
     def __init__(self, settings_path: str, pool_path: str, state_path: str):
         self.settings_path = settings_path
         self.pool_path = pool_path
+        base, ext = os.path.splitext(pool_path)
+        self.past_path = base + "History" + ext  # players' past seasons, for the games-played model
         self.state_path = state_path
         self.lock = threading.RLock()
         self.settings: Dict[str, Any] = {}
@@ -103,6 +109,7 @@ class DraftBoard:
         self.punt: List[str] = []
         self.fit_model = FIT_MODELS[0]
         self.proj_line, self.cat_weights, self.pricing_model = PROJ_LINES[0], CAT_WEIGHTS[0], PRICING_MODELS[0]
+        self.plan_objective = PLAN_OBJECTIVES[0]
         self.plan: Optional[Dict[str, Any]] = None  # the Plan tab's last result (not saved)
         self._team_range: "tuple[str, Optional[Dict[str, Any]]]" = ("", None)  # (inputs, result) of the last team range
         self.default_rated: List[str] = []
@@ -128,6 +135,7 @@ class DraftBoard:
                     self.team_days = team_days
             else:
                 self._fetch()
+            self._load_past(refresh)
             self._prepare()
             self._load_state()
             self._apply_settings()
@@ -147,6 +155,20 @@ class DraftBoard:
         self.team_days = self._fetch_schedule(season)
         self.league, self.players, self.fetched_at = league, players, time.time()
         draft.save_pool(self.pool_path, league, players, self.team_days)
+
+    def _load_past(self, refresh: bool = False) -> None:
+        """Each player's past availability (library/availability.history_availability), cached next to the pool."""
+        season = self.league.season
+        past = None if refresh else draft.load_past(self.past_path, season)
+        if past is None:
+            try:
+                past = draft.fetch_past(season, [p.id for p in self.players])
+                draft.save_past(self.past_path, season, past)
+            except draft.EspnError as ex:
+                self.warnings.append(f"No past seasons for the games-played model: {ex}")
+                past = {}
+        for p in self.players:
+            p.hist_avail = availability.history_availability(past.get(p.id, []), season)
 
     def _fetch_schedule(self, season: int) -> Dict[str, List[int]]:
         try:
@@ -177,7 +199,7 @@ class DraftBoard:
             rated=list(self.default_rated),
             starters=sum(1 for slot in self.slots if slot != roster.BENCH),
         )
-        self.warnings = [w for w in self.warnings if w.startswith(("Using default", "No NBA schedule"))]
+        self.warnings = [w for w in self.warnings if w.startswith(("Using default", "No NBA schedule", "No past seasons"))]
         if league.draft_type != "AUCTION":
             self.warnings.append(f"This league's draft type is {league.draft_type.lower()}; values are still shown in auction dollars.")
         # ESPN's average prices come from leagues of every size, so they add up
@@ -193,6 +215,7 @@ class DraftBoard:
         self.shape.ignore_players = room["ignorePlayers"] if room["ignorePlayers"] is not None else self.default_ignore
         self.market_scale = room["marketScale"] if room["marketScale"] is not None else self.auto_market_scale
         self.shape.replacement = float(room["replacement"] if room["replacement"] is not None else DEFAULT_REPLACEMENT)
+        self.shape.fill_rate = (room.get("fillRate") if room.get("fillRate") is not None else DEFAULT_FILL_RATE) / 100
         self.shape.core = room["core"] if room["core"] is not None else min(DEFAULT_CORE, len(self.slots))
         start = room["fadeStart"] if room["fadeStart"] is not None else DEFAULT_FADE[0]
         end = room["fadeEnd"] if room["fadeEnd"] is not None else DEFAULT_FADE[1]
@@ -202,6 +225,7 @@ class DraftBoard:
         self.proj_line = room["projLine"] or PROJ_LINES[0]
         self.cat_weights = room["catWeights"] or CAT_WEIGHTS[0]
         self.pricing_model = room["pricing"] or PRICING_MODELS[0]
+        self.plan_objective = room.get("planObjective") or PLAN_OBJECTIVES[0]
         for p in self.players:
             p.line_source = self.proj_line
         self.shape.weights = dict(valuation.CATEGORY_WEIGHTS) if self.cat_weights == "league" else {}
@@ -272,6 +296,8 @@ class DraftBoard:
                 room["ignorePlayers"] = max(0, min(len(self.slots) - 1, int(saved["ignorePlayers"])))
             if saved.get("replacement") is not None:
                 room["replacement"] = max(0, min(MAX_REPLACEMENT, int(round(float(saved["replacement"])))))
+            if saved.get("fillRate") is not None:
+                room["fillRate"] = max(0, min(100, int(round(float(saved["fillRate"])))))
             if saved.get("core") is not None:
                 room["core"] = max(1, min(len(self.slots), int(saved["core"])))
             if saved.get("fadeStart") is not None:
@@ -286,6 +312,8 @@ class DraftBoard:
                 room["catWeights"] = saved["catWeights"]
             if saved.get("pricing") in PRICING_MODELS:
                 room["pricing"] = saved["pricing"]
+            if saved.get("planObjective") in PLAN_OBJECTIVES:
+                room["planObjective"] = saved["planObjective"]
             # Punting is always your choice: only categories you tick are punted.
             room["punt"] = [c for c in cats if c in set(saved.get("punt") or [])]
         except (TypeError, ValueError):
@@ -502,6 +530,8 @@ class DraftBoard:
                 "budget_left": self._me(picks, mine)["budgetLeft"],
                 "punt": list(self.punt),
                 "avoid": list(self.state["avoid"]),
+                "objective": self.plan_objective,
+                "averages": dict(self.baseline.per_game),
             }
             stamp = self._plan_stamp()
             self.plan = {"status": "building", "stamp": stamp, "started": time.time()}
@@ -525,6 +555,9 @@ class DraftBoard:
         def build(b: planner.Build) -> Dict[str, Any]:
             return {
                 "ids": b.ids, "cost": b.cost, "wins": round(b.wins, 2),
+                "winsSd": round(b.wins_sd, 3),
+                "floor10": None if b.floor10 is None else round(b.floor10, 2),
+                "floor20": None if b.floor20 is None else round(b.floor20, 2),
                 "chances": {c: round(x, 3) for c, x in b.chances.items()},
                 "ratings": {c: round(x, 1) for c, x in b.ratings.items()},
             }
@@ -544,7 +577,7 @@ class DraftBoard:
         return {
             "best": best, "builds": others, "swaps": swaps, "mine": plan.mine,
             "budgetLeft": plan.budget_left, "streamers": plan.streamers,
-            "searched": plan.searched, "evaluated": plan.evaluated,
+            "searched": plan.searched, "evaluated": plan.evaluated, "objective": plan.objective,
             "costs": {str(i): costs[i] for i in ids},
         }
 
@@ -576,8 +609,9 @@ class DraftBoard:
         rate = valuation.pricing(rows, shape)
         # Ranges: games and season value when both games and the per-game rating are uncertain.
         # Their dollars are priced against every player's mean outcome, so the ranges share a scale.
-        ranges = {r.id: _ranges(self.by_id[r.id].default_exp_gp, r.gp_delta, round(r.proj_pg, 1), float(shape.replacement))
-                  for r in rows}
+        missed_value = shape.replacement * shape.fill_rate  # what a missed game is worth on average: filled or lost
+        ranges = {r.id: _ranges(self.by_id[r.id].default_exp_gp, r.gp_delta, None if r.hist is None else round(r.hist),
+                                round(r.proj_pg, 1), missed_value) for r in rows}
         range_rate = valuation.pricing([SimpleNamespace(value=x[3]) for x in ranges.values()], shape)
         # Fit rank among players I can still get (and my own).
         fit_order = sorted((pid for pid in fits if picks.get(pid, {}).get("status") != TAKEN), key=lambda pid: -fits[pid])
@@ -621,7 +655,7 @@ class DraftBoard:
                 "delta": r.delta,
                 "projPg": _r(r.proj_pg),
                 "value": _r(r.value, 2),
-                "valuePm": _r(availability.plus_minus(r.value, float(shape.replacement), r), 1),  # ± 1 SD of games
+                "valuePm": _r(availability.plus_minus(r.value, missed_value, r), 1),  # ± 1 SD of games
                 "rank": r.rank,
                 "espnRank": p.espn_rank,
                 "espn": _r(p.espn_value, 0),
@@ -692,6 +726,7 @@ class DraftBoard:
             "pricedSize": shape.priced_size,
             "fade": [self.fade.start, self.fade.end],
             "fitModel": self.fit_model,
+            "planObjective": self.plan_objective,
             "projLine": self.proj_line,
             "catWeights": self.cat_weights,
             "pricingModel": self.pricing_model,
@@ -701,6 +736,7 @@ class DraftBoard:
             "punt": self.punt,
             "fitCategories": self.fit_categories(),
             "replacement": shape.replacement,
+            "fillRate": round(shape.fill_rate * 100),
             "core": shape.core,
             "gamesInSeason": valuation.GAMES_IN_SEASON,
             "maxReplacement": MAX_REPLACEMENT,
@@ -708,6 +744,7 @@ class DraftBoard:
                 "rated": self.default_rated,
                 "ignorePlayers": self.default_ignore,
                 "replacement": DEFAULT_REPLACEMENT,
+                "fillRate": DEFAULT_FILL_RATE,
                 "core": min(DEFAULT_CORE, len(self.slots)),
                 "fade": list(DEFAULT_FADE),
             },

@@ -173,6 +173,9 @@ class DraftValueTest(unittest.TestCase):
         self.assertAlmostEqual(v.season_value(140, 41, 90), 115)
         self.assertAlmostEqual(v.season_value(90, 10, 90), 90)  # a replacement player is worth replacement
         self.assertAlmostEqual(v.season_value(100, 120), 100)  # games capped at a season
+        # Only the filled share of missed games counts at the replacement rating.
+        self.assertAlmostEqual(v.season_value(140, 41, 90, fill_rate=0.5), (140 * 41 + 45 * 41) / 82)
+        self.assertAlmostEqual(v.season_value(140, 41, 90, fill_rate=0.0), 70)
 
     def test_value_is_per_game_rating_times_games(self):
         plain = self.value()

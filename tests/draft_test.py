@@ -1,12 +1,18 @@
+import copy
+import http.client
 import json
 import os
+import socket
 import tempfile
 import unittest
+from dataclasses import replace
+from datetime import date
 from unittest import mock
 
 from library import draft
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
+OPENING = "2026-10-20"  # opening night of the fixture's schedule (day 1)
 
 
 def fixture(name):
@@ -77,7 +83,7 @@ class ParseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "pool.json")
             draft.save_pool(path, league, players)
-            loaded_league, loaded, _, _ = draft.load_pool(path)
+            loaded_league, loaded, _, _, _ = draft.load_pool(path)
         self.assertEqual(loaded_league.categories, league.categories)
         self.assertEqual([p.name for p in loaded], [p.name for p in players])
         self.assertEqual(loaded[0].last_pg, players[0].last_pg)
@@ -110,15 +116,101 @@ class BoardTest(unittest.TestCase):
         schedule = draft.parse_schedule(fixture("espn_schedule_2027.json"))
         with mock.patch.object(draft, "fetch_league", return_value=league), mock.patch.object(
             draft, "fetch_pool", return_value=players
-        ), mock.patch.object(draft, "fetch_schedule", return_value=schedule), mock.patch.object(
+        ), mock.patch.object(draft, "fetch_schedule", return_value=(schedule, OPENING)), mock.patch.object(
             draft, "fetch_past", return_value={}
-        ):
+        ), mock.patch.object(draft, "fetch_birth_dates", return_value={3112335: "1995-02-19"}):
             self.board = DraftBoard(settings, os.path.join(self.tmp.name, "pool.json"), os.path.join(self.tmp.name, "state.json"))
             self.board.load()
         self.ids = {p.name: p.id for p in players}
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def test_age(self):
+        rows = {r["name"]: r for r in self.board.snapshot()["rows"]}
+        self.assertEqual(rows["Nikola Jokic"]["age"], 31)  # born 1995-02-19; season age is on Feb 1, 2027
+        self.assertIsNone(next(r for r in rows.values() if r["name"] != "Nikola Jokic")["age"])
+
+    def test_old_cache_gets_birth_dates(self):
+        from gui.board import DraftBoard
+
+        b = self.board
+        for p in b.players:
+            p.birth_date = None
+        draft.save_pool(b.pool_path, b.league, b.players, b.team_days)
+        with mock.patch.object(draft, "fetch_birth_dates", return_value={3112335: "1995-02-19"}) as fetch:
+            DraftBoard(b.settings_path, b.pool_path, b.state_path).load()
+            DraftBoard(b.settings_path, b.pool_path, b.state_path).load()  # now cached
+        fetch.assert_called_once()
+        _, players, _, _, _ = draft.load_pool(b.pool_path)
+        self.assertEqual({p.id: p.birth_date for p in players}[3112335], "1995-02-19")
+
+    def test_birth_dates_looked_up_once(self):
+        from gui.board import DraftBoard
+
+        b = self.board
+        fetched_at = b.fetched_at
+        for p in b.players:
+            p.birth_date = None
+        draft.save_pool(b.pool_path, b.league, b.players, b.team_days, fetched_at)  # a cache from before birth dates
+        with mock.patch.object(draft, "fetch_birth_dates", return_value={}) as fetch:  # ESPN has none of them
+            DraftBoard(b.settings_path, b.pool_path, b.state_path).load()
+            DraftBoard(b.settings_path, b.pool_path, b.state_path).load()
+        fetch.assert_called_once()
+        self.assertEqual(draft.load_pool(b.pool_path)[3], fetched_at)  # still when the pool came from ESPN
+
+    def test_birth_dates_retried_after_a_failure(self):
+        from gui.board import DraftBoard
+
+        b = self.board
+        draft.save_pool(b.pool_path, b.league, b.players, b.team_days, b.fetched_at)  # birth dates not looked up yet
+        with mock.patch.object(draft, "fetch_birth_dates", side_effect=draft.EspnError("Couldn't reach ESPN")):
+            failed = DraftBoard(b.settings_path, b.pool_path, b.state_path)
+            failed.load()
+        self.assertTrue(any(w.startswith("No ages") for w in failed.warnings))
+        self.assertFalse(draft.load_pool(b.pool_path)[4])
+        with mock.patch.object(draft, "fetch_birth_dates", return_value={}):
+            failed.load()
+        self.assertEqual(failed.warnings, [])  # the old warning goes once ages load
+
+    def refresh(self, rookie=False, **patches):
+        players = [replace(p, birth_date=None) for p in self.board.players]
+        if rookie:  # someone new in the pool
+            players.append(replace(players[-1], id=999999999, name="New Player"))
+        with mock.patch.object(draft, "fetch_league", return_value=self.board.league), mock.patch.object(
+            draft, "fetch_pool", return_value=players
+        ), mock.patch.object(draft, "fetch_schedule", return_value=(self.board.team_days, OPENING)), mock.patch.object(
+            draft, "fetch_past", return_value={}
+        ), mock.patch.object(draft, "fetch_birth_dates", **patches) as fetch:
+            self.board.load(refresh=True)
+        return fetch
+
+    def test_refresh_keeps_birth_dates(self):
+        fetch = self.refresh(return_value={})
+        # Only players with no birth date are looked up again.
+        self.assertNotIn(self.ids["Nikola Jokic"], fetch.call_args[0][0])
+        self.assertEqual(self.board.by_id[self.ids["Nikola Jokic"]].birth_date, "1995-02-19")
+
+    def test_failed_refresh_keeps_the_board(self):
+        before = self.board.snapshot()["rows"]
+        with self.assertRaises(RuntimeError):
+            self.refresh(rookie=True, side_effect=RuntimeError("boom"))
+        self.assertEqual(self.board.snapshot()["rows"], before)
+
+    def test_undo_refused_after_another_change(self):
+        b = self.board
+        jokic = self.ids["Nikola Jokic"]
+        before = copy.deepcopy(b.state)
+        b.pick(jokic, "taken")
+        rev = b.rev
+        self.assertIsNone(b.replace_state(before, rev))  # nothing changed since: undone
+        self.assertNotIn(str(jokic), b.state["picks"])
+        b.pick(jokic, "taken")
+        rev = b.rev
+        other = next(pid for pid in self.ids.values() if pid != jokic)
+        b.pick(other, "taken")  # a co-manager marks a pick
+        self.assertIsNotNone(b.replace_state(before, rev))
+        self.assertIn(str(other), b.state["picks"])
 
     def test_snapshot_shape(self):
         snap = self.board.snapshot()
@@ -214,27 +306,33 @@ class BoardTest(unittest.TestCase):
 
         b = self.board
         meta = b.snapshot()["meta"]
-        self.assertEqual((meta["projLine"], meta["catWeights"], meta["pricingModel"]), ("espn", "league", "curve"))
+        # Defaults: ESPN's line and category weights (backtested), and worth pricing (no cap).
+        self.assertEqual((meta["projLine"], meta["catWeights"], meta["pricingModel"]), ("espn", "league", "formula"))
         self.assertEqual(b.shape.weights, valuation.CATEGORY_WEIGHTS)
-        self.assertTrue(b.shape.price_curve)
-        self.assertTrue(all(p.line_source == "espn" for p in b.players))
-        top = max(r["ours"] for r in b.snapshot()["rows"])
-        self.assertLessEqual(top, meta["curveTop"] + 1)
-        # Switch everything back to the old model.
-        b.update_settings(projLine="last", catWeights="equal", pricing="formula")
-        meta = b.snapshot()["meta"]
-        self.assertEqual((meta["projLine"], meta["catWeights"], meta["pricingModel"]), ("last", "equal", "formula"))
-        self.assertEqual((b.shape.weights, b.shape.price_curve), ({}, []))
-        self.assertTrue(all(p.line_source == "last" for p in b.players))
+        self.assertEqual(b.shape.price_curve, [])
         self.assertIsNone(meta["curveTop"])
+        self.assertTrue(all(p.line_source == "espn" for p in b.players))
+        worth_top = max(r["ours"] for r in b.snapshot()["rows"])
+        # The league price curve caps Ours at what the room has paid for its top player.
+        b.update_settings(pricing="curve")
+        meta = b.snapshot()["meta"]
+        self.assertTrue(b.shape.price_curve)
+        self.assertLessEqual(max(r["ours"] for r in b.snapshot()["rows"]), meta["curveTop"] + 1)
+        self.assertGreaterEqual(worth_top, meta["curveTop"] - 1)
+        # Switch the rest to the old model too.
+        b.update_settings(projLine="last", catWeights="equal")
+        meta = b.snapshot()["meta"]
+        self.assertEqual((meta["projLine"], meta["catWeights"], meta["pricingModel"]), ("last", "equal", "curve"))
+        self.assertEqual(b.shape.weights, {})
+        self.assertTrue(all(p.line_source == "last" for p in b.players))
         # Saved with the draft state, and reset to the defaults with None.
         from gui.board import DraftBoard
 
         again = DraftBoard(b.settings_path, b.pool_path, b.state_path)
         again.load()
-        self.assertEqual((again.proj_line, again.cat_weights, again.pricing_model), ("last", "equal", "formula"))
+        self.assertEqual((again.proj_line, again.cat_weights, again.pricing_model), ("last", "equal", "curve"))
         b.update_settings(projLine=None, catWeights=None, pricing=None)
-        self.assertEqual((b.proj_line, b.cat_weights, b.pricing_model), ("espn", "league", "curve"))
+        self.assertEqual((b.proj_line, b.cat_weights, b.pricing_model), ("espn", "league", "formula"))
         b.update_settings(projLine="last")
         b.update_settings(projLine="bogus")  # a bad value falls back to the default, like the Fit setting
         self.assertEqual(b.proj_line, "espn")
@@ -397,6 +495,46 @@ class ServerTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BirthDateTest(unittest.TestCase):
+    def test_parse_birth_dates(self):
+        data = {"items": [
+            {"id": "4431679", "dateOfBirth": "1999-09-19T07:00Z"},
+            {"id": "5", "dateOfBirth": None},
+            {"id": "6"},
+        ]}
+        self.assertEqual(draft.parse_birth_dates(data), {4431679: "1999-09-19"})
+
+    def test_age_on(self):
+        self.assertEqual(draft.age_on("1999-09-19", date(2026, 9, 18)), 26)
+        self.assertEqual(draft.age_on("1999-09-19", date(2026, 9, 19)), 27)
+        self.assertEqual(draft.age_on("2000-02-29", date(2026, 2, 28)), 25)
+        self.assertEqual(draft.age_on("2000-02-29", date(2026, 3, 1)), 26)
+        self.assertIsNone(draft.age_on(None, date(2026, 9, 19)))
+        self.assertIsNone(draft.age_on("1999-9-19T", date(2026, 9, 19)))  # a bad value in an old cache
+
+    def test_malformed_birth_dates_dropped(self):
+        data = {"items": [{"id": "1", "dateOfBirth": "1999-9-19T07:00Z"}, {"id": "2", "dateOfBirth": "unknown"}]}
+        self.assertEqual(draft.parse_birth_dates(data), {})
+
+
+class HttpTest(unittest.TestCase):
+    def test_network_failures_are_espn_errors(self):
+        failures = [
+            http.client.RemoteDisconnected("closed"),
+            ConnectionResetError(54, "reset"),
+            socket.timeout("timed out"),  # not a TimeoutError on Python 3.9
+        ]
+        for failure in failures:
+            with mock.patch("urllib.request.urlopen", side_effect=failure), self.assertRaises(draft.EspnError):
+                draft._get_json("https://example.invalid")
+
+    def test_non_json_is_an_espn_error(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b"<html>down for maintenance</html>"
+        with mock.patch("urllib.request.urlopen", return_value=response), self.assertRaises(draft.EspnError):
+            draft._get_json("https://example.invalid")
 
 
 class PastSeasonsTest(unittest.TestCase):

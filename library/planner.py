@@ -271,13 +271,12 @@ def plan_team(
         empty = _build(env, [], costs)
         return Plan(empty, [], {}, mine, budget_left, streamers, 0, env.evaluated, env.objective)
 
-    skip = taken_set | set(avoid)
-    ranked = [r for r in sorted(rows, key=lambda r: -r.value) if r.id not in skip]
+    ranked = _ranked(rows, taken_set | set(avoid))
     # Buy as many counted players as the budget allows; any spot left over streams at $1.
     first: List[int] = []
     while picks > 0:
         budget = budget_left - (open_spots - picks)
-        cands = [r for r in ranked if costs.get(r.id, 1) <= budget - (picks - 1)][:pool]
+        cands = _candidates(ranked, costs, picks, budget, pool)
         first = _knapsack(cands, costs, picks, budget, shape.replacement) if budget >= picks else []
         if first:
             break
@@ -325,14 +324,65 @@ def plan_team(
         if all(len(set(b.ids) - set(o.ids)) >= distinct for o in [best] + others):
             others.append(b)
 
+    swaps = _swaps(env, best, ids, costs, budget, alternatives)
+    if floors and env.objective not in FLOOR_Z:
+        for b in [best] + others:
+            floors.score(b, mine)
+    return Plan(best, others, swaps, mine, budget_left, streamers, len(starts_list), env.evaluated, env.objective)
+
+
+def score_team(
+    rows: Sequence[v.Valued],
+    shape: v.LeagueShape,
+    schedule: Optional[v.Schedule],
+    costs: Dict[int, int],
+    mine: Sequence[int],
+    taken: Iterable[int],
+    budget_left: int,
+    ids: Sequence[int],
+    punt: Iterable[str] = (),
+    avoid: Iterable[int] = (),
+    objective: str = "wins",
+    averages: Optional[v.Stats] = None,
+    pool: int = 140,
+    alternatives: int = 3,
+) -> Plan:
+    """A roster I chose instead (say, the plan with a player switched), scored and
+    given alternatives the way plan_team scores its best. Takes plan_team's inputs
+    plus `ids`, the players to buy; the other open spots stream at $1."""
+    mine = list(mine)
+    ids = list(ids)
+    streamers = shape.roster_size - len(mine) - len(ids)
+    budget = budget_left - streamers
+    taken_set: Set[int] = set(taken) | set(mine)
+    env = _Env(rows, shape, schedule, mine, list(set(taken)), punt, objective)
+    cands = [r.id for r in _candidates(_ranked(rows, taken_set | set(avoid)), costs, len(ids), budget, pool)]
+    best = _build(env, ids, costs)
+    swaps = _swaps(env, best, cands, costs, budget, alternatives)
+    _exact(best, rows, shape, schedule, mine, taken_set - set(mine))
+    if averages:
+        _Floors(rows, shape, schedule, taken_set - set(mine), averages).score(best, mine)
+    return Plan(best, [], swaps, mine, budget_left, streamers, 0, env.evaluated, env.objective)
+
+
+def _ranked(rows: Sequence[v.Valued], skip: Set[int]) -> List[v.Valued]:
+    return [r for r in sorted(rows, key=lambda r: -r.value) if r.id not in skip]
+
+
+def _candidates(ranked: Sequence[v.Valued], costs: Dict[int, int], picks: int, budget: int, pool: int) -> List[v.Valued]:
+    """The `pool` most valuable players who fit the budget with $1 for each other pick."""
+    return [r for r in ranked if costs.get(r.id, 1) <= budget - (picks - 1)][:pool]
+
+
+def _swaps(env: _Env, best: Build, cands: Sequence[int], costs: Dict[int, int], budget: int, alternatives: int) -> Dict[int, List[Swap]]:
+    """Per player to buy, the best affordable players to take his spot."""
     swaps: Dict[int, List[Swap]] = {}
-    spent = best.cost
     chosen = set(best.ids)
     base_wins = env.score(best.ids)[1]  # swaps compare on the search's fixed league, like for like
     for pos, out in enumerate(best.ids):
-        room = budget - spent + costs[out]
+        room = budget - best.cost + costs[out]
         options = []
-        for j in ids:
+        for j in cands:
             if j in chosen or costs[j] > room:
                 continue
             trial = best.ids[:pos] + [j] + best.ids[pos + 1:]
@@ -340,11 +390,7 @@ def plan_team(
             options.append((u, w, j))
         options.sort(key=lambda x: -x[0])
         swaps[out] = [Swap(out, j, costs[j] - costs[out], w - base_wins) for _, w, j in options[:alternatives]]
-
-    if floors and env.objective not in FLOOR_Z:
-        for b in [best] + others:
-            floors.score(b, mine)
-    return Plan(best, others, swaps, mine, budget_left, streamers, len(starts_list), env.evaluated, env.objective)
+    return swaps
 
 
 class _Floors:

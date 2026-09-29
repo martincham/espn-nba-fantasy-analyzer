@@ -5,7 +5,7 @@
 const $ = (id) => document.getElementById(id);
 let B = null; // latest board snapshot
 let byId = new Map();
-const UI = { q: "", pos: "ALL", team: "ALL", hideGone: false, onlyAdj: false, affordable: false, catSel: [], sort: { key: "rank", dir: 1 },
+const UI = { q: "", pos: "ALL", team: "ALL", hideGone: false, onlyAdj: false, affordable: false, maxCost: null, minMin: null, minValue: null, catSel: [], sort: { key: "rank", dir: 1 },
   sel: null, view: "board", pickSlot: null, dragging: false };
 
 // ------------------------------------------------------------------ format
@@ -73,7 +73,9 @@ const sendSettings = liveSender("settings");
 
 // Snapshot state so destructive actions can be undone.
 const snapshotState = () => JSON.parse(JSON.stringify(B.state));
-const undoTo = (state) => () => act("state", { state });
+// Called right after the action, so B.rev is the board it produced: the server
+// refuses the undo if anything (say, a co-manager's pick) has changed since.
+const undoTo = (state) => { const rev = B.rev; return () => act("state", { state, rev }); };
 
 // ------------------------------------------------------------------ toast
 
@@ -109,7 +111,7 @@ function render() {
     UI.sel = first ? first.id : null;
   }
   if (!$("teams").childElementCount) renderTeams();
-  renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam(); renderPlan(); renderSettings();
+  renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam(); renderPlan(); renderPlayoffs(); renderSettings();
 }
 function renderLive() { // while dragging a slider: leave the panel being dragged alone
   byId = new Map(B.rows.map((r) => [r.id, r]));
@@ -141,12 +143,37 @@ function renderMeta() {
 }
 
 
+// Max cost slider: its right end is the priciest player, and means no limit.
+function renderMaxCost() {
+  const el = $("maxCost"), top = Math.max(1, ...B.rows.map((r) => Math.round(r.avg)));
+  if (UI.maxCost != null && UI.maxCost >= top) UI.maxCost = null;
+  el.max = top;
+  el.value = UI.maxCost ?? top;
+  $("maxCostOut").textContent = UI.maxCost == null ? "Any" : `≤ ${money(UI.maxCost)}`;
+  renderMinSliders();
+}
+// Min MIN and Min value sliders: their left end is the lowest in the pool, and means no limit.
+function renderMinSliders() {
+  const mins = $("minMin"), vals = $("minValue");
+  const topMin = Math.max(1, Math.ceil(Math.max(...B.rows.map((r) => r.expMin))));
+  const lo = Math.floor(Math.min(...B.rows.map((r) => r.value))), hi = Math.max(lo + 1, Math.ceil(Math.max(...B.rows.map((r) => r.value))));
+  if (UI.minMin != null && UI.minMin <= 0) UI.minMin = null;
+  if (UI.minValue != null && UI.minValue <= lo) UI.minValue = null;
+  mins.max = topMin;
+  mins.value = UI.minMin ?? 0;
+  vals.min = lo; vals.max = hi;
+  vals.value = UI.minValue ?? lo;
+  $("minMinOut").textContent = UI.minMin == null ? "Any" : `≥ ${UI.minMin}`;
+  $("minValueOut").textContent = UI.minValue == null ? "Any" : `≥ ${UI.minValue}`;
+}
+
 function renderScore() {
   const me = B.me, pool = B.pool;
   $("sBudget").textContent = money(me.budgetLeft);
   $("sMax").textContent = `max bid ${money(me.maxBid)}`;
   $("affordableTxt").textContent = `Only affordable (≤ ${money(me.maxBid)})`;
   $("affordableLbl").title = `Hide undrafted players whose Avg paid is more than your max bid (${money(me.maxBid)})`;
+  renderMaxCost();
   $("sRoster").textContent = `${me.count} / ${B.meta.rosterSize}`;
   $("sRosterSub").textContent = me.count ? me.names.map(lastName).join(", ") : "No picks yet";
   $("sPool").textContent = `${pool.left} / ${pool.size}`;
@@ -253,7 +280,8 @@ let showCats = false;
 try { showCats = localStorage.getItem("draftroom-cats") === "1"; } catch (e) { /* storage blocked */ }
 const catKey = (c) => "cat:" + c;
 const GROUPS = () => [
-  { label: "", span: 3, toggle: true },
+  { label: "", span: 3, toggle: true }, // over the frozen Taken, Rk and Player columns, so it stays as wide as they are
+  { label: "", span: 1 }, // Age scrolls
   ...(showCats ? [{ label: "Categories · per game", span: B.meta.categories.length + 1, cls: "g-cats" }] : []),
   { label: B.meta.statsLabel, span: 3 },
   { label: `${B.meta.seasonLabel} outlook`, span: 9, cls: "g-out" },
@@ -261,8 +289,9 @@ const GROUPS = () => [
 ];
 const BASE_COLS = [
   { key: "taken", label: "", sr: "Taken", nosort: true, cls: "tk-h", title: "Drafted by another team" },
-  { key: "rank", label: "Rk", title: "Rank by value" },
-  { key: "name", label: "Player", cls: "l" },
+  { key: "rank", label: "Rk", cls: "rk-h", title: "Rank by value" },
+  { key: "name", label: "Player", cls: "l l-h" },
+  { key: "age", label: "Age", title: "Season age: his age on February 1 of the season, as Basketball Reference counts it" },
   { key: "gp", label: "GP", title: "Games played last season" },
   { key: "lastPg", label: "Per gm", title: "Per-game rating (100 = pool average)" },
   { key: "lastValue", label: "Value", title: "Per-game rating over the season, with missed games filled by a replacement free agent" },
@@ -276,14 +305,14 @@ const BASE_COLS = [
   { key: "value", label: "Value", title: "Projected per-game rating over 82 games: Exp GP at his rating; of the games he misses, the filled share at the replacement rating and the rest lost (Settings). ± is one standard deviation from games played alone." },
   { key: "fit", label: "Fit", title: "Value to your current team: how much he raises your weekly category win chances. Categories you're already winning count less, punted ones not at all. Only games he'd start count, so games on nights your roster is already full add less. 100 = an average player. ± is one standard deviation from games played alone." },
   { key: "avg", label: "Cost", title: "What he should cost: the average price in ESPN auction drafts, scaled to this league's budget, unless you set your own. Drag or type; clear to go back to ESPN's." },
-  { key: "ours", label: "Ours", cls: "ours-h", title: "Our value before the draft" },
-  { key: "edge", label: "Edge", cls: "ours-h", title: "Ours − Avg paid" },
-  { key: "fitEdge", label: "Fit edge", cls: "ours-h", title: "Fit $ − Avg paid: the bargain for your current team. Fit $ converts Fit to dollars at the league's rate." },
+  { key: "ours", label: "Ours", cls: "ours-h", title: "What he's worth: the league's money split among the players worth buying, in proportion to their value above replacement. No cap: a player far better than the rest is worth far more." },
+  { key: "edge", label: "Edge", cls: "ours-h", title: "Ours − Cost: what he's worth minus what he should go for" },
+  { key: "fitEdge", label: "Fit edge", cls: "ours-h", title: "Fit $ − Cost: the bargain for your current team. Fit $ converts Fit to dollars at the same rate as Ours." },
 ];
 
 function cols() {
   if (!showCats) return BASE_COLS;
-  const at = BASE_COLS.findIndex((c) => c.key === "name") + 1;
+  const at = BASE_COLS.findIndex((c) => c.key === "age") + 1;
   const m = B.meta;
   const mix = {
     key: "catmix", label: UI.catSel.length ? `Mix <small>${UI.catSel.length}</small>` : "Mix", cls: "cat-h mix-h",
@@ -319,7 +348,10 @@ function visibleRows() {
     (UI.team === "ALL" || r.team === UI.team) &&
     (!UI.hideGone || !r.status) &&
     (!UI.onlyAdj || r.delta || r.gpDelta || r.minSet || r.note) &&
-    (!UI.affordable || r.status || Math.round(r.avg) <= B.me.maxBid));
+    (!UI.affordable || r.status || Math.round(r.avg) <= B.me.maxBid) &&
+    (UI.maxCost == null || r.status || Math.round(r.avg) <= UI.maxCost) &&
+    (UI.minMin == null || r.status || r.expMin >= UI.minMin) &&
+    (UI.minValue == null || r.status || r.value >= UI.minValue));
   const { key, dir } = UI.sort;
   const val = (r) => (key === "catmix" ? catMix(r) : r[key]);
   rows.sort((a, b) => {
@@ -394,13 +426,17 @@ const riskCls = (p) => (p >= 0.25 ? "hi" : p >= 0.15 ? "mid" : "");
 // ± one standard deviation from games played alone (library/availability.py).
 const pm = (x) => (x == null ? "" : `<small class="pm">±${x < 10 ? x.toFixed(1) : Math.round(x)}</small>`);
 
+// The value an edited Exp MIN or Cost cell replaced, shown small above its top-left corner.
+const was = (v) => `<span class="was" aria-hidden="true">${v}</span>`;
+
 function rowHTML(r) {
   const e = r.edge, ecls = edgeCls(e);
   const drag = r.status === "taken" ? "" : ` draggable="true" data-drag="${r.id}" title="Drag onto a roster slot"`;
-  return `<tr data-id="${r.id}" class="${UI.sel === r.id ? "sel" : ""} ${r.status ? "gone" : ""}">
+  return `<tr data-id="${r.id}" class="${UI.sel === r.id ? "sel" : ""} ${r.status ? "gone" : ""}"${drag}>
     <td class="tk">${takenToggle(r)}</td>
     <td class="rk">${r.rank}</td>
-    <td class="l"><div class="pcell"${drag}><span class="pname">${esc(r.name)}${statusPill(r)}</span><span class="psub">${esc(r.team)} · ${esc(r.pos)}${badges(r)}</span></div></td>${showCats ? catCells(r) : ""}
+    <td class="l"><div class="pcell"><span class="pname" title="${esc(r.name)}">${esc(r.name)}</span><span class="psub">${esc(r.team)} · ${esc(r.pos)}${statusPill(r)}${badges(r)}</span></div></td>
+    <td class="age">${r.age ?? "—"}</td>${showCats ? catCells(r) : ""}
     <td>${r.fromProj ? "—" : r.gp}</td>
     <td>${fmt(r.lastPg)}</td>
     <td>${r.fromProj ? "—" : fmt(r.lastValue)}</td>
@@ -408,12 +444,12 @@ function rowHTML(r) {
     <td class="${r.gpDelta ? "edited-v" : ""}">${r.expGp}</td>
     <td class="rng" title="Median ${r.gpRange[1]} games">${r.gpRange[0]}–${r.gpRange[2]}</td>
     <td class="risk ${riskCls(r.risk)}">${Math.round(r.risk * 100)}%</td>
-    <td><input class="cell ${r.minSet ? "edited" : ""}" type="text" inputmode="decimal" autocomplete="off" value="${fmt(r.expMin)}" title="Last season ${r.lastMin ?? "—"} min · ESPN projects ${r.projMin ?? "—"}" aria-label="Expected minutes for ${esc(r.name)}" data-min="${r.id}" id="m-${r.id}"></td>
+    <td><span class="cw"><input class="cell ${r.minSet ? "edited" : ""}" type="text" inputmode="decimal" autocomplete="off" value="${fmt(r.expMin)}" title="Last season ${r.lastMin ?? "—"} min · ESPN projects ${r.projMin ?? "—"}" aria-label="Expected minutes for ${esc(r.name)}" data-min="${r.id}" id="m-${r.id}">${was(fmt(r.defMin))}</span></td>
     <td><input class="cell ${r.delta ? "edited" : ""}" type="text" inputmode="text" autocomplete="off" value="${signedInput(r.delta)}" placeholder="0" aria-label="Δ rating points for ${esc(r.name)}" data-delta="${r.id}" id="d-${r.id}"></td>
     <td>${fmt(r.projPg)}</td>
     <td class="val">${fmt(r.value)}${pm(r.valuePm)}</td>
     <td class="fit">${r.status === "taken" ? "—" : `${fmt(r.fit)}${pm(r.fitPm)}`}</td>
-    <td><input class="cell ${r.costSet ? "edited" : ""}" type="text" inputmode="numeric" autocomplete="off" value="${Math.round(r.avg)}" title="ESPN: ${money(r.avgEspn)} (average ${money(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)})" aria-label="Cost of ${esc(r.name)}" data-cost="${r.id}" id="c-${r.id}"></td>
+    <td><span class="cw"><input class="cell ${r.costSet ? "edited" : ""}" type="text" inputmode="numeric" autocomplete="off" value="${Math.round(r.avg)}" title="ESPN: ${money(r.avgEspn)} (average ${money(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)})" aria-label="Cost of ${esc(r.name)}" data-cost="${r.id}" id="c-${r.id}">${was(Math.round(r.avgEspn))}</span></td>
     <td class="ours">${money(r.ours)}</td>
     <td class="ours"><span class="edge ${ecls}">${signed(e)}</span></td>
     <td class="ours">${r.status === "taken" || r.fitEdge == null ? "—" : `<span class="edge ${edgeCls(r.fitEdge)}">${signed(r.fitEdge)}</span>`}</td>
@@ -462,10 +498,10 @@ function renderDetail() {
     <div class="kv">
       <div><span class="lbl">Value rank</span><span class="v">#${r.rank}</span></div>
       <div><span class="lbl">Ours</span><span class="v">${money(r.ours)}</span></div>
-      <div title="Ours − Avg paid"><span class="lbl">Edge</span><span class="v ${r.edge >= 3 ? "up" : r.edge <= -3 ? "down" : ""}">${signed(r.edge)}</span></div>
+      <div title="Ours − Cost: what he's worth minus what he should go for"><span class="lbl">Edge</span><span class="v ${r.edge >= 3 ? "up" : r.edge <= -3 ? "down" : ""}">${signed(r.edge)}</span></div>
       <div title="Rank by Fit among players still available"><span class="lbl">Fit rank</span><span class="v">${r.fitRank ? "#" + r.fitRank : "—"}</span></div>
       <div title="Fit ${fmt(r.fit)} converted at the league's $/point"><span class="lbl">Fit $</span><span class="v">${r.fitDollars == null ? "—" : money(r.fitDollars)}</span></div>
-      <div title="Fit $ − Avg paid"><span class="lbl">Fit edge</span><span class="v ${r.fitEdge >= 3 ? "up" : r.fitEdge <= -3 ? "down" : ""}">${r.fitEdge == null ? "—" : signed(r.fitEdge)}</span></div>
+      <div title="Fit $ − Cost: the bargain for your current team"><span class="lbl">Fit edge</span><span class="v ${r.fitEdge >= 3 ? "up" : r.fitEdge <= -3 ? "down" : ""}">${r.fitEdge == null ? "—" : signed(r.fitEdge)}</span></div>
       <div><span class="lbl">ESPN rank</span><span class="v">#${r.espnRank ?? "—"}</span></div>
       <div><span class="lbl">ESPN $</span><span class="v">${money(r.espn)}</span></div>
       <div title="${r.costSet ? `Your price. ESPN's: ${money(r.avgEspn)}` : `ESPN average $${fmt(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)} to fit this league's budget`}"><span class="lbl">${r.costSet ? "Your cost" : "Cost"}</span><span class="v">${money(r.avg)}</span></div>
@@ -627,9 +663,14 @@ function markTargets(on) {
     el.classList.add(s === "UT" || s === "BE" || elig.includes(s) ? "ok" : "no");
   });
 }
+// Board rows drag from anywhere, except from their inputs and buttons, which
+// keep their own click, typing and scrubbing.
+let dragFrom = null;
+document.addEventListener("pointerdown", (e) => { dragFrom = e.target; }, true);
 document.addEventListener("dragstart", (e) => {
   const d = e.target.closest && e.target.closest("[data-drag]");
   if (!d) return;
+  if (dragFrom && dragFrom !== d && dragFrom.closest?.("input, button, select, textarea")) { e.preventDefault(); return; }
   DRAG = +d.dataset.drag;
   e.dataTransfer.effectAllowed = "move";
   e.dataTransfer.setData("text/plain", String(DRAG));
@@ -757,6 +798,16 @@ $("teams").addEventListener("keydown", (e) => {
 });
 $("q").addEventListener("input", (e) => { UI.q = e.target.value; renderBody(); });
 ["hideGone", "onlyAdj", "affordable"].forEach((k) => $(k).addEventListener("change", (e) => { UI[k] = e.target.checked; renderBody(); }));
+$("maxCost").addEventListener("input", (e) => {
+  UI.maxCost = +e.target.value >= +e.target.max ? null : +e.target.value;
+  renderMaxCost();
+  renderBody();
+});
+[["minMin", "minMin"], ["minValue", "minValue"]].forEach(([id, key]) => $(id).addEventListener("input", (e) => {
+  UI[key] = +e.target.value <= +e.target.min ? null : +e.target.value;
+  renderMinSliders();
+  renderBody();
+}));
 $("thead").addEventListener("click", (e) => {
   if (e.target.closest("[data-toggle-cats]")) {
     showCats = !showCats;
@@ -993,34 +1044,53 @@ function renderPlan() {
   const cost = (id) => R?.costs[id] ?? byId.get(id)?.avg;
   const who = (id) => { const r = byId.get(id); return r ? `<button class="linkbtn" type="button" data-goto="${id}">${esc(r.name)}</button>` : "?"; };
   const floorMode = m.planObjective !== "wins", odds = m.planObjective === "floor20" ? 20 : 10;
-  let h = `<div class="plan-head"><div><h3>Recommended team</h3>
+  const sw = R?.switched, switchedIn = new Set(sw?.in || []);
+  const pw = m.playoffWeeks, focus = P?.focus || m.planFocus;
+  const weeksTxt = pw.length ? `weeks ${pw[0]}–${pw[pw.length - 1]}` : "";
+  const focusTxt = focus === "playoffs" ? ` in the fantasy playoffs (${weeksTxt})` : focus === "both" ? `, with the playoffs (${weeksTxt}) counting as much as the regular season` : "";
+  // Every planned player still undrafted, with a roster spot for each: then the plan can go on My Team.
+  const canSave = R && R.best.ids.length && R.best.ids.every((id) => !byId.get(id)?.status)
+    && B.state.filled.filter((x) => x == null).length >= R.best.ids.length;
+  let h = `<div class="plan-head"><div><h3>${sw ? "Your plan" : "Recommended team"}</h3>
       <p class="sub">${floorMode
         ? `The players to buy whose <b>bad season</b> wins the most categories per week: the season only 1 in ${odds} is worse, from simulated seasons of your players' games and per-game ratings,`
-        : "The players to buy that win the most categories per week"} at expected prices: Avg paid, or your own cost where you set one. It starts from your roster and budget, skips taken players, and ignores categories you punt.</p>
+        : "The players to buy that win the most categories per week"}${focusTxt} at expected prices: Avg paid, or your own cost where you set one. It starts from your roster and budget, skips taken players, and ignores categories you punt.</p>
       <div class="seg" role="group" aria-label="Plan for">
         <button type="button" data-plan-objective="wins" aria-pressed="${!floorMode}" title="Maximize expected category wins per week">Most wins</button>
         <button type="button" data-plan-objective="floor" aria-pressed="${m.planObjective === "floor"}" title="Maximize wins in a 1-in-10 bad season, trading some expected wins for less risk">Floor · 1 in 10</button>
-        <button type="button" data-plan-objective="floor20" aria-pressed="${m.planObjective === "floor20"}" title="Maximize wins in a 1-in-20 bad season: more cautious still">Floor · 1 in 20</button></div></div>
-      <button class="btn primary ${building ? "busy" : ""}" type="button" id="planBuild" ${building ? "disabled" : ""}>${building ? "Building…" : P ? "Rebuild" : "Build plan"}</button></div>`;
+        <button type="button" data-plan-objective="floor20" aria-pressed="${m.planObjective === "floor20"}" title="Maximize wins in a 1-in-20 bad season: more cautious still">Floor · 1 in 20</button></div>
+      ${pw.length ? `<div class="seg" role="group" aria-label="Optimize for">
+        <button type="button" data-plan-focus="season" aria-pressed="${m.planFocus === "season"}" title="Every week of the season counts the same">Season</button>
+        <button type="button" data-plan-focus="both" aria-pressed="${m.planFocus === "both"}" title="The playoff weeks count as much as the whole regular season">Season + playoffs</button>
+        <button type="button" data-plan-focus="playoffs" aria-pressed="${m.planFocus === "playoffs"}" title="Only the playoff weeks (${weeksTxt}): schedules matter most here">Playoffs</button></div>` : ""}</div>
+      <div class="plan-actions">${canSave ? `<button class="btn" type="button" id="planSave" title="Mark the ${R.best.ids.length} planned players as yours, at their planned prices">Add to My Team</button>` : ""}
+      <button class="btn primary ${building ? "busy" : ""}" type="button" id="planBuild" ${building ? "disabled" : ""}>${building ? "Building…" : P ? "Rebuild" : "Build plan"}</button></div></div>`;
   const avoided = B.state.avoid.map((id) => byId.get(id)).filter(Boolean);
   if (avoided.length) h += `<p class="plan-avoid"><span class="lbl">Left out</span> ${avoided.map((r) => `<span class="av">${esc(r.name)} <button class="x" type="button" data-unavoid="${r.id}" aria-label="Allow ${esc(r.name)} in the plan" title="Allow in the plan">×</button></span>`).join("")}</p>`;
   if (!P) {
-    h += `<p class="plan-empty">Build a plan to see the best team you can still make, with the best alternative for every player. Takes about 5–15 seconds.</p>`;
+    h += `<p class="plan-empty">Build a plan to see the best team you can still make, with the best alternative for every player. It can take a minute, and a floor plan about twice as long.</p>`;
   } else if (building) {
-    h += `<p class="plan-empty">Searching for the best team…</p>`;
+    h += `<p class="plan-empty">Searching for the best team… ${P.elapsed || 0}s${P.lastSeconds ? ` (the last one took ${Math.round(P.lastSeconds)}s)` : ""}</p>`;
   } else if (P.status === "error") {
     h += `<p class="plan-empty bad">${esc(P.error)}</p>`;
   } else if (!R) {
     h += `<p class="plan-empty">Your roster is full, so there's nothing left to plan.</p>`;
   } else {
     if (P.stale) h += `<p class="plan-stale">Your draft changed since this plan was built. Rebuild to update it.</p>`;
+    if (sw) {
+      const names = (ids) => ids.map((id) => esc(byId.get(id)?.name || "?")).join(", ");
+      const floorNote = floorMode && floorOf(sw) != null && floorOf(R.best) != null ? `, floor ${signed(floorOf(R.best) - floorOf(sw), 2)}` : "";
+      const what = sw.build != null ? `You're using Build ${String.fromCharCode(66 + sw.build)}` : `You switched in ${names(sw.in)} for ${names(sw.out)}`;
+      h += `<p class="plan-switched">${what}: ${signed(R.best.wins - sw.wins, 2)} cats/week${floorNote} and ${R.best.cost === sw.cost ? "the same spend" : `${signed(R.best.cost - sw.cost)} $`} against the recommendation.
+        <button class="linkbtn" type="button" id="planRestore">Back to the recommendation</button></p>`;
+    }
     if (R.budgetLeft < R.streamers + R.best.cost) h += `<p class="plan-stale">You have $${R.budgetLeft} left for ${R.best.ids.length + R.streamers} open spot${R.best.ids.length + R.streamers > 1 ? "s" : ""}, and every spot costs at least $1.</p>`;
     else if (!R.best.ids.length) h += `<p class="plan-empty">Your best ${m.counted} are set. Fill the open spots with $1 streamers.</p>`;
     const best = R.best, cats = m.categories, n = cats.length;
     const mine = R.mine.map((id) => byId.get(id)).filter(Boolean);
     const spend = best.cost + R.streamers;
     h += `<div class="overall">
-      <div><span class="lbl">Cats won per week</span><span class="v">${best.wins.toFixed(1)}–${(n - best.wins).toFixed(1)}</span><span class="s">expected vs the average team · ±${best.winsSd.toFixed(2)} from games played</span></div>
+      <div><span class="lbl">Cats won per week</span><span class="v">${best.wins.toFixed(1)}–${(n - best.wins).toFixed(1)}</span><span class="s">expected vs the average team${focus === "playoffs" ? " in the playoff weeks" : focus === "both" ? ", playoffs weighted up" : ""} · ±${best.winsSd.toFixed(2)} from games played</span></div>
       ${floorOf(best) == null ? "" : `<div title="From ${m.planFloorDraws || 600} simulated seasons of your players' games and per-game ratings: 1 season in ${odds} is worse"><span class="lbl">Floor</span><span class="v">${floorOf(best).toFixed(2)}</span><span class="s">cats a week in a bad season (1 in ${odds})</span></div>`}
       <div><span class="lbl">Spend</span><span class="v">$${spend}</span><span class="s">of $${R.budgetLeft} left${R.budgetLeft - spend ? `, $${R.budgetLeft - spend} to spare` : ""}</span></div>
       <div><span class="lbl">Buy</span><span class="v">${best.ids.length}</span><span class="s">players${R.streamers ? ` + ${R.streamers} $1 streaming spot${R.streamers > 1 ? "s" : ""}` : ""}${mine.length ? `, with your ${mine.length}` : ""}</span></div>
@@ -1039,26 +1109,29 @@ function renderPlan() {
     for (const id of best.ids) {
       const r = byId.get(id), alts = R.swaps[id] || [], open = PLAN.open.has(id);
       if (!r) continue;
-      h += `<tr><td class="l">${who(id)}${r.inj && r.inj !== "ACTIVE" ? ` <span class="pill inj">${esc(r.inj.replace(/_/g, " "))}</span>` : ""}</td><td class="l">${esc(r.team)} · ${esc(r.pos)}</td>
+      h += `<tr><td class="l">${who(id)}${switchedIn.has(id) ? ` <span class="pill proj" title="You switched him in">Switched in</span>` : ""}${r.inj && r.inj !== "ACTIVE" ? ` <span class="pill inj">${esc(r.inj.replace(/_/g, " "))}</span>` : ""}</td><td class="l">${esc(r.team)} · ${esc(r.pos)}</td>
         <td><b>$${cost(id)}</b></td><td>${money(r.ours)}</td><td>${fmt(r.projPg)}</td><td>${r.expGp}</td><td>${fmt(r.value)}</td>
         <td class="l">${alts.length ? `<button class="linkbtn" type="button" data-alt="${id}" aria-expanded="${open}">${open ? "Hide" : `${alts.length} alternative${alts.length > 1 ? "s" : ""}`}</button>` : `<span class="muted">none affordable</span>`}
           · <button class="linkbtn quiet" type="button" data-avoid="${id}" title="Don't recommend ${esc(r.name)}, and rebuild">Leave out</button></td></tr>`;
       if (open) {
         h += `<tr class="alts"><td colspan="8"><ul>${alts.map((a) => `<li>${who(a.id)} <span class="muted">${esc(byId.get(a.id)?.team || "")} · ${esc(byId.get(a.id)?.pos || "")}</span>
           <span class="num">$${cost(a.id)} <span class="muted">(${a.costChange === 0 ? "same price" : signed(a.costChange) + " $"})</span></span>
-          <span class="num ${a.winsChange < -0.05 ? "neg" : ""}">${signed(a.winsChange, 2)} cats/week</span></li>`).join("")}</ul></td></tr>`;
+          <span class="num ${a.winsChange < -0.05 ? "neg" : ""}">${signed(a.winsChange, 2)} cats/week</span>
+          <button class="btn sm" type="button" data-switch="${id}" data-in="${a.id}" title="Put ${esc(byId.get(a.id)?.name || "him")} in ${esc(r.name)}'s spot and rescore the plan">Switch in</button></li>`).join("")}</ul></td></tr>`;
       }
     }
     if (R.streamers) h += `<tr class="stream"><td class="l" colspan="2">${R.streamers} streaming spot${R.streamers > 1 ? "s" : ""}</td><td>$1 each</td><td class="l muted" colspan="5">Any free agents. Only your best ${m.counted} count, so these spots stream pickups at the replacement rating.</td></tr>`;
     h += `</tbody></table></div>`;
     if (R.builds.length) {
-      h += `<div class="builds"><h3>Other builds</h3><p class="sub">Different rosters the search also found, close behind the recommended one.</p>`;
-      R.builds.forEach((b, i) => {
+      h += `<div class="builds"><h3>Other builds</h3><p class="sub">Different rosters the search also found, close behind the recommended one. Use one to make it your plan: it gets alternatives for every spot, and you can add it to My Team.</p>`;
+      R.builds.forEach((b) => {
         const adds = b.adds.map((id) => `${who(id)} <span class="num">$${cost(id)}</span>`).join(", ");
         const drops = b.drops.map((id) => esc(byId.get(id)?.name || "?")).join(", ");
         const moved = cats.map((c) => [c, b.chances[c] - best.chances[c]]).filter(([, d]) => Math.abs(d) >= 0.05).sort((x, y) => y[1] - x[1]);
-        h += `<div class="build"><div class="build-t"><b>Build ${String.fromCharCode(66 + i)}</b>
-            <span class="num">${b.wins.toFixed(2)} cats/week (${signed(b.wins - best.wins, 2)})</span>${floorOf(b) == null || floorOf(best) == null ? "" : `<span class="num">floor ${floorOf(b).toFixed(2)} (${signed(floorOf(b) - floorOf(best), 2)})</span>`}<span class="num">$${b.cost + R.streamers}</span></div>
+        const name = `Build ${String.fromCharCode(66 + b.n)}`;
+        h += `<div class="build"><div class="build-t"><b>${name}</b>
+            <span class="num">${b.wins.toFixed(2)} cats/week (${signed(b.wins - best.wins, 2)})</span>${floorOf(b) == null || floorOf(best) == null ? "" : `<span class="num">floor ${floorOf(b).toFixed(2)} (${signed(floorOf(b) - floorOf(best), 2)})</span>`}<span class="num">$${b.cost + R.streamers}</span>
+            <button class="btn sm" type="button" data-use-build="${b.ids.join(",")}" data-name="${name}" title="Make ${name} your plan">Use this build</button></div>
           <p><span class="lbl">In</span> ${adds}</p><p><span class="lbl">Out</span> ${drops}</p>
           ${moved.length ? `<p class="muted">${moved.map(([c, d]) => `${esc(c)} ${signed(d * 100)}%`).join(" · ")} weekly win chance</p>` : ""}</div>`;
       });
@@ -1078,11 +1151,40 @@ async function pollPlan() {
     if (!b) break;
     B = b;
     if (B.plan?.status !== "building") { PLAN.polling = false; render(); return; }
+    renderPlan();  // the elapsed time
   }
   PLAN.polling = false;
 }
 $("planPanel").addEventListener("click", (e) => {
   if (e.target.closest("#planBuild")) { PLAN.open.clear(); return act("plan"); }
+  const sw = e.target.closest("[data-switch]");
+  if (sw) {
+    const out = +sw.dataset.switch, into = +sw.dataset.in, name = (id) => byId.get(id)?.name;
+    sw.disabled = true; sw.classList.add("busy"); sw.textContent = "Switching…";
+    return act("plan-switch", { out, in: into }).then((ok) => {
+      if (!ok) return;
+      PLAN.open.delete(out);
+      toast(`Switched in ${name(into)} for ${name(out)}.`, () => act("plan-switch", { out: into, in: out }));
+    });
+  }
+  const use = e.target.closest("[data-use-build]");
+  if (use) {
+    const ids = use.dataset.useBuild.split(",").map(Number), prev = B.plan.result.best.ids, name = use.dataset.name;
+    use.disabled = true; use.classList.add("busy"); use.textContent = "Switching…";
+    PLAN.open.clear();
+    return act("plan-use", { ids }).then((ok) => ok && toast(`Your plan is now ${name}.`, () => act("plan-use", { ids: prev })));
+  }
+  if (e.target.closest("#planRestore")) { PLAN.open.clear(); return act("plan-restore"); }
+  if (e.target.closest("#planSave")) {
+    const prev = snapshotState(), n = B.plan.result.best.ids.length;
+    return act("plan-save").then((ok) => ok && toast(`Added ${n} player${n > 1 ? "s" : ""} to My Team at their planned prices.`, undoTo(prev)));
+  }
+  const pf = e.target.closest("[data-plan-focus]");
+  if (pf) {
+    if (pf.dataset.planFocus === B.meta.planFocus) return;
+    PLAN.open.clear();
+    return act("settings", { planFocus: pf.dataset.planFocus }).then((ok) => ok && act("plan"));
+  }
   const objective = e.target.closest("[data-plan-objective]");
   if (objective) {
     if (objective.dataset.planObjective === B.meta.planObjective) return;
@@ -1099,6 +1201,117 @@ $("planPanel").addEventListener("click", (e) => {
   if (alt) { const id = +alt.dataset.alt; PLAN.open.has(id) ? PLAN.open.delete(id) : PLAN.open.add(id); return renderPlan(); }
   const g = e.target.closest("[data-goto]");
   if (g) { UI.sel = +g.dataset.goto; setView("board"); render(); }
+});
+
+// ------------------------------------------------------------------ playoffs
+
+const PO = { affordable: false, show: 20 };
+const shortDate = (iso) => (iso ? new Date(iso + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric" }) : "?");
+const dateSpan = (a, b) => (a && b ? `${shortDate(a)} – ${shortDate(b)}` : "");
+const FOCUS_LABEL = { season: "the whole season", both: "the season and the playoffs", playoffs: "the playoffs" };
+
+function renderPlayoffs() {
+  const el = $("playoffsPanel"), P = B.playoffs, m = B.meta;
+  if (!P) {
+    el.innerHTML = `<p class="plan-empty">${m.daily ? "ESPN hasn't published enough of the NBA schedule to place the fantasy playoffs yet." : "There's no NBA schedule, so the playoffs can't be placed. Refresh from ESPN once it's published."}</p>`;
+    return;
+  }
+  const T = P.team, nba = new Map(P.nba.map((t) => [t.team, t])), cats = m.categories, weeks = P.weeks;
+  const first = P.rounds[0], last = P.rounds[P.rounds.length - 1];
+  const who = (id) => { const r = byId.get(id); return r ? `<button class="linkbtn" type="button" data-goto="${id}">${esc(r.name)}</button>` : "?"; };
+  const wkCells = (team) => { const t = nba.get(team); return weeks.map((w, i) => `<td>${t ? t.weeks[i] : "—"}</td>`).join(""); };
+  const wkHead = weeks.map((w) => `<th scope="col" title="${dateSpan(w.first, w.last)}">W${w.week}</th>`).join("");
+  const gamesCls = (g) => (g == null ? "" : g >= P.avgGames + 1 ? "pos" : g <= P.avgGames - 1 ? "neg" : "");
+  const rounds = P.rounds.map((r) => `${dateSpan(r.first, r.last)}${r.weeks.length > 1 ? ` (weeks ${r.weeks[0]}–${r.weeks[r.weeks.length - 1]})` : ` (week ${r.weeks[0]})`}`);
+  const mineIds = B.state.filled.filter((x) => x != null);
+  const myTeams = mineIds.map((id) => byId.get(id)?.team).filter(Boolean);
+  const planFocus = B.plan?.focus || "season", planReady = B.plan?.status === "ready";
+
+  let h = `<div class="plan-head"><div><h3>Fantasy playoffs</h3>
+      <p class="sub">The top ${P.playoffTeams} of ${P.teams} teams after ${P.regularWeeks} regular-season weeks play ${P.rounds.length === 1 ? "one round" : `${P.rounds.length} rounds`}: ${rounds.join(", then ")}. That's ${weeks.length} weeks, so each player's playoff schedule is a small sample: a team with ${Math.max(...P.nba.map((t) => t.games))} games instead of ${Math.min(...P.nba.map((t) => t.games))}, or games on nights your lineup has room, is worth a lot more here than over a season.</p>
+      ${P.known ? "" : `<p class="plan-stale">ESPN didn't give this league's playoff settings, so this assumes the last ${weeks.length} weeks.</p>`}</div></div>`;
+
+  // The four weeks, day by day: NBA teams playing, and how many of yours.
+  h += `<div class="po-weeks" role="list" aria-label="Playoff weeks">${weeks.map((w) => {
+    const most = 30, start = new Date(w.first + "T12:00:00");
+    const bars = w.days.map((n, i) => {
+      const day = new Date(start); day.setDate(start.getDate() + i);
+      const light = n > 0 && n < P.lightShare * most, mine = w.mine[i], over = mine > P.starters;
+      const label = `${day.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}: ${n / 2} NBA games${mineIds.length ? `, ${mine} of your players` : ""}${over ? ` (more than your ${P.starters} starting slots)` : ""}`;
+      return `<div class="po-day ${light ? "light" : ""}" title="${label}"><span class="po-col"><span class="po-bar" style="height:${Math.round((n / most) * 100)}%"></span></span>
+        <span class="po-dn">${day.toLocaleDateString([], { weekday: "narrow" })}</span>${mineIds.length ? `<span class="po-mine ${over ? "over" : ""}">${mine}</span>` : ""}</div>`;
+    }).join("");
+    return `<div class="po-week" role="listitem"><div class="po-wt"><b>Week ${w.week}</b><span>${dateSpan(w.first, w.last)}</span><span class="num">${w.games} games</span></div><div class="po-days">${bars}</div></div>`;
+  }).join("")}</div>
+  <p class="callout">Bars: NBA teams playing each night; <span class="po-key"></span> light nights, when fewer than half play, are the easiest games to fit into a lineup.${mineIds.length ? ` The numbers under them are your players with a game; red means more than your ${P.starters} starting slots, so someone sits.` : ""}</p>`;
+
+  // My team over those weeks.
+  const n = cats.length;
+  if (mineIds.length) {
+    const games = T.players.reduce((a, p) => a + (p.games || 0), 0), starts = T.players.reduce((a, p) => a + (p.starts || 0), 0);
+    h += `<h3 class="po-h">Your team in the playoffs</h3><div class="overall">
+      <div><span class="lbl">Cats won per week</span><span class="v">${T.expectedWins.toFixed(1)}–${(n - T.expectedWins).toFixed(1)}</span><span class="s">vs the average team in these weeks · ${signed(T.expectedWins - T.seasonWins, 2)} vs your season</span></div>
+      <div><span class="lbl">Wins a matchup</span><span class="v">${Math.round(T.matchupWin * 100)}%</span><span class="s">more categories than the average team in a week</span></div>
+      <div><span class="lbl">Games started</span><span class="v">${Math.round(starts)} / ${games}</span><span class="s">of your players' games fit your ${P.starters} slots${games - starts >= 0.5 ? ` · ${Math.round(games - starts)} sit on the bench` : ""}</span></div>
+      <div><span class="lbl">Open slots</span><span class="v">${Math.max(0, Math.round(T.slots - starts))}</span><span class="s">of ${T.slots} starting slots on game nights${T.streamed ? ` · streamers fill about ${Math.round(T.streamed)}` : ", for empty spots and pickups"}</span></div>
+    </div>
+    <div class="plancats" role="list" aria-label="Weekly win chance by category in the playoffs">${cats.map((c) => {
+      const p = T.chances[c], r = T.ratings[c], d = r - T.seasonRatings[c];
+      return `<div class="pc ${p >= 0.65 ? "hi" : p <= 0.35 ? "lo" : ""} ${m.punt.includes(c) ? "punted" : ""}" role="listitem" title="${esc(c)}: team rating ${Math.round(r)} in the playoffs, ${Math.round(T.seasonRatings[c])} over the season (100 = the average team)">
+        <span class="k">${esc(c)}</span><span class="w">${Math.round(p * 100)}%</span><span class="r">${Math.round(r)} <small class="${Math.abs(d) >= 1 ? (d > 0 ? "pos" : "neg") : ""}">${signed(d)}</small></span></div>`;
+    }).join("")}</div>
+    <div class="plantab-wrap"><table class="plantab" aria-label="Your players in the playoffs">
+      <thead><tr><th class="l" scope="col">Player</th><th class="l" scope="col">Team</th>${wkHead}<th scope="col" title="His team's games in the playoff weeks">Games</th><th scope="col" title="Games that fit in your starting slots">Starts</th><th scope="col" title="Value to your team over the season">Fit</th><th scope="col" title="Value to your team over the playoff weeks, on Fit's scale: 100 is an average player with an average playoff schedule">Playoff Fit</th></tr></thead><tbody>
+      ${T.players.map((p) => { const r = byId.get(p.id); if (!r) return ""; return `<tr><td class="l">${who(p.id)}</td><td class="l">${esc(r.team)} · ${esc(r.pos)}</td>${wkCells(r.team)}
+        <td class="${gamesCls(p.games)}">${p.games ?? "—"}</td><td>${p.starts == null ? "—" : fmt(p.starts, 0)}</td><td>${fmt(r.fit)}</td><td><b>${fmt(p.pfit)}</b> <small class="${p.pfit - r.fit >= 3 ? "pos" : p.pfit - r.fit <= -3 ? "neg" : "muted"}">${signed(p.pfit - r.fit)}</small></td></tr>`; }).join("")}
+      </tbody></table></div>`;
+  } else {
+    h += `<p class="plan-empty">Add players to your team to see how it plays in these weeks.</p>`;
+  }
+
+  // Best playoff adds, and the plan.
+  const maxBid = B.me.maxBid;
+  const pool = P.players.filter((p) => p.pfit != null && !byId.get(p.id)?.status && (!PO.affordable || byId.get(p.id).avg <= maxBid))
+    .sort((a, b) => b.pfit - a.pfit);
+  h += `<div class="po-sec"><div><h3 class="po-h">Best for the playoffs</h3>
+      <p class="sub">Players you can still get, by Playoff Fit: what each adds to your team in these ${weeks.length} weeks alone, counting only the games that fit in your lineup, on Fit's scale. Compare it with Fit to find the players whose schedule makes them better, or worse, when it matters.</p></div>
+      <label class="check" for="poAffordable"><input type="checkbox" id="poAffordable" ${PO.affordable ? "checked" : ""}> Only affordable (≤ ${money(maxBid)})</label></div>
+    <div class="plantab-wrap"><table class="plantab" aria-label="Best players for the playoffs">
+      <thead><tr><th class="l" scope="col">Player</th><th class="l" scope="col">Team</th>${wkHead}<th scope="col">Games</th><th scope="col">Fit</th><th scope="col">Playoff Fit</th><th scope="col" title="Avg paid, or your own cost">Cost</th></tr></thead><tbody>
+      ${pool.slice(0, PO.show).map((p) => { const r = byId.get(p.id); return `<tr><td class="l">${who(p.id)}${r.inj && r.inj !== "ACTIVE" ? ` <span class="pill inj">${esc(r.inj.replace(/_/g, " "))}</span>` : ""}</td><td class="l">${esc(r.team)} · ${esc(r.pos)}</td>${wkCells(r.team)}
+        <td class="${gamesCls(p.games)}">${p.games ?? "—"}</td><td>${fmt(r.fit)}</td><td><b>${fmt(p.pfit)}</b> <small class="${p.pfit - r.fit >= 3 ? "pos" : p.pfit - r.fit <= -3 ? "neg" : "muted"}">${signed(p.pfit - r.fit)}</small></td><td>${money(r.avg)}</td></tr>`; }).join("")}
+      ${pool.length ? "" : `<tr><td class="l muted" colspan="${6 + weeks.length}">No one left${PO.affordable ? " within your max bid" : ""}.</td></tr>`}
+      </tbody></table></div>
+    ${pool.length > PO.show ? `<p><button class="linkbtn" type="button" id="poMore">Show ${Math.min(20, pool.length - PO.show)} more</button></p>` : ""}
+    <div class="po-plan"><div><h3 class="po-h">Plan a playoff team</h3>
+      <p class="sub">The Plan tab's search, scored on the playoff weeks. <b>Playoffs</b> counts only those ${weeks.length} weeks. <b>Season + playoffs</b> counts them as much as the ${P.regularWeeks} weeks before, since you have to get there first.${planReady && planFocus !== "season" ? ` Your current plan is for ${FOCUS_LABEL[planFocus]}.` : ""}</p></div>
+      <div class="plan-actions"><button class="btn" type="button" data-po-plan="both">Season + playoffs</button><button class="btn primary" type="button" data-po-plan="playoffs">Plan for the playoffs</button></div></div>`;
+
+  // Every NBA team's playoff schedule.
+  const counts = {};
+  myTeams.forEach((t) => (counts[t] = (counts[t] || 0) + 1));
+  h += `<h3 class="po-h">NBA schedules in the playoffs</h3>
+    <div class="plantab-wrap"><table class="plantab po-nba" aria-label="NBA teams' games in the playoff weeks">
+      <thead><tr><th class="l" scope="col">Team</th>${wkHead}<th scope="col">Games</th><th scope="col" title="Games on nights when fewer than half the NBA plays">Light nights</th><th scope="col">Yours</th></tr></thead><tbody>
+      ${P.nba.map((t) => `<tr class="${counts[t.team] ? "yours" : ""}"><td class="l">${esc(NBA_TEAMS[t.team]?.[0] || t.team)} <span class="muted">${esc(t.team)}</span></td>${t.weeks.map((g) => `<td>${g}</td>`).join("")}
+        <td class="${gamesCls(t.games)}"><b>${t.games}</b></td><td>${t.light}</td><td>${counts[t.team] || ""}</td></tr>`).join("")}
+      </tbody></table></div>
+    <p class="callout">An average team plays ${P.avgGames} games in these weeks. Games come from ESPN's NBA schedule; late-season rest for stars on tanking or clinched teams isn't in it.</p>`;
+  el.innerHTML = h;
+}
+$("playoffsPanel").addEventListener("click", (e) => {
+  const g = e.target.closest("[data-goto]");
+  if (g) { UI.sel = +g.dataset.goto; setView("board"); return render(); }
+  if (e.target.closest("#poMore")) { PO.show += 20; return renderPlayoffs(); }
+  const plan = e.target.closest("[data-po-plan]");
+  if (plan) {
+    PLAN.open.clear();
+    setView("plan");
+    return act("settings", { planFocus: plan.dataset.poPlan }).then((ok) => ok && act("plan"));
+  }
+});
+$("playoffsPanel").addEventListener("change", (e) => {
+  if (e.target.id === "poAffordable") { PO.affordable = e.target.checked; PO.show = 20; renderPlayoffs(); }
 });
 
 // ------------------------------------------------------------------ settings
@@ -1167,9 +1380,9 @@ function renderSettings() {
         ${m.catWeights === "league" ? `<p class="hint spreads">${m.categories.map((c) => `${esc(c)} <b>${m.categoryWeights[c].toFixed(2)}</b>`).join(" · ")}</p>` : ""}
         <span class="set-sub">Dollars</span>
         <div class="seg" role="group" aria-label="Dollars">
-          <button type="button" data-rating-set="pricing:curve" aria-pressed="${m.pricingModel === "curve"}">League price curve</button>
-          <button type="button" data-rating-set="pricing:formula" aria-pressed="${m.pricingModel === "formula"}">Core formula</button></div>
-        <p class="hint">${m.pricingModel === "curve" ? `The Nth most valuable player is worth what this league pays for its Nth most expensive player (2020-21 to 2024-25 auctions), scaled to the budget. Top price $${m.curveTop}.` : "The core players share the money in proportion to their value above the last of them (Core players, above)."}</p>
+          <button type="button" data-rating-set="pricing:formula" aria-pressed="${m.pricingModel === "formula"}">Worth</button>
+          <button type="button" data-rating-set="pricing:curve" aria-pressed="${m.pricingModel === "curve"}">League price curve</button></div>
+        <p class="hint">${m.pricingModel === "curve" ? `The Nth most valuable player is priced at what this league pays for its Nth most expensive player (2020-21 to 2024-25 auctions), scaled to the budget. Caps Ours at $${m.curveTop}, however far ahead the top player is.` : "The core players share the league's money in proportion to their value above the last of them (Core players, above), with no cap. What the room usually pays is Cost, the other side of Edge."}</p>
       </div>
     </section>
     <section class="set">
@@ -1296,7 +1509,7 @@ function setView(v) {
     $("tab-" + k).setAttribute("aria-selected", v === k);
   });
 }
-const VIEWS = ["board", "team", "plan", "settings"];
+const VIEWS = ["board", "team", "plan", "playoffs", "settings"];
 VIEWS.forEach((k) => $("tab-" + k).addEventListener("click", () => { setView(k); render(); }));
 
 function setTheme(t) {
@@ -1321,6 +1534,25 @@ async function watchForReload() {
   }, 1000);
 }
 watchForReload();
+
+// Keep the board current when someone else (a co-manager, another tab) changes it.
+function watchBoard() {
+  let busy = false;
+  setInterval(async () => {
+    // Wait while you're typing in a field: redrawing would throw away what you typed.
+    if (busy || !B || document.hidden || document.activeElement?.matches("input, textarea, select")) return;
+    busy = true;
+    try {
+      const v = await (await fetch("/api/version", { cache: "no-store" })).json();
+      if (v.rev > B.rev) {
+        const fresh = await (await fetch("/api/board", { cache: "no-store" })).json();
+        if (fresh.rev > B.rev) { B = fresh; renderKeepFocus(); } // skip if an edit of ours got there first
+      }
+    } catch (e) { /* offline or restarting: try again next time */ }
+    busy = false;
+  }, 3000);
+}
+watchBoard();
 
 if (VIEWS.includes(location.hash.slice(1))) setView(location.hash.slice(1));
 (async () => {

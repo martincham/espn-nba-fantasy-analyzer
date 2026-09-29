@@ -549,21 +549,32 @@ def team_categories(members: Sequence[Member], categories: Sequence[str], counte
 # --------------------------------------------------------------------------
 
 
+def _popcount(x: int) -> int:
+    return bin(x).count("1")
+
+
+if hasattr(int, "bit_count"):  # Python 3.10+
+    _popcount = int.bit_count  # noqa: F811
+
+
 class Schedule:
     """The NBA schedule as fantasy days (ESPN scoring periods).
 
     `team_days` maps each NBA team to the days it plays. A player without a
     known team plays an average schedule: on each day, the share of NBA teams
-    that play that day. Weeks are 7-day blocks from opening night.
+    that play that day. `week_of` gives each day's matchup week, numbered from
+    0 in day order (library/playoffs.py); without it, weeks are 7-day blocks
+    from opening night.
     """
 
-    def __init__(self, team_days: Dict[str, Sequence[int]]):
+    def __init__(self, team_days: Dict[str, Sequence[int]], week_of: Optional[Dict[int, int]] = None):
         days = sorted({d for ds in team_days.values() for d in ds})
         index = {d: i for i, d in enumerate(days)}
         self.days = len(days)
+        self.day_ids = days  # the days as given (scoring periods)
         first = days[0] if days else 0
-        self.week = [(d - first) // 7 for d in days]
-        self.weeks = self.week[-1] + 1 if days else 0
+        self.week = [week_of[d] for d in days] if week_of else [(d - first) // 7 for d in days]
+        self.weeks = max(self.week) + 1 if days else 0
         self.team_days = {t: [index[d] for d in sorted(set(ds))] for t, ds in team_days.items()}
         playing = [0] * self.days
         for ds in self.team_days.values():
@@ -572,17 +583,68 @@ class Schedule:
         teams = len(self.team_days) or 1
         self.share = [n / teams for n in playing]
         self.average_games = sum(self.share)
+        # For Lineup.weights: one byte per day, packed into an int. A team's game days are a 1
+        # in the low bit of those days' bytes; `ones` has it on every day.
+        self.masks = {t: sum(1 << (8 * i) for i in ds) for t, ds in self.team_days.items()}
+        self.ones = sum(1 << (8 * i) for i in range(self.days))
+        # Each week's days as an index range (days are in order); a week without games is empty.
+        self.week_spans: List["tuple[int, int]"] = [(0, 0)] * self.weeks
+        for i, w in enumerate(self.week):
+            start = self.week_spans[w][0] if self.week_spans[w][1] else i
+            self.week_spans[w] = (start, i + 1)
+        self._presence: Dict[Optional[str], List["tuple[int, float]"]] = {}
+        self._stream_caps: Dict[int, List[float]] = {}
+        self._season_games: Optional[Dict[str, int]] = None  # set by focus(): games count from the whole season
+
+    def focus(self, days: Iterable[int], repeat: int = 1, rest: bool = False) -> "Schedule":
+        """This schedule counting `days` (as given) `repeat` times, and every other day once if `rest`.
+
+        Each copy of a day is a day of its own, in a week of its own. Players'
+        games still come from the whole season, so a member counts for his starts
+        on these days over his season's games: a player whose team plays more on
+        them counts for more, and a team's totals are its totals on these days.
+        """
+        chosen = set(days)
+        offset = (self.day_ids[-1] + 1) if self.day_ids else 0
+        keeps: List[Optional[set]] = ([None] if rest else []) + [chosen] * max(0, repeat - (1 if rest else 0))
+        team_days: Dict[str, List[int]] = {t: [] for t in self.team_days}  # every team, even with no games here
+        week_of: Dict[int, int] = {}
+        for c, keep in enumerate(keeps):
+            for t, ds in self.team_days.items():
+                team_days[t].extend(self.day_ids[i] + c * offset for i in ds if keep is None or self.day_ids[i] in keep)
+            for i, d in enumerate(self.day_ids):
+                week_of[d + c * offset] = self.week[i] + c * self.weeks
+        out = Schedule(team_days, week_of)
+        out._season_games = {t: len(ds) for t, ds in self.team_days.items()}
+        out.average_games = self.average_games
+        return out
 
     def presence(self, team: Optional[str]) -> List["tuple[int, float]"]:
         """(day, chance he has a game) for every day his team might play."""
-        days = self.team_days.get(team) if team else None
-        if days is None:
-            return [(i, p) for i, p in enumerate(self.share) if p > 0]
-        return [(i, 1.0) for i in days]
+        key = team if team in self.team_days else None
+        out = self._presence.get(key)
+        if out is None:
+            days = self.team_days.get(team) if team else None
+            out = [(i, p) for i, p in enumerate(self.share) if p > 0] if days is None else [(i, 1.0) for i in days]
+            self._presence[key] = out
+        return out
+
+    def stream_caps(self, count: int) -> List[float]:
+        """Per week, the games `count` average players would play."""
+        caps = self._stream_caps.get(count)
+        if caps is None:
+            caps = [0.0] * self.weeks
+            for day in range(self.days):
+                caps[self.week[day]] += self.share[day] * count
+            self._stream_caps[count] = caps
+        return caps
 
     def games(self, team: Optional[str]) -> float:
+        """His team's games in the season (an average team's for an unknown team)."""
         days = self.team_days.get(team) if team else None
-        return float(len(days)) if days is not None else self.average_games
+        if days is None:
+            return self.average_games
+        return float(self._season_games[team] if self._season_games is not None else len(days))
 
 
 @dataclass
@@ -622,28 +684,48 @@ class Lineup:
         best = best_members(members, self.counted)
         if not self.daily:
             return [(m, float(m.count)) for m in best]
-        sched = self.schedule
-        open_slots = [float(self.starters)] * sched.days
+        sched, starters = self.schedule, self.starters
+        # While every start is a whole game, each day's filled slots is a byte of `used`, and a
+        # player's starts are a few operations on whole ints instead of a loop over his games.
+        # Adding 128 - starters to a byte sets its high bit exactly when the day is full.
+        packed = starters < 128
+        used, full_at, high = 0, sched.ones * (128 - starters), sched.ones << 7
+        open_slots: Optional[List[float]] = None  # per day, once a start is a fraction
         out = []
         for m in sorted(best, key=lambda m: m.rating, reverse=True):
-            starts = 0.0
-            for day, chance in sched.presence(m.team):
-                room = open_slots[day]
-                if room <= 0:
-                    continue
-                take = min(chance * m.count, room)
-                open_slots[day] = room - take
-                starts += take
+            mask = sched.masks.get(m.team) if packed and m.team else None
+            if mask is not None:
+                starts = 0.0
+                for _ in range(m.count):  # a spot counting twice fills a second slot on each day
+                    add = mask & ~(((used + full_at) & high) >> 7)
+                    used += add
+                    starts += _popcount(add)
+            else:
+                if open_slots is None:
+                    packed = False  # an average schedule: fractions of games from here on
+                    open_slots = [float(starters - u) for u in used.to_bytes(sched.days, "little")]
+                starts = 0.0
+                for day, chance in sched.presence(m.team):
+                    room = open_slots[day]
+                    if room <= 0:
+                        continue
+                    take = min(chance * m.count, room)
+                    open_slots[day] = room - take
+                    starts += take
             games = sched.games(m.team)
             out.append((m, starts / games if games else 0.0))
         if self.streamer is not None and sched.average_games:
-            room = [0.0] * sched.weeks
-            cap = [0.0] * sched.weeks
-            for day in range(sched.days):
-                week = sched.week[day]
-                room[week] += open_slots[day]
-                cap[week] += sched.share[day] * self.streamer.count
-            streamed = sum(min(r, c) for r, c in zip(room, cap))
+            if open_slots is None:  # whole games: exact in any order
+                used_days = used.to_bytes(sched.days, "little")
+                room = [float(starters * (b - a) - sum(used_days[a:b])) for a, b in sched.week_spans]
+            else:  # added in order, as sum() rounds floats differently from Python 3.12
+                room = []
+                for a, b in sched.week_spans:
+                    r = 0.0
+                    for x in open_slots[a:b]:
+                        r += x
+                    room.append(r)
+            streamed = sum(min(r, c) for r, c in zip(room, sched.stream_caps(self.streamer.count)))
             out.append((self.streamer, streamed / sched.average_games))
         return out
 

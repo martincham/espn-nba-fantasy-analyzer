@@ -14,10 +14,11 @@ import os
 import threading
 import time
 from dataclasses import replace
+from datetime import date
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
 
-from library import availability, draft, planner, roster, valuation
+from library import availability, draft, planner, playoffs, roster, valuation
 from library.valuation import Adjustment, LeagueShape
 
 DEFAULT_SETTINGS = {
@@ -46,24 +47,36 @@ DEFAULT_FADE = (110, 140)  # team category rating where extra strength starts to
 DEFAULT_ROOM_SETTINGS = {
     "marketScale": None, "rated": None, "ignorePlayers": None, "replacement": None, "fillRate": None, "core": None,
     "fadeStart": None, "fadeEnd": None, "punt": [], "fitModel": None,
-    "projLine": None, "catWeights": None, "pricing": None, "planObjective": None,
+    "projLine": None, "catWeights": None, "pricing": None, "planObjective": None, "planFocus": None,
 }
 FIT_MODELS = ("wins", "fade")  # weekly win chances (default), or the simple 110-140 fade
 # Rating model choices; the first of each is the default, backtested in docs/BACKTEST_PLAN.md.
 PROJ_LINES = ("espn", "last")  # ESPN's per-game projection, or last season's per-minute rates
 CAT_WEIGHTS = ("league", "equal")  # valuation.CATEGORY_WEIGHTS, or every category equal
-PRICING_MODELS = ("curve", "formula")  # this league's price curve, or the core-share formula
+# How Ours turns value into dollars. Default (the user's call, 2026-09-27): worth, with no cap. The core
+# players split the league's money in proportion to their value above the last of them. Past prices
+# belong in Cost, the market side of Edge. The other option prices by rank on this league's price curve,
+# which caps Ours at what the room has paid for its top player (about $80).
+PRICING_MODELS = ("formula", "curve")
 PLAN_OBJECTIVES = planner.OBJECTIVES  # what the Plan tab maximises: expected wins (default) or a bad season's wins
+# The weeks a plan wins: the whole season (default), the season with the playoff weeks counting as much as
+# the regular season, or only the fantasy playoffs.
+PLAN_FOCUSES = ("season", "both", "playoffs")
+
+
+# Environment variables that override settings.txt, so a hosted copy keeps the ESPN cookies in its secrets.
+SETTINGS_ENV = {"ESPN_LEAGUE_ID": "leagueId", "ESPN_S2": "espn_s2", "ESPN_SWID": "SWID", "DRAFT_SEASON": "draftSeason"}
 
 
 def load_settings(path: str) -> Dict[str, Any]:
-    """Read settings.txt without creating or modifying it."""
+    """Read settings.txt without creating or modifying it, then apply SETTINGS_ENV."""
     settings = dict(DEFAULT_SETTINGS)
     try:
         with open(path) as f:
             settings.update(json.load(f))
     except FileNotFoundError:
         pass
+    settings.update({key: os.environ[env] for env, key in SETTINGS_ENV.items() if os.environ.get(env)})
     return settings
 
 
@@ -99,8 +112,13 @@ class DraftBoard:
         self.players: List[draft.DraftPlayer] = []
         self.team_days: Dict[str, List[int]] = {}  # NBA schedule: each team's game days
         self.schedule: Optional[valuation.Schedule] = None
+        self.calendar: Optional[playoffs.Calendar] = None  # matchup weeks and playoff rounds
+        self.focus_schedules: Dict[str, Optional[valuation.Schedule]] = {}  # the schedule each plan focus counts
         self.by_id: Dict[int, draft.DraftPlayer] = {}
         self.fetched_at = 0.0
+        # Goes up on every change, so open pages can tell they're out of date. It starts
+        # from the clock so it keeps going up across restarts.
+        self.rev = time.time_ns() // 1_000_000
         self.shape = LeagueShape()
         self.slots: List[str] = []
         self.baseline: Optional[valuation.Baseline] = None
@@ -112,8 +130,13 @@ class DraftBoard:
         self.fit_model = FIT_MODELS[0]
         self.proj_line, self.cat_weights, self.pricing_model = PROJ_LINES[0], CAT_WEIGHTS[0], PRICING_MODELS[0]
         self.plan_objective = PLAN_OBJECTIVES[0]
+        self.plan_focus = PLAN_FOCUSES[0]
         self.plan: Optional[Dict[str, Any]] = None  # the Plan tab's last result (not saved)
+        # (inputs, recommended plan, plan shown) behind self.plan, so players can be switched in
+        self._plan_work: Optional[Tuple[Dict[str, Any], planner.Plan, planner.Plan]] = None
+        self._plan_seconds: Dict[str, float] = {}  # how long the last plan took, per objective (for the wait message)
         self._team_range: "tuple[str, Optional[Dict[str, Any]]]" = ("", None)  # (inputs, result) of the last team range
+        self._playoffs: "tuple[str, Optional[Dict[str, Any]]]" = ("", None)  # (inputs, result) of the last Playoffs tab
         self.default_rated: List[str] = []
         self.state = self._empty_state()
 
@@ -125,23 +148,39 @@ class DraftBoard:
 
     def load(self, refresh: bool = False) -> None:
         with self.lock:
-            self.settings = load_settings(self.settings_path)
-            cached = None if refresh else draft.load_pool(self.pool_path)
-            if cached:
-                self.league, self.players, team_days, self.fetched_at = cached
-                if team_days is None:  # cached before schedules were stored
-                    self.team_days = self._fetch_schedule(self.league.season)
-                    draft.save_pool(self.pool_path, self.league, self.players, self.team_days)
-                else:
-                    self.team_days = team_days
-            else:
-                self._fetch()
-            self._load_past(refresh)
-            self._prepare()
-            self._load_state()
-            self._apply_settings()
+            warnings, self.warnings = self.warnings, []
+            try:
+                self._load(refresh)
+            except Exception:  # a failed refresh leaves the board as it was
+                self.warnings = warnings
+                raise
+
+    def _load(self, refresh: bool) -> None:
+        self.settings = load_settings(self.settings_path)
+        cached = None if refresh else draft.load_pool(self.pool_path)
+        if cached:
+            self.league, self.players, team_days, self.fetched_at, has_birth_dates = cached
+            changed = False
+            if team_days is None:  # cached before schedules were stored
+                team_days, self.league.opening = self._fetch_schedule(self.league.season)
+                changed = True
+            self.team_days = team_days
+            if self.league.matchup_weeks is None or self.league.opening is None:  # cached before the playoff calendar
+                changed = self._add_calendar() or changed
+            if not has_birth_dates:  # cached before birth dates were stored
+                has_birth_dates = self._add_birth_dates(self.players)
+                changed = changed or has_birth_dates
+            if changed:
+                draft.save_pool(self.pool_path, self.league, self.players, self.team_days, self.fetched_at, has_birth_dates)
+        else:
+            self._fetch()
+        self._load_past(refresh)
+        self._prepare()
+        self._load_state()
+        self._apply_settings()
 
     def _fetch(self) -> None:
+        """Download a new pool. Nothing on the board changes unless every step succeeds."""
         season = int(self.settings.get("draftSeason") or draft.current_season())
         league_id = self.settings.get("leagueId")
         s2, swid = self.settings.get("espn_s2"), self.settings.get("SWID")
@@ -153,9 +192,31 @@ class DraftBoard:
                 self.warnings.append(f"Using default league settings: {ex}")
         league = league or draft.LeagueInfo(league_id=None, season=season)
         players = draft.fetch_pool(season, league.league_id, s2, swid, rank_type=league.rank_type)
-        self.team_days = self._fetch_schedule(season)
-        self.league, self.players, self.fetched_at = league, players, time.time()
-        draft.save_pool(self.pool_path, league, players, self.team_days)
+        team_days, league.opening = self._fetch_schedule(season)
+        if league.matchup_weeks is None:  # the default league: no matchup settings to look up
+            league.matchup_weeks = {}
+        # Birth dates never change: keep the ones we have and look up only new players.
+        known = {p.id: p.birth_date for p in self.players if p.birth_date}
+        for p in players:
+            p.birth_date = known.get(p.id)
+        has_birth_dates = self._add_birth_dates(players)
+        fetched_at = time.time()
+        draft.save_pool(self.pool_path, league, players, team_days, fetched_at, has_birth_dates)
+        self.league, self.players, self.team_days, self.fetched_at = league, players, team_days, fetched_at
+
+    def _add_birth_dates(self, players: List[draft.DraftPlayer]) -> bool:
+        """Fill in missing birth dates. False if ESPN couldn't be reached."""
+        missing = [p for p in players if not p.birth_date]
+        if not missing:
+            return True
+        try:
+            dates = draft.fetch_birth_dates([p.id for p in missing])
+        except draft.EspnError as ex:
+            self.warnings.append(f"No ages: {ex}")
+            return False
+        for p in missing:
+            p.birth_date = dates.get(p.id)
+        return True
 
     def _load_past(self, refresh: bool = False) -> None:
         """Each player's past availability (library/availability.history_availability), cached next to the pool."""
@@ -171,13 +232,33 @@ class DraftBoard:
         for p in self.players:
             p.hist_avail = availability.history_availability(past.get(p.id, []), season)
 
-    def _fetch_schedule(self, season: int) -> Dict[str, List[int]]:
+    def _fetch_schedule(self, season: int) -> Tuple[Dict[str, List[int]], str]:
+        """Each NBA team's game days, and the date of day 1 ("" if unknown)."""
         try:
-            days = draft.fetch_schedule(season)
+            return draft.fetch_schedule(season)
         except draft.EspnError as ex:
-            days = {}
             self.warnings.append(f"No NBA schedule, so Fit ignores it: {ex}")
-        return days
+            return {}, ""
+
+    def _add_calendar(self) -> bool:
+        """Look up the matchup settings and opening date for a pool cached before they were stored.
+
+        False if ESPN couldn't be reached: the Playoffs tab then assumes the last four weeks.
+        """
+        league, s = self.league, self.settings
+        try:
+            if league.matchup_weeks is None:
+                found = draft.fetch_league(int(league.league_id), league.season, s.get("espn_s2"), s.get("SWID")) if league.league_id else None
+                league.matchup_count = found.matchup_count if found else 0
+                league.matchup_weeks = found.matchup_weeks if found else {}
+                league.playoff_teams = found.playoff_teams if found else 0
+            if league.opening is None:
+                team_days, league.opening = draft.fetch_schedule(league.season)
+                self.team_days = team_days or self.team_days
+        except draft.EspnError as ex:
+            self.warnings.append(f"No playoff calendar from ESPN, so the Playoffs tab assumes the last four weeks: {ex}")
+            return False
+        return True
 
     def _prepare(self) -> None:
         league, s = self.league, self.settings
@@ -188,7 +269,15 @@ class DraftBoard:
             self.slots = roster.slots_from_positions(s["rosterPositions"], int(s["teamSize"]))
         ignored = set(s.get("ignoredStats") or [])
         self.default_rated = [c for c in league.categories if c not in ignored]
-        self.schedule = valuation.Schedule(self.team_days) if self.team_days else None
+        opening = date.fromisoformat(league.opening) if league.opening else None
+        self.calendar = None
+        if self.team_days:
+            self.calendar = playoffs.calendar(self.team_days, opening, league.matchup_count, league.matchup_weeks or {},
+                                              league.playoff_teams)
+        # Real matchup weeks when the dates are known (streaming room is counted per week).
+        week_of = self.calendar.week_of() if self.calendar and opening else None
+        self.schedule = valuation.Schedule(self.team_days, week_of) if self.team_days else None
+        self.focus_schedules = self._focus_schedules()
         self.shape = LeagueShape(
             teams=league.teams,
             budget=league.budget,
@@ -199,7 +288,6 @@ class DraftBoard:
             rated=list(self.default_rated),
             starters=sum(1 for slot in self.slots if slot != roster.BENCH),
         )
-        self.warnings = [w for w in self.warnings if w.startswith(("Using default", "No NBA schedule", "No past seasons"))]
         if league.draft_type != "AUCTION":
             self.warnings.append(f"This league's draft type is {league.draft_type.lower()}; values are still shown in auction dollars.")
         # ESPN's average prices come from leagues of every size, so they add up
@@ -207,6 +295,21 @@ class DraftBoard:
         top_market = sum(sorted((p.avg_paid for p in self.players), reverse=True)[: self.shape.pool_size])
         self.auto_market_scale = (self.shape.teams * self.shape.budget) / top_market if top_market > 0 else 1.0
         self.market_scale = self.auto_market_scale  # until saved settings are applied
+
+    def _focus_schedules(self) -> Dict[str, Optional[valuation.Schedule]]:
+        """The schedule behind each plan focus (PLAN_FOCUSES). Without playoff rounds, every focus is the season."""
+        sched, cal = self.schedule, self.calendar
+        out: Dict[str, Optional[valuation.Schedule]] = {f: sched for f in PLAN_FOCUSES}
+        if sched is None or cal is None or not cal.rounds:
+            return out
+        days = set(cal.playoff_days)
+        out["playoffs"] = sched.focus(days)
+        # "both": the playoff weeks count as much as the regular season before them.
+        start = min(days)
+        regular = sum(1 for d in sched.day_ids if d < start)
+        in_playoffs = sum(1 for d in sched.day_ids if d in days)
+        out["both"] = sched.focus(days, repeat=max(1, round(regular / in_playoffs)) if in_playoffs else 1, rest=True)
+        return out
 
     def _apply_settings(self) -> None:
         """Apply the Draft Room settings on top of the league's defaults."""
@@ -226,6 +329,7 @@ class DraftBoard:
         self.cat_weights = room["catWeights"] or CAT_WEIGHTS[0]
         self.pricing_model = room["pricing"] or PRICING_MODELS[0]
         self.plan_objective = room.get("planObjective") or PLAN_OBJECTIVES[0]
+        self.plan_focus = room.get("planFocus") or PLAN_FOCUSES[0]
         for p in self.players:
             p.line_source = self.proj_line
         self.shape.weights = dict(valuation.CATEGORY_WEIGHTS) if self.cat_weights == "league" else {}
@@ -314,13 +418,19 @@ class DraftBoard:
                 room["pricing"] = saved["pricing"]
             if saved.get("planObjective") in PLAN_OBJECTIVES:
                 room["planObjective"] = saved["planObjective"]
+            if saved.get("planFocus") in PLAN_FOCUSES:
+                room["planFocus"] = saved["planFocus"]
             # Punting is always your choice: only categories you tick are punted.
             room["punt"] = [c for c in cats if c in set(saved.get("punt") or [])]
         except (TypeError, ValueError):
             pass  # a bad value keeps its default
         return room
 
+    def _touch(self) -> None:
+        self.rev = max(self.rev + 1, time.time_ns() // 1_000_000)
+
     def _save(self) -> None:
+        self._touch()
         tmp = self.state_path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(self.state, f, indent=1)
@@ -486,9 +596,12 @@ class DraftBoard:
             self.state["filled"] = [None] * len(self.slots)
             self._save()
 
-    def replace_state(self, state: Dict[str, Any]) -> None:
-        """Restore a previous state (used by Undo)."""
+    def replace_state(self, state: Dict[str, Any], rev: Optional[int] = None) -> Optional[str]:
+        """Restore a previous state (used by Undo). `rev` is the board revision the
+        undo belongs to: if anything changed since, restoring would lose that change."""
         with self.lock:
+            if rev is not None and int(rev) != self.rev:
+                return "The board changed since then, so it can't be undone. Fix it by hand."
             merged = self._empty_state()
             merged.update({k: state[k] for k in merged if k in state})
             self.state = self._clean(merged)
@@ -523,7 +636,7 @@ class DraftBoard:
             inputs = {
                 "rows": rows,
                 "shape": copy.deepcopy(self.shape),
-                "schedule": self.schedule,
+                "schedule": self.focus_schedules.get(self.plan_focus, self.schedule),
                 "costs": {p.id: self._plan_cost(p, by_row.get(p.id)) for p in self.players},
                 "mine": mine,
                 "taken": [pid for pid, v in picks.items() if v["status"] == TAKEN],
@@ -534,24 +647,116 @@ class DraftBoard:
                 "averages": dict(self.baseline.per_game),
             }
             stamp = self._plan_stamp()
-            self.plan = {"status": "building", "stamp": stamp, "started": time.time()}
-        threading.Thread(target=self._run_plan, args=(inputs, stamp), daemon=True).start()
+            focus = self.plan_focus
+            self.plan = {"status": "building", "stamp": stamp, "started": time.time(), "focus": focus}
+            self._plan_work = None
+            self._touch()
+        threading.Thread(target=self._run_plan, args=(inputs, stamp, focus), daemon=True).start()
         return None
 
-    def _run_plan(self, inputs: Dict[str, Any], stamp: str) -> None:
+    def _run_plan(self, inputs: Dict[str, Any], stamp: str, focus: str = PLAN_FOCUSES[0]) -> None:
         started = time.time()
         try:
             result = planner.plan_team(**inputs)
             payload = self._plan_payload(result, inputs["costs"]) if result else None
             done = {"status": "ready", "stamp": stamp, "seconds": round(time.time() - started, 1), "builtAt": time.time(),
-                    "result": payload, "full": result is None}
+                    "result": payload, "full": result is None, "focus": focus}
         except Exception as ex:  # keep the app alive; show the error on the tab
-            done = {"status": "error", "stamp": stamp, "error": f"The plan failed: {ex}"}
+            done, result = {"status": "error", "stamp": stamp, "error": f"The plan failed: {ex}", "focus": focus}, None
         with self.lock:
             self.plan = done
+            self._plan_work = (inputs, result, result) if result else None
+            if done["status"] == "ready":
+                self._plan_seconds[f"{inputs['objective']}/{focus}"] = done["seconds"]
+            self._touch()
+
+    def switch_plan(self, out_id: int, in_id: int) -> Optional[str]:
+        """Put another player in a planned player's spot and rescore the plan."""
+        with self.lock:
+            if not self._plan_work or not self.plan or self.plan.get("status") != "ready":
+                return "Build a plan first."
+            inputs, recommended, shown = self._plan_work
+            ids, costs = shown.best.ids, inputs["costs"]
+            if out_id not in ids:
+                return "That player isn't in the plan any more."
+            if in_id not in self.by_id or in_id not in costs:
+                return "Unknown player."
+            if in_id in ids or in_id in inputs["mine"] or in_id in inputs["taken"]:
+                return f"{self.by_id[in_id].name} can't be switched in: he's already on a team or in the plan."
+            if shown.best.cost - costs[out_id] + costs[in_id] + shown.streamers > shown.budget_left:
+                return f"{self.by_id[in_id].name} costs too much to fit the budget."
+            plan = self.plan
+        return self._rescore(plan, inputs, recommended, [in_id if i == out_id else i for i in ids])
+
+    def use_plan(self, ids: List[int]) -> Optional[str]:
+        """Show a plan with these players to buy instead (another build, or the one before an undo), rescored."""
+        ids = list(dict.fromkeys(int(i) for i in ids))
+        with self.lock:
+            if not self._plan_work or not self.plan or self.plan.get("status") != "ready":
+                return "Build a plan first."
+            inputs, recommended, shown = self._plan_work
+            costs = inputs["costs"]
+            if not ids or any(i not in self.by_id or i not in costs for i in ids):
+                return "Unknown player."
+            gone = [self.by_id[i].name for i in ids if i in inputs["mine"] or i in inputs["taken"]]
+            if gone:
+                return f"{', '.join(gone)} can't be in the plan: already on a team."
+            spots = len(shown.best.ids) + shown.streamers
+            if len(ids) > spots:
+                return "That's more players than you have open spots."
+            if sum(costs[i] for i in ids) + spots - len(ids) > shown.budget_left:
+                return "That team costs more than your budget."
+            plan = self.plan
+        return self._rescore(plan, inputs, recommended, ids)
+
+    def _rescore(self, plan: Dict[str, Any], inputs: Dict[str, Any], recommended: planner.Plan, ids: List[int]) -> Optional[str]:
+        if set(ids) == set(recommended.best.ids):
+            result = recommended
+        else:
+            result = planner.score_team(**inputs, ids=ids)
+            result.builds, result.searched = recommended.builds, recommended.searched  # the search behind it
+        return self._show_plan(plan, inputs, recommended, result)
+
+    def restore_plan(self) -> Optional[str]:
+        """Undo every switch: back to the recommended team."""
+        with self.lock:
+            if not self._plan_work or not self.plan or self.plan.get("status") != "ready":
+                return None
+            inputs, recommended, _ = self._plan_work
+            plan = self.plan
+        return self._show_plan(plan, inputs, recommended, recommended)
+
+    def _show_plan(self, plan: Dict[str, Any], inputs: Dict[str, Any], recommended: planner.Plan, result: planner.Plan) -> Optional[str]:
+        payload = self._plan_payload(result, inputs["costs"], recommended)
+        with self.lock:
+            if self.plan is not plan:
+                return "The plan was rebuilt in the meantime."
+            self.plan = {**plan, "result": payload}
+            self._plan_work = (inputs, recommended, result)
+            self._touch()
+        return None
+
+    def save_plan(self) -> Optional[str]:
+        """Add the plan's players to my team at their planned prices."""
+        with self.lock:
+            result = (self.plan or {}).get("result")
+            if not result or self.plan.get("status") != "ready":
+                return "Build a plan first."
+            ids = result["best"]["ids"]
+            if not ids:
+                return "The plan has no players to add."
+            gone = [self.by_id[i].name for i in ids if str(i) in self.state["picks"]]
+            if gone:
+                return f"Your draft changed since this plan was built ({', '.join(gone)} already drafted). Rebuild it first."
+            if self.state["filled"].count(None) < len(ids):
+                return "Your roster doesn't have room for the whole plan. Rebuild it first."
+            for i in ids:
+                self.pick(i, MINE, result["costs"][str(i)])
+            return None
 
     @staticmethod
-    def _plan_payload(plan: planner.Plan, costs: Dict[int, int]) -> Dict[str, Any]:
+    def _plan_payload(plan: planner.Plan, costs: Dict[int, int], recommended: Optional[planner.Plan] = None) -> Dict[str, Any]:
+        """The plan for the page. `recommended` is the search's own best when players were switched in."""
         def build(b: planner.Build) -> Dict[str, Any]:
             return {
                 "ids": b.ids, "cost": b.cost, "wins": round(b.wins, 2),
@@ -564,8 +769,11 @@ class DraftBoard:
 
         best = build(plan.best)
         others = []
-        for b in plan.builds:
+        for n, b in enumerate(plan.builds):
+            if set(b.ids) == set(plan.best.ids):
+                continue
             out = build(b)
+            out["n"] = n  # its place among the search's builds, so its name stays put when you use another
             out["adds"] = [i for i in b.ids if i not in plan.best.ids]
             out["drops"] = [i for i in plan.best.ids if i not in b.ids]
             others.append(out)
@@ -574,8 +782,15 @@ class DraftBoard:
         for out_id, options in plan.swaps.items():
             swaps[str(out_id)] = [{"id": s.in_id, "costChange": s.cost_change, "winsChange": round(s.wins_change, 3)} for s in options]
             ids |= {s.in_id for s in options}
+        switched = None
+        if recommended is not None and set(recommended.best.ids) != set(plan.best.ids):
+            rec = build(recommended.best)
+            switched = {"in": [i for i in plan.best.ids if i not in rec["ids"]], "out": [i for i in rec["ids"] if i not in plan.best.ids],
+                        "wins": rec["wins"], "floor10": rec["floor10"], "floor20": rec["floor20"], "cost": rec["cost"],
+                        "build": next((n for n, b in enumerate(plan.builds) if set(b.ids) == set(plan.best.ids)), None)}
+            ids |= set(rec["ids"])
         return {
-            "best": best, "builds": others, "swaps": swaps, "mine": plan.mine,
+            "best": best, "builds": others, "swaps": swaps, "mine": plan.mine, "switched": switched,
             "budgetLeft": plan.budget_left, "streamers": plan.streamers,
             "searched": plan.searched, "evaluated": plan.evaluated, "objective": plan.objective,
             "costs": {str(i): costs[i] for i in ids},
@@ -586,6 +801,9 @@ class DraftBoard:
             return None
         out = {k: x for k, x in self.plan.items() if k != "stamp"}
         out["stale"] = self.plan["stamp"] != self._plan_stamp()
+        if self.plan["status"] == "building":
+            out["elapsed"] = round(time.time() - self.plan["started"])
+            out["lastSeconds"] = self._plan_seconds.get(f"{self.plan_objective}/{self.plan.get('focus')}")
         return out
 
     def snapshot(self) -> Dict[str, Any]:
@@ -618,6 +836,7 @@ class DraftBoard:
         fit_rank = {pid: i + 1 for i, pid in enumerate(fit_order)}
 
         out_rows = []
+        age_day = date(self.league.season, 2, 1)  # season age, as Basketball Reference counts it
         adjustments = state["adjustments"]
         for r in rows:
             p = self.by_id[r.id]
@@ -631,6 +850,7 @@ class DraftBoard:
                 "name": p.name,
                 "team": p.pro_team,
                 "pos": "/".join(p.positions) or "—",
+                "age": draft.age_on(p.birth_date, age_day),
                 "elig": p.eligible_slots,
                 "inj": p.injury,
                 "gp": p.last_gp,
@@ -649,6 +869,7 @@ class DraftBoard:
                 "dollarRange": [_r(range_rate.dollars(x), 0) for x in value_range],
                 "expMin": round(r.exp_min, 1),
                 "minSet": r.min_set,
+                "defMin": _r(p.default_exp_min),  # what Exp MIN resets to
                 "lastMin": _r(p.last_pg.get("MIN")),
                 "projMin": _r(p.proj_pg.get("MIN")),
                 "rateSource": p.rate_source,
@@ -690,6 +911,7 @@ class DraftBoard:
 
         return {
             "meta": self._meta(),
+            "rev": self.rev,
             "state": state,
             "rows": out_rows,
             "pool": self._pool(rows, picks),
@@ -697,6 +919,7 @@ class DraftBoard:
             "plan": self._plan_snapshot(),
             "me": self._me(picks, mine),
             "team": {**self._team(sim, rows, picks, mine), **self._team_range_for(rows, mine, taken)},
+            "playoffs": self._playoffs_for(rows, mine, taken, sim),
         }
 
     def _meta(self) -> Dict[str, Any]:
@@ -727,6 +950,8 @@ class DraftBoard:
             "fade": [self.fade.start, self.fade.end],
             "fitModel": self.fit_model,
             "planObjective": self.plan_objective,
+            "planFocus": self.plan_focus,
+            "playoffWeeks": self.calendar.playoff_weeks if self.calendar and self.calendar.rounds else [],
             "projLine": self.proj_line,
             "catWeights": self.cat_weights,
             "pricingModel": self.pricing_model,
@@ -812,6 +1037,79 @@ class DraftBoard:
             tr = availability.team_range([by_id[i] for i in mine if i in by_id], mean_sim, averages, shape)
             result = {"winsRange": [round(tr.quantile(q), 2) for q in (0.1, 0.5, 0.9)], "halfSeason": round(tr.half_season, 1)}
         self._team_range = (key, result)
+        return result
+
+    def _playoffs_for(self, rows, mine: List[int], taken: List[int], season: valuation.LeagueSim) -> Optional[Dict[str, Any]]:
+        """The Playoffs tab: when the fantasy playoffs land, each NBA team's games in them, and my team
+        and every available player counted over just those weeks. Recomputed only when the draft changes.
+
+        Playoff Fit is Fit over the playoff weeks (the league simulated on those days alone), put back
+        on the season's scale: 100 is an average player with an average playoff schedule, so a player
+        whose team plays more then, on days my lineup has room, rates higher.
+        """
+        cal, sched = self.calendar, self.focus_schedules.get("playoffs")
+        if cal is None or not cal.rounds or sched is None or sched is self.schedule:
+            return None
+        key = json.dumps([self.state, self.fetched_at], sort_keys=True, default=str)
+        if key == self._playoffs[0]:
+            return self._playoffs[1]
+        shape = self.shape
+        psim = valuation.simulate_league(rows, mine, taken, shape, sched)
+        useful = valuation.fit_by_wins if self.fit_model == "wins" else valuation.fit_by_fade(self.fade)
+        starts: Dict[int, float] = {}
+        fits = valuation.team_fit(rows, mine, shape, psim, self.baseline, self.fit_categories(), useful, starts)
+        window_games = sum(sched.share)  # an average team's games in the playoffs
+        stretch = sched.average_games / window_games if window_games else 1.0
+        teams = {t.team: t for t in playoffs.team_playoffs(self.team_days, cal)}
+
+        def player(r: valuation.Valued) -> Dict[str, Any]:
+            t = teams.get(r.team)
+            games = t.games if t else None
+            # team_fit's starts are a share of his season's games: turn them into playoff games started.
+            started = starts.get(r.id, 0.0) * sched.games(r.team) if r.team in sched.team_days else None
+            return {"id": r.id, "pfit": _r(100 + (fits[r.id] - 100) * stretch) if r.id in fits else None,
+                    "games": games, "starts": _r(started, 1) if started is not None else None}
+
+        skip = set(taken) | set(mine)
+        cats = shape.categories
+        chances = {c: valuation.win_chance(psim.ratings.get(c, 100.0), c) for c in cats}
+        weights = psim.lineup.weights(psim.mine)
+        streamer = psim.lineup.streamer
+        streamed = next((w for m, w in weights if m is streamer), 0.0) * sched.average_games if streamer else 0.0
+        by_id = {r.id: r for r in rows}
+        date_of = lambda d: cal.date(d).isoformat() if cal.date(d) else None  # noqa: E731
+        plays = {t: set(ds) for t, ds in self.team_days.items()}
+        my_teams = [by_id[i].team for i in mine if i in by_id]
+        weeks = []
+        for w in playoffs.weekly_games(self.team_days, cal):
+            days = range(w["first"], w["last"] + 1)
+            weeks.append({**w, "first": date_of(w["first"]), "last": date_of(w["last"]),
+                          "mine": [sum(1 for t in my_teams if d in plays.get(t, ())) for d in days]})  # my players with a game
+        result = {
+            "known": cal.known,
+            "playoffTeams": cal.playoff_teams,
+            "teams": shape.teams,
+            "regularWeeks": min(r.weeks[0] for r in cal.rounds) - 1,
+            "rounds": [{"period": r.period, "weeks": r.weeks, "first": date_of(r.first), "last": date_of(r.last)} for r in cal.rounds],
+            "weeks": weeks,
+            "starters": shape.starters,
+            "nba": [{"team": t.team, "weeks": t.weeks, "games": t.games, "light": t.light} for t in teams.values()],
+            "avgGames": round(window_games, 1),
+            "lightShare": playoffs.LIGHT_DAY,
+            "team": {
+                "ratings": {c: round(psim.ratings.get(c, 100.0), 1) for c in cats},
+                "seasonRatings": {c: round(season.ratings.get(c, 100.0), 1) for c in cats},
+                "chances": {c: round(x, 3) for c, x in chances.items()},
+                "expectedWins": round(sum(chances.values()), 2),
+                "seasonWins": round(sum(valuation.win_chance(season.ratings.get(c, 100.0), c) for c in cats), 2),
+                "matchupWin": round(valuation.matchup_win(list(chances.values())), 3),
+                "slots": shape.starters * sched.days,  # starting slots on playoff days with games
+                "streamed": round(streamed, 1),
+                "players": [player(by_id[i]) for i in mine if i in by_id],
+            },
+            "players": [player(r) for r in rows if r.id not in skip],
+        }
+        self._playoffs = (key, result)
         return result
 
     def _team(self, sim: valuation.LeagueSim, rows, picks, mine: List[int]) -> Dict[str, Any]:

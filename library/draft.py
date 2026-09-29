@@ -7,19 +7,24 @@ public leagues work without cookies; private leagues need espn_s2 and SWID.
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional
+from collections import Counter
+from datetime import date, datetime, timedelta, timezone
+from typing import Dict, List, Optional, Tuple
 
 from espn_api.basketball.constant import POSITION_MAP, PRO_TEAM_MAP, STATS_MAP
 
 from library.valuation import PERCENT_STATS, VOLUME_STATS
 
 BASE_URL = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba"
+ATHLETES_URL = "https://sports.core.api.espn.com/v3/sports/basketball/nba/athletes"
 BASE_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 POOL_CACHE_VERSION = 1
 MAX_GP = 82
@@ -68,8 +73,10 @@ def _get_json(url: str, headers: Optional[Dict[str, str]] = None, cookie: Option
         if ex.code == 404:
             raise EspnError("ESPN couldn't find that league or season. Check leagueId in settings.txt.") from ex
         raise EspnError(f"ESPN returned HTTP {ex.code}.") from ex
-    except (urllib.error.URLError, TimeoutError) as ex:
+    except (OSError, http.client.HTTPException) as ex:  # URLError, timeouts, dropped connections
         raise EspnError(f"Couldn't reach ESPN: {getattr(ex, 'reason', ex)}") from ex
+    except ValueError as ex:  # not JSON, or not UTF-8
+        raise EspnError("ESPN sent a response that isn't JSON.") from ex
 
 
 def current_season() -> int:
@@ -95,6 +102,11 @@ class LeagueInfo:
     reverse: List[str] = field(default_factory=lambda: ["TO"])
     slot_counts: Dict[str, int] = field(default_factory=dict)
     team_names: Dict[int, str] = field(default_factory=dict)
+    # The matchup schedule (library/playoffs.py). None: not looked up yet (a pool cached before it was).
+    matchup_count: int = 0  # matchup periods in the regular season
+    matchup_weeks: Optional[Dict[int, List[int]]] = None  # matchup period -> its matchup weeks, numbered from 1
+    playoff_teams: int = 0
+    opening: Optional[str] = None  # the date of day 1 (ISO); "" when ESPN's schedule has no dates
 
     @property
     def rank_type(self) -> str:
@@ -113,6 +125,7 @@ def parse_league(data: dict, league_id: Optional[int], season: int) -> LeagueInf
         if int(v) > 0
     }
     draft = settings.get("draftSettings", {})
+    schedule = settings.get("scheduleSettings", {})
     info = LeagueInfo(
         league_id=league_id,
         season=season,
@@ -123,6 +136,9 @@ def parse_league(data: dict, league_id: Optional[int], season: int) -> LeagueInf
         scoring_type=scoring.get("scoringType") or "H2H_CATEGORY",
         slot_counts=counts,
         team_names={int(t["id"]): t.get("name") or t.get("abbrev") or f"Team {t['id']}" for t in data.get("teams", [])},
+        matchup_count=int(schedule.get("matchupPeriodCount") or 0),
+        matchup_weeks={int(k): [int(w) for w in v] for k, v in (schedule.get("matchupPeriods") or {}).items()},
+        playoff_teams=int(schedule.get("playoffTeamCount") or 0),
     )
     if categories:
         info.categories = categories
@@ -161,6 +177,7 @@ class DraftPlayer:
     # Which per-game line drives the projection: "espn" (ESPN's projection,
     # which backtested better) or "last" (last season's per-minute rates).
     line_source: str = "espn"
+    birth_date: Optional[str] = None  # YYYY-MM-DD
 
     @property
     def base_is_projection(self) -> bool:
@@ -298,9 +315,26 @@ def parse_schedule(data: dict) -> Dict[str, List[int]]:
     return days
 
 
-def fetch_schedule(season: int) -> Dict[str, List[int]]:
-    """The season's NBA schedule. Empty when ESPN hasn't published it yet."""
-    return parse_schedule(_get_json(f"{BASE_URL}/seasons/{season}?view=proTeamSchedules_wl"))
+def parse_opening(data: dict) -> str:
+    """The date of day 1 (scoring period 1), ISO. "" when the games have no dates.
+
+    Each game's date in US Eastern time, minus its day number: the most common answer.
+    """
+    eastern = timezone(timedelta(hours=-5))  # every game starts after noon, so standard time is close enough
+    votes: Counter = Counter()
+    for team in data.get("settings", {}).get("proTeams", []):
+        for period in (team.get("proGamesByScoringPeriod") or {}).values():
+            for g in period:
+                if g.get("date") and g.get("scoringPeriodId"):
+                    day = datetime.fromtimestamp(g["date"] / 1000, eastern).date()
+                    votes[day - timedelta(days=int(g["scoringPeriodId"]) - 1)] += 1
+    return votes.most_common(1)[0][0].isoformat() if votes else ""
+
+
+def fetch_schedule(season: int) -> Tuple[Dict[str, List[int]], str]:
+    """The season's NBA schedule and the date of day 1 (see parse_opening). Empty when ESPN hasn't published it yet."""
+    data = _get_json(f"{BASE_URL}/seasons/{season}?view=proTeamSchedules_wl")
+    return parse_schedule(data), parse_opening(data)
 
 
 # --------------------------------------------------------------------------
@@ -358,14 +392,75 @@ def load_past(path: str, season: int) -> Optional[Dict[int, List[List[float]]]]:
 
 
 # --------------------------------------------------------------------------
+# Birth dates
+# --------------------------------------------------------------------------
+
+
+def _birth_date(athlete: dict) -> Optional[str]:
+    dob = athlete.get("dateOfBirth")  # e.g. "1999-09-19T07:00Z": midnight US time, so the date part is right
+    try:
+        return date.fromisoformat(dob[:10]).isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_birth_dates(data: dict) -> Dict[int, str]:
+    """id -> birth date (YYYY-MM-DD) from ESPN's list of NBA athletes."""
+    out: Dict[int, str] = {}
+    for a in data.get("items", []):
+        dob = _birth_date(a)
+        if a.get("id") and dob:
+            out[int(a["id"])] = dob
+    return out
+
+
+def fetch_birth_dates(ids: List[int]) -> Dict[int, str]:
+    """Birth dates for these players. ESPN's athlete list leaves out some (often
+    injured) players, so those are looked up one at a time."""
+    out = parse_birth_dates(_get_json(f"{ATHLETES_URL}?limit=5000", timeout=60))
+
+    def one(pid: int) -> Optional[str]:
+        try:
+            return _birth_date(_get_json(f"{ATHLETES_URL}/{pid}"))
+        except EspnError:
+            return None
+
+    missing = [pid for pid in ids if pid not in out]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for pid, dob in zip(missing, pool.map(one, missing)):
+            if dob:
+                out[pid] = dob
+    return out
+
+
+def age_on(birth_date: Optional[str], day: date) -> Optional[int]:
+    """Age in whole years on `day`."""
+    try:
+        born = date.fromisoformat(birth_date or "")
+    except ValueError:
+        return None
+    return day.year - born.year - ((day.month, day.day) < (born.month, born.day))
+
+
+# --------------------------------------------------------------------------
 # Cache
 # --------------------------------------------------------------------------
 
 
-def save_pool(path: str, league: LeagueInfo, players: List[DraftPlayer], schedule: Optional[Dict[str, List[int]]] = None) -> None:
+def save_pool(
+    path: str,
+    league: LeagueInfo,
+    players: List[DraftPlayer],
+    schedule: Optional[Dict[str, List[int]]] = None,
+    fetched_at: Optional[float] = None,
+    birth_dates: bool = False,
+) -> None:
+    """`fetched_at` is when the pool came from ESPN (default: now). `birth_dates`
+    records that they were looked up, even if ESPN had none for some players."""
     payload = {
         "version": POOL_CACHE_VERSION,
-        "fetchedAt": time.time(),
+        "fetchedAt": time.time() if fetched_at is None else fetched_at,
+        "birthDates": birth_dates,
         "league": asdict(league),
         "players": [asdict(p) for p in players],
         "schedule": schedule or {},
@@ -377,9 +472,10 @@ def save_pool(path: str, league: LeagueInfo, players: List[DraftPlayer], schedul
 
 
 def load_pool(path: str):
-    """Returns (league, players, schedule, fetched_at) or None if missing or outdated.
+    """Returns (league, players, schedule, fetched_at, birth_dates) or None if missing or outdated.
 
-    The schedule is None in caches saved before it was stored.
+    The schedule is None in caches saved before it was stored, and birth_dates
+    is False until birth dates have been looked up.
     """
     try:
         with open(path) as f:
@@ -390,6 +486,8 @@ def load_pool(path: str):
         return None
     league_data = payload["league"]
     league_data["team_names"] = {int(k): v for k, v in league_data.get("team_names", {}).items()}
+    if league_data.get("matchup_weeks") is not None:
+        league_data["matchup_weeks"] = {int(k): v for k, v in league_data["matchup_weeks"].items()}
     league = LeagueInfo(**league_data)
     players = [DraftPlayer(**p) for p in payload["players"]]
-    return league, players, payload.get("schedule"), payload.get("fetchedAt", 0)
+    return league, players, payload.get("schedule"), payload.get("fetchedAt", 0), bool(payload.get("birthDates"))

@@ -41,6 +41,7 @@
     <button class="tab" role="tab" id="tab-board" aria-selected="true" aria-controls="view-board" type="button">Board</button>
     <button class="tab" role="tab" id="tab-team" aria-selected="false" aria-controls="view-team" type="button">My Team<span class="count" id="teamCount"></span></button>
     <button class="tab" role="tab" id="tab-plan" aria-selected="false" aria-controls="view-plan" type="button">Plan</button>
+    <button class="tab" role="tab" id="tab-playoffs" aria-selected="false" aria-controls="view-playoffs" type="button">Playoffs</button>
     <button class="tab" role="tab" id="tab-settings" aria-selected="false" aria-controls="view-settings" type="button">Settings</button>
   </div>
 
@@ -54,6 +55,9 @@
       <label class="check" for="hideGone"><input type="checkbox" id="hideGone"> Hide drafted</label>
       <label class="check" for="onlyAdj"><input type="checkbox" id="onlyAdj"> Only adjusted</label>
       <label class="check" for="affordable" id="affordableLbl"><input type="checkbox" id="affordable"> <span id="affordableTxt">Only affordable</span></label>
+      <label class="slider costcap" for="maxCost" title="Hide players whose Cost is above this. Drag to the right end to show everyone.">Max cost <input type="range" id="maxCost" min="1" step="1"><output id="maxCostOut" for="maxCost">Any</output></label>
+      <label class="slider costcap" for="minMin" title="Hide players expected to play fewer minutes a game than this (Exp MIN). Drag to the left end to show everyone.">Min MIN <input type="range" id="minMin" min="0" step="1"><output id="minMinOut" for="minMin">Any</output></label>
+      <label class="slider costcap" for="minValue" title="Hide players whose Value is below this. Drag to the left end to show everyone.">Min value <input type="range" id="minValue" step="1"><output id="minValueOut" for="minValue">Any</output></label>
       <div class="teams" role="radiogroup" aria-label="Filter by NBA team" id="teams"></div>
     </div>
     <div class="strip" id="strip" aria-label="My roster slots. Drag players here."></div>
@@ -77,6 +81,10 @@
 
   <div id="view-plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
     <div class="plan" id="planPanel"></div>
+  </div>
+
+  <div id="view-playoffs" role="tabpanel" aria-labelledby="tab-playoffs" hidden>
+    <div class="po" id="playoffsPanel"></div>
   </div>
 
   <div id="view-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>

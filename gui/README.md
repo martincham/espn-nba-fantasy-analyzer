@@ -7,7 +7,7 @@ A local web app for your fantasy basketball auction draft. It pulls your league'
 - **During the draft:** mark players as yours (at the price you paid) or taken by another team, and follow your budget and max bid.
 - **Settings:** tune the replacement player, how many core players share the money, the Avg paid scale, which categories count, and how many players count toward team totals.
 
-Everything runs on your computer. The app listens on `127.0.0.1` only, so other devices on your network can't reach it.
+Everything runs on your computer. The app listens on `127.0.0.1` only, so other devices on your network can't reach it. To share it with friends, see [Host it online](#host-it-online).
 
 ## Requirements
 
@@ -62,7 +62,9 @@ Your browser opens to the app. Press **Ctrl+C** in the terminal to stop it.
 | Option | What it does |
 |---|---|
 | `--port 8001` | Use a different port (default 8000) |
-| `--settings path/to/settings.txt` | Read settings from somewhere else |
+| `--host 0.0.0.0` | Listen on every network interface, not just this computer (default `127.0.0.1`). Refuses to start unless `DRAFTROOM_PASSWORD` is set |
+| `--data-dir path/` | Keep `draftPool.json` and `draftState.json` in another folder (default the repo folder, or `$DRAFTROOM_DATA`) |
+| `--settings path/to/settings.txt` | Read settings from somewhere else (default `settings.txt` in the data folder) |
 | `--refresh` | Download a fresh player pool from ESPN before starting |
 | `--no-browser` | Don't open a browser tab |
 | `--reload` | For development: restart the server when a `.py` file in `gui/` or `library/` changes, and refresh the open page after a restart or an edit in `gui/static/` |
@@ -83,6 +85,7 @@ To start over, stop the app and delete `draftState.json`.
   - **Sort by one or more categories:** click category headers to pick them (they're underlined), and the board sorts by **Mix**, best first. Click a picked header again to drop it; click Mix to reverse.
   - **Mix** is the player's average percentile in the picked categories among the top 144 players: 90 means better than 90% of them. Percentiles keep one extreme category (a 578 in blocks) from drowning out the others.
 - **Only affordable:** hides undrafted players whose Avg paid is more than your max bid. The label shows your current max bid.
+- **Max cost, Min MIN, Min value:** sliders that hide undrafted players above a Cost, below an Exp MIN (minutes a game), or below a Value. Drag Max cost to the right end, or the Min sliders to the left end, to show everyone.
 - **Filter by team:** the row of team-colored buttons under the search box shows one NBA team at a time (**FA** is unsigned players). Click the selected team again, or **All**, to clear it. Arrow keys move between teams.
 - **Edit a player:** drag sideways on a **GP Δ**, **Exp MIN** or **Δ** cell to change it (hold Shift for bigger steps), or click the cell to type. You can also select a row and use the sliders in the side panel.
   - **Exp MIN defaults to ESPN's projected minutes.** Production starts from ESPN's projected per-game line and scales with minutes, keeping ESPN's per-minute rates. (Settings → Rating model can use last season's per-minute rates instead.) Clear the cell to go back to ESPN's minutes.
@@ -105,11 +108,19 @@ To start over, stop the app and delete `draftState.json`.
 - **Fit:** each player's value to *your current team*, on the same scale as Value. It's how much he raises your weekly category win chances, so categories you're already winning count less. Steady categories (PTS, FG%, FT%) reach a sure win sooner than swingy ones (BLK, STL). Settings → Fit can switch to a simple fade instead: full weight up to 110, nothing past 140. Sort by Fit during the draft to find who helps you most.
   - Fit follows the NBA schedule. Each day only 7 players start, so a player whose games fall on nights your roster is already full adds less, and one who plays on nights your core is idle adds more. Your streaming spots fill open slots at the replacement rating. The player panel shows **Starts**: the share of his games that would make your lineup.
   - **Fit edge** = Fit $ − Avg paid: the bargain *for your team*, where Edge is the bargain for anyone. **Fit $** (Fit converted to dollars) and **Fit rank** are in the player panel. ESPN's own suggested price is also in the panel now.
-- **Plan tab:** click **Build plan** for the team that wins the most categories per week at expected prices (Cost: Avg paid or your own price). It keeps the players already on your roster, skips taken players, fits your budget, and ignores categories you punt. Only your best 9 count, so it buys up to 9 and leaves $1 streaming spots. It takes about 5–15 seconds.
+- **Plan tab:** click **Build plan** for the team that wins the most categories per week at expected prices (Cost: Avg paid or your own price). It keeps the players already on your roster, skips taken players, fits your budget, and ignores categories you punt. Only your best 9 count, so it buys up to 9 and leaves $1 streaming spots. It takes 10–30 seconds on a laptop, a floor plan about twice that, and longer on a small hosted machine; the tab shows the time so far and how long the last one took.
   - Each recommended player has **alternatives**: the best players who could take his spot within your budget, and how many categories per week you'd gain or lose.
   - **Other builds** are different rosters that finished close behind, with what goes in and out and which categories move.
   - **Leave out** a player you won't buy (say, one whose games you don't trust): click **Leave out** on his Plan row, which rebuilds right away, or **Leave out of plan** in his side panel. The plan never recommends him, but the simulated opponents can still draft him. The **Left out** list at the top of the tab brings players back with ×.
   - The plan doesn't update by itself. When you mark a pick or change a price or setting, it says it's out of date: click **Rebuild**.
+  - **Optimize for** picks the weeks it wins: **Season** (every week the same), **Playoffs** (only the fantasy playoff weeks), or **Season + playoffs** (the playoff weeks count as much as the whole regular season).
+- **Playoffs tab:** when the fantasy playoffs land (from the league's ESPN settings: here the top 4 of 12, weeks 21–24, as two 2-week rounds), and how to build for them. Four weeks is a small sample of each player's schedule, so it matters much more there than over a season.
+  - **Each playoff week, night by night:** how many NBA teams play (green nights are light: fewer than half play, so games fit into lineups easily), and how many of your players have a game. Red means more of them than your starting slots, so someone sits.
+  - **Your team in the playoffs:** categories won per week against the average team over just those weeks, your chance of winning a matchup, and each player's games, starts and **Playoff Fit**.
+  - **Playoff Fit** is Fit counted over the playoff weeks alone, on Fit's scale: 100 is an average player with an average playoff schedule. A player whose team plays more then, on nights your lineup has room, rates above his Fit. **Best for the playoffs** lists the players you can still get by it.
+  - **Plan a playoff team** runs the Plan tab's search for **Playoffs** or **Season + playoffs**.
+  - **NBA schedules in the playoffs:** every team's games in each playoff week, and its games on light nights.
+  - Matchup weeks follow ESPN's: opening night to the first Sunday, then Monday to Sunday, with the All-Star week joined to the next. Before the season ESPN leaves the NBA Cup knockout games off the schedule; **Refresh from ESPN** picks them up once they're set. Late-season rest for stars isn't in the schedule.
 - **Rearrange:** on **My Team**, drag between slots or click one slot and then another.
   - **×** removes a player and **Clear roster** empties every slot.
   - Both show an **Undo** message.
@@ -117,8 +128,10 @@ To start over, stop the app and delete `draftState.json`.
   - **Pool left** counts how many core players (the top 84 by value with 7 per team) are still available.
 - **Settings tab:**
   - **Replacement player:** the per-game rating of the free agent who fills a hurt player's games. Lower it to make health count more; 0 counts missed games as lost.
-  - **Core players:** how many players per team share the money (default 7) under the *Core formula* pricing. The rest of the roster are priced at $1.
-  - **Rating model:** the per-game line (*ESPN projection* or *Last season per minute*), category weights (*Weekly win impact* or *Equal*) and dollars (*League price curve* or *Core formula*). The defaults tested better on this league's past seasons; see [`docs/BACKTEST_PLAN.md`](../docs/BACKTEST_PLAN.md).
+  - **Core players:** how many players per team share the money (default 7) under *Worth* pricing. The rest of the roster are priced at $1.
+  - **Rating model:** the per-game line (*ESPN projection* or *Last season per minute*), category weights (*Weekly win impact* or *Equal*) and dollars (*Worth* or *League price curve*). The default line and weights tested better on this league's past seasons; see [`docs/BACKTEST_PLAN.md`](../docs/BACKTEST_PLAN.md).
+    - *Worth* (default): the core players split the league's money in proportion to their value above the last of them, with no cap, so Ours says what a player is worth rather than what the room will pay (that's Cost).
+    - *League price curve*: the Nth most valuable player gets what this league has paid for its Nth most expensive player, which caps Ours near $80. The backtest's dollar check favored the curve by about $1 a pick, but it scored against prices set on that same curve. The formula put the top player at $97–168.
   - **Fit:** *Win chances* (default) or *Simple fade*, with the fade's start (110) and end (140).
   - **Avg paid scale:** Auto fits ESPN's prices to your league's budget. Drag the slider to set your own multiplier.
   - **Categories in player value:** starts from `ignoredStats` in settings.txt. Team ranks always show every category.
@@ -126,6 +139,92 @@ To start over, stop the app and delete `draftState.json`.
   - **Default expected games:** the blend of ESPN's projected games and last season's. Default ⅔ ESPN.
   - **Reset draft:** unmarks every taken player and empties your roster, with Undo.
   - Changes save to `draftState.json`; settings.txt is never edited.
+
+## Host it online
+
+To share the board with friends, and keep it up while your computer is off, run it on [Fly.io](https://fly.io). It costs roughly $2 a month: the smallest machine, which stops when nobody's using it and starts on the next visit, plus a 1 GB disk for your draft. The repo has the `Dockerfile` and `fly.toml` it needs.
+
+**What keeps it private:**
+- A shared password. Every page and request needs it. After you enter it, a cookie keeps that browser signed in for 90 days, and opening the board extends that.
+- HTTPS, so the password and your draft are encrypted on the way.
+- Your ESPN cookies are stored as Fly secrets. They stay on the server and never reach the browser. The image holds only `gui/` and `library/` (see `.dockerignore`), never `settings.txt` or your JSON files.
+
+**Everyone shares one board.** That suits co-managers of one team. Anyone with the password can change your draft, click **Refresh from ESPN** (which uses your cookies) or **Reset draft**, so give it only to people you trust. Your valuations and notes are your draft strategy.
+
+### Setup
+
+1. Install `flyctl` and sign in: `brew install flyctl`, then `fly auth login`. Fly asks for a card.
+2. From the repo folder, create the app. Pick a name; it becomes `https://NAME.fly.dev`:
+
+   ```
+   fly launch --copy-config --no-deploy --name NAME
+   ```
+
+   Say no if it offers databases or other extras. It keeps `fly.toml`'s settings and writes your app name into it. Change `primary_region` in `fly.toml` if `iad` (Virginia) isn't close to you (`fly platform regions` lists them).
+
+3. Create the disk, in the same region:
+
+   ```
+   fly volumes create draftroom_data --size 1 --region iad
+   ```
+
+4. Set the password. Use a long passphrase, since anyone on the internet can try to guess it:
+
+   ```
+   fly secrets set DRAFTROOM_PASSWORD='a long passphrase you share with friends'
+   ```
+
+5. Copy your league and ESPN cookies from `settings.txt` into Fly secrets. This pipes them straight to Fly, so they don't end up in your shell history:
+
+   ```
+   python3 -c "import json; s = json.load(open('settings.txt')); print(f\"ESPN_LEAGUE_ID={s['leagueId']}\nESPN_S2={s['espn_s2']}\nESPN_SWID={s['SWID']}\")" | fly secrets import
+   ```
+
+   A public league only needs `ESPN_LEAGUE_ID`. To force a season, also set `DRAFT_SEASON` (e.g. `2027`).
+
+6. Deploy. Keep it to one machine, because the board lives in that machine's memory and on its disk:
+
+   ```
+   fly deploy --ha=false
+   ```
+
+7. Open `https://NAME.fly.dev`, enter any username and the password. On first start it downloads the player pool from ESPN.
+
+### Bring your local draft along (optional)
+
+Copy your `draftState.json` (and `draftPool.json` and `draftPoolHistory.json`, to skip the download) to the disk, then restart so the app reads them:
+
+```
+fly ssh sftp shell
+» put draftState.json /data/draftState.json
+» put draftPool.json /data/draftPool.json
+» put draftPoolHistory.json /data/draftPoolHistory.json
+fly apps restart NAME
+```
+
+(Press Ctrl+D to leave the sftp shell.) Restart right after the upload: the running app saves over `draftState.json` on the next change. `fly ssh sftp get /data/draftState.json` copies it back down.
+
+### Keeping it running
+
+- **Update the code:** `fly deploy --ha=false`. Your draft stays on the disk.
+- **Draft day:** set `min_machines_running = 1` in `fly.toml` and deploy, so nobody waits for the machine to start. Set it back to 0 afterwards.
+- **Change the password:** `fly secrets set DRAFTROOM_PASSWORD=...` (the app restarts). This signs every browser out, and everyone enters the new one.
+- **New ESPN cookies:** rerun step 5. They expire every few months, or when you sign out of ESPN everywhere.
+- **Logs:** `fly logs`.
+- **Remove it:** `fly apps destroy NAME` deletes the app, its disk and its secrets.
+
+### Keeping costs down
+
+Fly has no spending cap and no billing alerts. Prepaid credits don't cap it either: when they run out, the rest goes on your card. You're billed once a month, for the month before.
+
+- **After the first deploy, check what you're paying for:**
+  - `fly machines list` shows one machine. A second one doubles the compute and splits your draft; destroy it with `fly machines destroy ID`.
+  - `fly volumes list` shows one volume.
+  - `fly ips list` shows a *shared* IPv4. A dedicated one costs about $2 a month; `fly ips release ADDRESS` removes it.
+- **Watch the bill:** look at the Billing page in the Fly dashboard during the first couple of weeks.
+- **Card alerts:** set your bank to alert you on any purchase over about $10. For a hard limit, give Fly a virtual card with a monthly limit (e.g. [Privacy.com](https://privacy.com)), which declines anything over it.
+- **Snapshots:** Fly snapshots the disk daily and bills for the storage, a few cents a month for 1 GB. `fly volumes update ID --scheduled-snapshots=false` turns them off, but then there's no backup.
+- **After the draft:** `fly apps destroy NAME`. A stopped app still pays for its disk.
 
 ## Troubleshooting
 
@@ -154,10 +253,10 @@ ESPN averages prices across leagues of every size, so for the top players it add
 ## For developers
 
 - **Code layout:**
-  - `gui/server.py` is a standard-library HTTP server.
+  - `gui/server.py` is a standard-library HTTP server. With `DRAFTROOM_PASSWORD` set it requires the password (HTTP Basic auth) or the 90-day session cookie it hands out after a login on every request. Without one it only answers requests addressed to `127.0.0.1` or `localhost`, so another site can't reach it through DNS rebinding. It always refuses POSTs from other sites' pages.
   - `gui/board.py` holds the state and builds the snapshot.
   - `gui/static/` is the frontend, with no build step.
-  - The math lives in `library/valuation.py` and `library/roster.py`, and ESPN access in `library/draft.py`.
+  - The math lives in `library/valuation.py`, `library/roster.py`, `library/planner.py` and `library/playoffs.py` (matchup weeks and playoff rounds), and ESPN access in `library/draft.py`.
   - The design and model are described in [`docs/GUI_PLAN.md`](../docs/GUI_PLAN.md), and colors and type in `gui/static/tokens.css` ([style reference](../docs/style-reference.html)).
 - **Live editing:** run `python3 -m gui --reload`.
   - Saving a Python file restarts the server, and the page refreshes itself. Your data is kept, because it lives in `draftState.json`.
@@ -166,7 +265,7 @@ ESPN averages prices across leagues of every size, so for the top players it add
 - **Tests:** these run offline against a saved ESPN fixture.
 
   ```
-  python3 -m unittest tests.valuation_test tests.roster_test tests.draft_test
+  python3 -m unittest tests.valuation_test tests.roster_test tests.draft_test tests.hosting_test tests.planner_test tests.playoffs_test
   ```
 
   (`tests/rating_test.py` and `tests/loading_test.py` are older tests that call ESPN live.)

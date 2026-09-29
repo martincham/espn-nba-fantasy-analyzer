@@ -1,0 +1,6 @@
+# Allowlist: only the Draft Room's code goes into the image. settings.txt, draftState.json,
+# draftPool.json and anything else with cookies or your draft stay out.
+*
+!gui/
+!library/
+**/__pycache__

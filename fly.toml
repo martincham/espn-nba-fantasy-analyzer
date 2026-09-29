@@ -1,0 +1,26 @@
+# Draft Room on Fly.io. Setup steps are in gui/README.md, "Host it online".
+# `fly launch` replaces the app name and region with yours.
+app = 'oaks-draft'
+primary_region = 'iad'
+kill_signal = 'SIGINT'
+kill_timeout = '10s'
+
+[build]
+
+# Your draft lives here, and survives restarts and deploys.
+[[mounts]]
+  source = 'draftroom_data'
+  destination = '/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Stop when nobody's using it and start on the next visit (a few seconds), so you pay for little
+  # more than the disk. Set min_machines_running = 1 to keep it always warm on draft day.
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'  # downloading the pool from ESPN peaks near 280 MB (about 35 MB once it's cached)

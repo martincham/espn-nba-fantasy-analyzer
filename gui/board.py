@@ -13,6 +13,7 @@ import json
 import os
 import threading
 import time
+import uuid
 from dataclasses import replace
 from datetime import date
 from types import SimpleNamespace
@@ -62,6 +63,8 @@ PLAN_OBJECTIVES = planner.OBJECTIVES  # what the Plan tab maximises: expected wi
 # The weeks a plan wins: the whole season (default), the season with the playoff weeks counting as much as
 # the regular season, or only the fantasy playoffs.
 PLAN_FOCUSES = ("season", "both", "playoffs")
+MAX_SAVED = 10  # saved rosters (the Saved tab)
+MAX_NAME = 40
 
 
 # Environment variables that override settings.txt, so a hosted copy keeps the ESPN cookies in its secrets.
@@ -144,7 +147,7 @@ class DraftBoard:
 
     @staticmethod
     def _empty_state() -> Dict[str, Any]:
-        return {"adjustments": {}, "picks": {}, "filled": [], "settings": dict(DEFAULT_ROOM_SETTINGS), "avoid": []}
+        return {"adjustments": {}, "picks": {}, "filled": [], "settings": dict(DEFAULT_ROOM_SETTINGS), "avoid": [], "saved": []}
 
     def load(self, refresh: bool = False) -> None:
         with self.lock:
@@ -384,7 +387,24 @@ class DraftBoard:
             if pick.get("status") == TAKEN:
                 pick.pop("price", None)  # only that they're gone matters, not what they cost
         state["settings"] = self._clean_settings(state.get("settings") or {})
+        state["saved"] = self._clean_saved(state.get("saved") or [])
         return state
+
+    def _clean_saved(self, saved: List[Any]) -> List[Dict[str, Any]]:
+        """Saved rosters: known players only, at most MAX_SAVED. A bad entry is dropped."""
+        out = []
+        for entry in saved:
+            try:
+                players = [
+                    {"id": int(p["id"]), "price": self._price(p.get("price"), None), "slot": None if p.get("slot") is None else int(p["slot"])}
+                    for p in entry.get("players") or []
+                    if int(p["id"]) in self.by_id
+                ]
+                out.append({"id": str(entry["id"]), "name": str(entry.get("name") or "Roster")[:MAX_NAME],
+                            "savedAt": float(entry.get("savedAt") or 0), "players": players})
+            except (KeyError, TypeError, ValueError, AttributeError):
+                continue
+        return out[:MAX_SAVED]
 
     def _clean_settings(self, saved: Dict[str, Any]) -> Dict[str, Any]:
         room = dict(DEFAULT_ROOM_SETTINGS)
@@ -595,6 +615,103 @@ class DraftBoard:
                     self.state["picks"].pop(str(pid), None)
             self.state["filled"] = [None] * len(self.slots)
             self._save()
+
+    # ---------------------------------------------------------- saved rosters
+
+    def save_roster(self, name: Optional[str] = None) -> Optional[str]:
+        """Keep a copy of my roster (players, slots and prices) on the Saved tab."""
+        with self.lock:
+            saved = self.state["saved"]
+            if len(saved) >= MAX_SAVED:
+                return f"You have {MAX_SAVED} saved rosters. Delete one first."
+            players = [
+                {"id": pid, "price": self._price(self.state["picks"].get(str(pid), {}).get("price"), self._default_price(pid)), "slot": i}
+                for i, pid in enumerate(self.state["filled"]) if pid is not None
+            ]
+            if not players:
+                return "Your roster is empty. Add players on the Board first."
+            name = " ".join(str(name or "").split())[:MAX_NAME]
+            if not name:
+                used = {s["name"] for s in saved}
+                name = next(f"Roster {n}" for n in range(1, MAX_SAVED + 2) if f"Roster {n}" not in used)
+            saved.append({"id": uuid.uuid4().hex[:8], "name": name, "savedAt": time.time(), "players": players})
+            self._save()
+            return None
+
+    def _saved(self, saved_id: str) -> Optional[Dict[str, Any]]:
+        return next((s for s in self.state["saved"] if s["id"] == str(saved_id)), None)
+
+    def load_roster(self, saved_id: str) -> Optional[str]:
+        """Make a saved roster my team, in its slots at its prices. It replaces the players on my
+        team now; saved players someone else has taken since are left out."""
+        with self.lock:
+            entry = self._saved(saved_id)
+            if entry is None:
+                return "That saved roster is gone. Someone may have deleted it."
+            picks = self.state["picks"]
+            for pid in self.state["filled"]:
+                if pid is not None:
+                    picks.pop(str(pid), None)
+            filled: List[Optional[int]] = [None] * len(self.slots)
+            wanted = [p for p in entry["players"] if picks.get(str(p["id"]), {}).get("status") != TAKEN]
+            later = []
+            for p in wanted:  # its own slot first, if that slot still exists and he still fits it
+                i = p["slot"]
+                if i is not None and 0 <= i < len(self.slots) and filled[i] is None and roster.eligible(self.slots[i], self.by_id[p["id"]].eligible_slots):
+                    filled[i] = p["id"]
+                else:
+                    later.append(p)
+            for p in later:
+                i = roster.auto_slot(self.slots, filled, self.by_id[p["id"]].eligible_slots)
+                if i >= 0:
+                    filled[i] = p["id"]
+            for p in wanted:
+                if p["id"] in filled:
+                    picks[str(p["id"])] = {"status": MINE, "price": p["price"]}
+            self.state["filled"] = filled
+            self._save()
+            return None
+
+    def delete_roster(self, saved_id: str) -> Optional[str]:
+        with self.lock:
+            entry = self._saved(saved_id)
+            if entry is None:
+                return "That saved roster is already gone."
+            self.state["saved"].remove(entry)
+            self._save()
+            return None
+
+    def rename_roster(self, saved_id: str, name: str) -> Optional[str]:
+        with self.lock:
+            entry, name = self._saved(saved_id), " ".join(str(name or "").split())[:MAX_NAME]
+            if entry is None:
+                return "That saved roster is gone. Someone may have deleted it."
+            if name and name != entry["name"]:
+                entry["name"] = name
+                self._save()
+            return None
+
+    def _saved_for(self, rows, picks, taken: List[int]) -> List[Dict[str, Any]]:
+        """Each saved roster scored like My Team: expected category wins a week against the average
+        team, with the draft as it is now (empty spots count as replacement players)."""
+        by_row = {r.id: r for r in rows}
+        cats = self.shape.categories
+        mine = {pid for pid in self.state["filled"] if pid is not None}
+        out = []
+        for entry in self.state["saved"]:
+            ids = [p["id"] for p in entry["players"] if p["id"] in by_row]
+            sim = valuation.simulate_league(rows, ids, [t for t in taken if t not in ids], self.shape, self.schedule)
+            chances = {c: valuation.win_chance(sim.ratings.get(c, 100.0), c) for c in cats}
+            out.append({
+                **entry,
+                "players": [{**p, "status": picks.get(p["id"], {}).get("status")} for p in entry["players"]],
+                "cost": sum(p["price"] for p in entry["players"]),
+                "worth": _r(sum(by_row[i].ours for i in ids), 0),
+                "expectedWins": round(sum(chances.values()), 2),
+                "chances": {c: round(x, 3) for c, x in chances.items()},
+                "current": set(ids) == mine,
+            })
+        return out
 
     def replace_state(self, state: Dict[str, Any], rev: Optional[int] = None) -> Optional[str]:
         """Restore a previous state (used by Undo). `rev` is the board revision the
@@ -920,6 +1037,8 @@ class DraftBoard:
             "me": self._me(picks, mine),
             "team": {**self._team(sim, rows, picks, mine), **self._team_range_for(rows, mine, taken)},
             "playoffs": self._playoffs_for(rows, mine, taken, sim),
+            "saved": self._saved_for(rows, picks, taken),
+            "maxSaved": MAX_SAVED,
         }
 
     def _meta(self) -> Dict[str, Any]:

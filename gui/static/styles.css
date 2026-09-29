@@ -403,6 +403,17 @@ textarea{width:100%;min-height:60px;border:1px solid var(--line-strong);border-r
 .build-t{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline}
 .build-t .btn{margin-left:auto;align-self:center}
 .build .lbl{display:inline-block;width:32px}
+.saved .plan-actions input{width:180px;padding:5px 10px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.savedtab{min-width:640px}
+.savedtab td{padding:4px 10px}
+.savedtab .nm-in{width:170px;padding:3px 6px;border:1px solid transparent;border-radius:var(--r-sm);background:transparent;font:inherit;font-weight:600;color:inherit}
+.savedtab .nm-in:hover{border-color:var(--line-strong)}
+.savedtab .nm-in:focus{border-color:var(--accent);background:var(--surface);outline:none}
+.savedtab th{white-space:nowrap}
+.savedtab td.l:nth-child(3){font-family:var(--font-ui);font-size:12.5px;white-space:normal;min-width:260px}
+.savedtab td.top{color:var(--good);font-weight:600}
+.savedtab .gone{text-decoration:line-through;color:var(--muted)}
+.savedtab tr.yours td:first-child{padding-left:16px}
 @media (max-width:700px){.plancats{grid-template-columns:repeat(5,minmax(0,1fr))}.plan-head{flex-direction:column}}
 .plan-avoid{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:var(--fs-small)}
 .plan-avoid .lbl{margin-right:4px}

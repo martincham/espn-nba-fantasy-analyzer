@@ -212,6 +212,51 @@ class BoardTest(unittest.TestCase):
         self.assertIsNotNone(b.replace_state(before, rev))
         self.assertIn(str(other), b.state["picks"])
 
+    def test_saved_rosters(self):
+        from gui.board import DraftBoard, MAX_SAVED
+
+        b = self.board
+        ids = [p.id for p in sorted(b.players, key=lambda p: p.espn_rank or 999)[:6]]
+        self.assertIsNotNone(b.save_roster("Empty"))  # nothing to save
+        b.pick(ids[0], "mine", 50)
+        b.pick(ids[1], "mine", 30)
+        slot0 = b.state["filled"].index(ids[0])
+        self.assertIsNone(b.save_roster("  Stars   and scrubs "))
+        self.assertIsNone(b.save_roster())
+        first, second = b.state["saved"]
+        self.assertEqual((first["name"], second["name"]), ("Stars and scrubs", "Roster 1"))
+
+        snap = b.snapshot()["saved"][0]
+        self.assertTrue(snap["current"])
+        self.assertEqual((snap["cost"], len(snap["players"])), (80, 2))
+        self.assertEqual(snap["expectedWins"], b.snapshot()["team"]["expectedWins"])  # scored like My Team
+
+        # Loading replaces my team, keeping slots and prices, and leaves out players taken since.
+        b.clear_roster()
+        b.pick(ids[2], "mine", 10)
+        b.pick(ids[1], "taken")
+        self.assertIsNone(b.load_roster(first["id"]))
+        self.assertEqual([x for x in b.state["filled"] if x is not None], [ids[0]])
+        self.assertEqual(b.state["filled"].index(ids[0]), slot0)
+        self.assertEqual(b.state["picks"][str(ids[0])], {"status": "mine", "price": 50})
+        self.assertNotIn(str(ids[2]), b.state["picks"])
+        self.assertEqual(b.state["picks"][str(ids[1])]["status"], "taken")
+        self.assertEqual(b.snapshot()["saved"][0]["players"][1]["status"], "taken")
+
+        self.assertIsNone(b.rename_roster(first["id"], "Plan A"))
+        self.assertIsNone(b.delete_roster(second["id"]))
+        self.assertIsNotNone(b.load_roster(second["id"]))  # gone
+        self.assertEqual([s["name"] for s in b.state["saved"]], ["Plan A"])
+
+        while len(b.state["saved"]) < MAX_SAVED:
+            self.assertIsNone(b.save_roster())
+        self.assertIn("Delete one", b.save_roster())
+
+        # They're saved with the draft and survive a restart.
+        again = DraftBoard(b.settings_path, b.pool_path, b.state_path)
+        again.load()
+        self.assertEqual(again.state["saved"], b.state["saved"])
+
     def test_snapshot_shape(self):
         snap = self.board.snapshot()
         self.assertEqual(snap["meta"]["seasonLabel"], "2026-27")

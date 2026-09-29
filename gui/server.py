@@ -88,6 +88,10 @@ def _actions(board: DraftBoard) -> Dict[str, Callable[[Dict[str, Any]], Optional
         "plan-restore": lambda b: board.restore_plan(),
         "plan-use": lambda b: board.use_plan(list(b["ids"])),
         "plan-save": lambda b: board.save_plan(),
+        "roster-save": lambda b: board.save_roster(b.get("name")),
+        "roster-load": lambda b: board.load_roster(str(b["id"])),
+        "roster-delete": lambda b: board.delete_roster(str(b["id"])),
+        "roster-rename": lambda b: board.rename_roster(str(b["id"]), str(b["name"])),
     }
 
 

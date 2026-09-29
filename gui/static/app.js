@@ -111,7 +111,7 @@ function render() {
     UI.sel = first ? first.id : null;
   }
   if (!$("teams").childElementCount) renderTeams();
-  renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam(); renderPlan(); renderPlayoffs(); renderSettings();
+  renderMeta(); renderScore(); renderCatRow(); renderHead(); renderBody(); renderStrip(); renderDetail(); renderTeam(); renderSaved(); renderPlan(); renderPlayoffs(); renderSettings();
 }
 function renderLive() { // while dragging a slider: leave the panel being dragged alone
   byId = new Map(B.rows.map((r) => [r.id, r]));
@@ -577,7 +577,8 @@ function renderTeam() {
   const m = B.meta, filled = B.state.filled, me = B.me;
   const mine = filled.filter((x) => x != null).map((id) => byId.get(id)).filter(Boolean);
   const worth = mine.reduce((a, r) => a + r.ours, 0);
-  let h = `<div class="slothead"><h3>Roster</h3><button class="btn danger" type="button" data-clear ${mine.length ? "" : "disabled"}>Clear roster</button></div>
+  const full = B.saved.length >= B.maxSaved;
+  let h = `<div class="slothead"><h3>Roster</h3><span class="plan-actions"><button class="btn" type="button" data-save-roster ${mine.length && !full ? "" : "disabled"} title="${full ? `You have ${B.maxSaved} saved rosters. Delete one on the Saved tab first.` : "Keep a copy of this roster on the Saved tab"}">Save roster</button><button class="btn danger" type="button" data-clear ${mine.length ? "" : "disabled"}>Clear roster</button></span></div>
     <p class="sub">${me.count} of ${m.rosterSize} · $${me.spent} spent, worth ${money(worth)} by our value. Drag to rearrange, or click one slot and then another.</p>`;
   const firstBench = m.slots.indexOf("BE");
   m.slots.forEach((s, i) => {
@@ -697,6 +698,7 @@ document.addEventListener("drop", (e) => {
 function slotContainerHandlers(el) {
   el.addEventListener("click", (e) => {
     if (e.target.closest("[data-clear]")) return clearRoster();
+    if (e.target.closest("[data-save-roster]")) return saveRoster();
     const x = e.target.closest("[data-remove]");
     if (x) return removeMine(+x.dataset.remove);
     if (e.target.closest("input")) return;
@@ -1203,6 +1205,81 @@ $("planPanel").addEventListener("click", (e) => {
   if (g) { UI.sel = +g.dataset.goto; setView("board"); render(); }
 });
 
+// ------------------------------------------------------------------ saved rosters
+
+function renderSaved() {
+  const el = $("savedPanel"), m = B.meta, S = B.saved, n = m.categories.length;
+  $("savedCount").textContent = S.length || "";
+  const mine = B.state.filled.filter((x) => x != null);
+  const full = S.length >= B.maxSaved;
+  const best = Math.max(...S.map((s) => s.expectedWins));
+  const wl = (w) => `${w.toFixed(1)}–${(n - w).toFixed(1)}`;
+  const chanceTip = (ch) => m.categories.map((c) => `${c} ${Math.round(ch[c] * 100)}%`).join(" · ");
+  // Top 5 by our value; players someone else has taken since are struck through.
+  const top = (players) => {
+    const rows = players.map((p) => ({ p, r: byId.get(p.id) })).filter((x) => x.r).sort((a, b) => b.r.ours - a.r.ours);
+    return rows.slice(0, 5).map(({ p, r }) => `<span class="${p.status === "taken" ? "gone" : ""}" title="${esc(r.name)} · $${p.price}${p.status === "taken" ? " · taken" : ""}">${esc(initialLast(r.name))}</span>`).join(", ")
+      + (rows.length > 5 ? ` <span class="muted">+${rows.length - 5}</span>` : "");
+  };
+  let h = `<div class="plan-head"><div><h3>Saved rosters</h3>
+      <p class="sub">Up to ${B.maxSaved} versions of your team to compare. <b>Cats W–L</b> is the expected weekly record against the average team, scored with the draft as it is now, so empty spots count as replacement players. Hover it for each category. Loading one replaces your current team.</p></div>
+    <form class="plan-actions" id="saveForm"><input type="text" id="saveName" maxlength="40" placeholder="Name (optional)" aria-label="Name for the saved roster" autocomplete="off">
+      <button class="btn primary" type="submit" ${mine.length && !full ? "" : "disabled"}>Save current roster</button></form></div>`;
+  if (full) h += `<p class="plan-stale">You have ${B.maxSaved} saved rosters. Delete one to save another.</p>`;
+  const curChances = Object.fromEntries(B.team.categories.map((c) => [c.cat, c.win]));
+  h += `<div class="plantab-wrap"><table class="plantab savedtab" aria-label="Saved rosters">
+    <thead><tr><th class="l" scope="col">Name</th><th scope="col" title="Expected categories won–lost per week vs the average team">Cats W–L</th><th class="l" scope="col">Top players</th><th scope="col">Spent</th><th scope="col"><span class="sr">Actions</span></th></tr></thead><tbody>
+    <tr class="yours"><td class="l"><b>Current team</b></td><td title="${esc(chanceTip(curChances))}">${mine.length ? wl(B.team.expectedWins) : "—"}</td>
+      <td class="l">${mine.length ? top(mine.map((id) => ({ id, price: byId.get(id)?.price }))) : `<span class="muted">empty</span>`}</td><td>$${B.me.spent} <span class="muted">· ${mine.length}</span></td><td></td></tr>`;
+  for (const s of S) {
+    const taken = s.players.filter((p) => p.status === "taken").length;
+    h += `<tr>
+      <td class="l"><input type="text" class="nm-in" value="${esc(s.name)}" maxlength="40" data-rename="${s.id}" id="rn-${s.id}" aria-label="Name of saved roster ${esc(s.name)}" title="Click to rename" autocomplete="off">${s.current ? ` <span class="pill mine" title="Same players as your team now">Loaded</span>` : ""}</td>
+      <td class="${S.length > 1 && s.expectedWins === best ? "top" : ""}" title="${esc(chanceTip(s.chances))}">${wl(s.expectedWins)}</td>
+      <td class="l">${top(s.players)}${taken ? ` <span class="pill taken" title="${taken} of its players ${taken > 1 ? "have" : "has"} been taken since, and won't load">${taken} taken</span>` : ""}</td>
+      <td>$${s.cost} <span class="muted">· ${s.players.length}</span></td>
+      <td><button class="btn sm" type="button" data-load-roster="${s.id}" ${s.current ? "disabled" : ""}>Load</button> <button class="linkbtn quiet" type="button" data-delete-roster="${s.id}">Delete</button></td></tr>`;
+  }
+  h += `</tbody></table></div>`;
+  if (!S.length) h += `<p class="plan-empty">No saved rosters yet. Build a team, then save it here or with <b>Save roster</b> on My Team.</p>`;
+  el.innerHTML = h;
+}
+function saveRoster(name = "") {
+  const before = new Set(B.saved.map((s) => s.id));
+  return act("roster-save", { name }).then((ok) => {
+    if (!ok) return false;
+    const s = B.saved.find((x) => !before.has(x.id));
+    toast(`Saved ${s ? `"${s.name}"` : "your roster"}.`);
+    return true;
+  });
+}
+$("savedPanel").addEventListener("submit", (e) => {
+  e.preventDefault();
+  saveRoster($("saveName").value).then((ok) => { if (ok && $("saveName")) $("saveName").value = ""; });
+});
+$("savedPanel").addEventListener("change", (e) => {
+  const rn = e.target.closest("[data-rename]");
+  if (rn) act("roster-rename", { id: rn.dataset.rename, name: rn.value });
+});
+$("savedPanel").addEventListener("keydown", (e) => {
+  if (!e.target.matches("[data-rename]")) return;
+  if (e.key === "Enter") e.target.blur();
+  if (e.key === "Escape") { e.target.value = B.saved.find((s) => s.id === e.target.dataset.rename)?.name || ""; e.target.blur(); }
+});
+$("savedPanel").addEventListener("click", (e) => {
+  const load = e.target.closest("[data-load-roster]");
+  if (load) {
+    const s = B.saved.find((x) => x.id === load.dataset.loadRoster), prev = snapshotState();
+    const skipped = s.players.filter((p) => p.status === "taken").map((p) => byId.get(p.id)?.name).filter(Boolean);
+    return act("roster-load", { id: s.id }).then((ok) => ok && toast(`Loaded "${s.name}".${skipped.length ? ` Left out ${skipped.join(", ")}: taken.` : ""}`, undoTo(prev)));
+  }
+  const del = e.target.closest("[data-delete-roster]");
+  if (del) {
+    const s = B.saved.find((x) => x.id === del.dataset.deleteRoster), prev = snapshotState();
+    return act("roster-delete", { id: s.id }).then((ok) => ok && toast(`Deleted "${s.name}".`, undoTo(prev)));
+  }
+});
+
 // ------------------------------------------------------------------ playoffs
 
 const PO = { affordable: false, show: 20 };
@@ -1509,7 +1586,7 @@ function setView(v) {
     $("tab-" + k).setAttribute("aria-selected", v === k);
   });
 }
-const VIEWS = ["board", "team", "plan", "playoffs", "settings"];
+const VIEWS = ["board", "team", "saved", "plan", "playoffs", "settings"];
 VIEWS.forEach((k) => $("tab-" + k).addEventListener("click", () => { setView(k); render(); }));
 
 function setTheme(t) {

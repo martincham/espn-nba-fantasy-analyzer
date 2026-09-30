@@ -404,6 +404,9 @@ class BoardTest(unittest.TestCase):
         self.assertTrue(all(r["fit"] is not None for r in snap["rows"]))
         for r in snap["rows"]:
             self.assertAlmostEqual(r["fitEdge"], r["fitDollars"] - r["avg"], places=0)  # Fit $ − Avg paid
+        # Fit $ splits the same money as Ours, by Fit instead of Value.
+        total = lambda key: sum(sorted((r[key] for r in snap["rows"]), reverse=True)[: b.shape.priced_size])
+        self.assertAlmostEqual(total("fitDollars"), total("ours"), delta=1)
         self.assertEqual(snap["meta"]["punt"], [])  # never punts on its own
         # Punting a category takes it out of Fit only.
         before = {r["id"]: r["value"] for r in snap["rows"]}

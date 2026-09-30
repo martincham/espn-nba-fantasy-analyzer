@@ -285,7 +285,7 @@ const GROUPS = () => [
   ...(showCats ? [{ label: "Categories · per game", span: B.meta.categories.length + 1, cls: "g-cats" }] : []),
   { label: B.meta.statsLabel, span: 3 },
   { label: `${B.meta.seasonLabel} outlook`, span: 9, cls: "g-out" },
-  { label: "Auction $", span: 4, cls: "g-ours" },
+  { label: "Auction $", span: 5, cls: "g-ours" },
 ];
 const BASE_COLS = [
   { key: "taken", label: "", sr: "Taken", nosort: true, cls: "tk-h", title: "Drafted by another team" },
@@ -306,8 +306,9 @@ const BASE_COLS = [
   { key: "fit", label: "Fit", title: "Value to your current team: how much he raises your weekly category win chances. Categories you're already winning count less, punted ones not at all. Only games he'd start count, so games on nights your roster is already full add less. 100 = an average player. ± is one standard deviation from games played alone." },
   { key: "avg", label: "Cost", title: "What he should cost: the average price in ESPN auction drafts, scaled to this league's budget, unless you set your own. Drag or type; clear to go back to ESPN's." },
   { key: "ours", label: "Ours", cls: "ours-h", title: "What he's worth: the league's money split among the players worth buying, in proportion to their value above replacement. No cap: a player far better than the rest is worth far more." },
+  { key: "fitDollars", label: "Fit $", cls: "ours-h", title: "What he's worth to your team: Ours, but split by Fit instead of Value, so it counts the categories you need and the nights your roster already has covered. The same league money as Ours, so a player who fits no better or worse than his value comes out about the same." },
   { key: "edge", label: "Edge", cls: "ours-h", title: "Ours − Cost: what he's worth minus what he should go for" },
-  { key: "fitEdge", label: "Fit edge", cls: "ours-h", title: "Fit $ − Cost: the bargain for your current team. Fit $ converts Fit to dollars at the same rate as Ours." },
+  { key: "fitEdge", label: "Fit edge", cls: "ours-h", title: "Fit $ − Cost: the bargain for your current team" },
 ];
 
 function cols() {
@@ -451,6 +452,7 @@ function rowHTML(r) {
     <td class="fit">${r.status === "taken" ? "—" : `${fmt(r.fit)}${pm(r.fitPm)}`}</td>
     <td><span class="cw"><input class="cell ${r.costSet ? "edited" : ""}" type="text" inputmode="numeric" autocomplete="off" value="${Math.round(r.avg)}" title="ESPN: ${money(r.avgEspn)} (average ${money(r.avgRaw)} × ${B.meta.marketScale.toFixed(2)})" aria-label="Cost of ${esc(r.name)}" data-cost="${r.id}" id="c-${r.id}">${was(Math.round(r.avgEspn))}</span></td>
     <td class="ours">${money(r.ours)}</td>
+    <td class="ours">${r.status === "taken" || r.fitDollars == null ? "—" : money(r.fitDollars)}</td>
     <td class="ours"><span class="edge ${ecls}">${signed(e)}</span></td>
     <td class="ours">${r.status === "taken" || r.fitEdge == null ? "—" : `<span class="edge ${edgeCls(r.fitEdge)}">${signed(r.fitEdge)}</span>`}</td>
   </tr>`;
@@ -500,7 +502,7 @@ function renderDetail() {
       <div><span class="lbl">Ours</span><span class="v">${money(r.ours)}</span></div>
       <div title="Ours − Cost: what he's worth minus what he should go for"><span class="lbl">Edge</span><span class="v ${r.edge >= 3 ? "up" : r.edge <= -3 ? "down" : ""}">${signed(r.edge)}</span></div>
       <div title="Rank by Fit among players still available"><span class="lbl">Fit rank</span><span class="v">${r.fitRank ? "#" + r.fitRank : "—"}</span></div>
-      <div title="Fit ${fmt(r.fit)} converted at the league's $/point"><span class="lbl">Fit $</span><span class="v">${r.fitDollars == null ? "—" : money(r.fitDollars)}</span></div>
+      <div title="Fit ${fmt(r.fit)} priced like Ours: the league's money split by Fit"><span class="lbl">Fit $</span><span class="v">${r.fitDollars == null ? "—" : money(r.fitDollars)}</span></div>
       <div title="Fit $ − Cost: the bargain for your current team"><span class="lbl">Fit edge</span><span class="v ${r.fitEdge >= 3 ? "up" : r.fitEdge <= -3 ? "down" : ""}">${r.fitEdge == null ? "—" : signed(r.fitEdge)}</span></div>
       <div><span class="lbl">ESPN rank</span><span class="v">#${r.espnRank ?? "—"}</span></div>
       <div><span class="lbl">ESPN $</span><span class="v">${money(r.espn)}</span></div>
@@ -530,10 +532,12 @@ function renderDetail() {
       <div class="adj"><span>Δ</span><input type="range" id="dRange" min="${-B.meta.maxDelta}" max="${B.meta.maxDelta}" step="1" value="${r.delta}" aria-label="Δ rating points"><output id="dOut">${signed(r.delta)}</output></div>
       <div class="adj"><span>Exp MIN</span><input type="range" id="mRange" min="0" max="${B.meta.maxMin}" step="0.5" value="${r.expMin}" aria-label="Expected minutes"><output id="mOut">${fmt(r.expMin)}</output></div>
       <div class="adj"><span>GP Δ</span><input type="range" id="gRange" min="${-r.espnGp}" max="${82 - r.espnGp}" step="1" value="${r.gpDelta}" aria-label="Games more or fewer than ESPN projects"><output id="gOut">${gpOut(r, r.gpDelta)}</output></div>
+      <div class="adj" title="What he should cost. ESPN's: ${money(r.avgEspn)}"><span>Cost</span><input type="range" id="cRange" min="0" max="${B.meta.budget}" step="1" value="${Math.round(r.avg)}" aria-label="Cost of ${esc(r.name)}"><output id="cOut">$${Math.round(r.avg)}</output></div>
       <p class="hint">${espnHint}
         ${r.projMin || r.projGp ? `<button class="linkbtn" type="button" id="useEspn">Use ESPN's</button>` : ""}
         ${r.minSet ? ` · <button class="linkbtn" type="button" id="resetMin">Reset minutes</button>` : ""}
-        ${r.gpDelta ? ` · <button class="linkbtn" type="button" id="resetGp">Reset games</button>` : ""}</p></div>
+        ${r.gpDelta ? ` · <button class="linkbtn" type="button" id="resetGp">Reset games</button>` : ""}
+        ${r.costSet ? ` · <button class="linkbtn" type="button" id="resetCost">Reset cost to ESPN's ${money(r.avgEspn)}</button>` : ""}</p></div>
     <div><label class="lbl sec-t" for="noteBox">Note</label>
       <textarea id="noteBox" placeholder="Why the adjustment?">${esc(r.note || "")}</textarea></div>
     <div><span class="lbl sec-t">Draft</span>
@@ -989,9 +993,10 @@ det.addEventListener("input", (e) => {
   if (e.target.id === "dRange") { $("dOut").textContent = signed(+e.target.value); sendAdjust({ id: UI.sel, delta: +e.target.value }); }
   if (e.target.id === "gRange") { $("gOut").textContent = gpOut(byId.get(UI.sel), +e.target.value); sendAdjust({ id: UI.sel, gpDelta: +e.target.value }); }
   if (e.target.id === "mRange") { $("mOut").textContent = fmt(+e.target.value); sendAdjust({ id: UI.sel, expMin: +e.target.value }); }
+  if (e.target.id === "cRange") { $("cOut").textContent = "$" + e.target.value; sendAdjust({ id: UI.sel, cost: +e.target.value }); }
 });
 det.addEventListener("change", (e) => {
-  if (["dRange", "gRange", "mRange"].includes(e.target.id)) renderKeepFocus(); // redraw bars once the drag ends
+  if (["dRange", "gRange", "mRange", "cRange"].includes(e.target.id)) renderKeepFocus(); // redraw bars once the drag ends
   if (e.target.id === "noteBox") act("adjust", { id: UI.sel, note: e.target.value });
 });
 det.addEventListener("click", (e) => {
@@ -1020,6 +1025,8 @@ det.addEventListener("click", (e) => {
     act("adjust", { id: r.id, expMin: null });
   } else if (e.target.id === "resetGp") {
     act("adjust", { id: r.id, gpDelta: 0 });
+  } else if (e.target.id === "resetCost") {
+    act("adjust", { id: r.id, cost: null });
   }
 });
 

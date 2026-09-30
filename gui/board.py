@@ -942,6 +942,9 @@ class DraftBoard:
         zero_games = replace(rows[0], id=-1, proj_stats={}, exp_gp=0, proj_pg=float(shape.replacement), team=None) if rows else None
         zero_fit = valuation.team_fit([zero_games], mine, shape, sim, base, fit_cats, useful).get(-1, 100.0) if rows else 100.0
         rate = valuation.pricing(rows, shape)
+        # Fit $: the league's money split by Fit the way Ours splits it by Value. Fit sits higher than
+        # Value (an empty roster's top 84 came to ~$3,400 at Ours' rate), so it gets its own rate.
+        fit_rate = valuation.pricing([SimpleNamespace(value=f) for f in fits.values()], shape)
         # Ranges: games and season value when both games and the per-game rating are uncertain.
         # Their dollars are priced against every player's mean outcome, so the ranges share a scale.
         missed_value = shape.replacement * shape.fill_rate  # what a missed game is worth on average: filled or lost
@@ -1006,9 +1009,9 @@ class DraftBoard:
                 "edge": _r(r.ours - self._market(p), 2),
                 "fit": _r(fits.get(r.id)),
                 "fitPm": _r(availability.plus_minus(fits[r.id], zero_fit, r), 1) if r.id in fits else None,
-                "fitDollars": _r(rate.dollars(fits[r.id]), 2) if r.id in fits else None,
+                "fitDollars": _r(fit_rate.dollars(fits[r.id]), 2) if r.id in fits else None,
                 "fitRank": fit_rank.get(r.id),
-                "fitEdge": _r(rate.dollars(fits[r.id]) - self._market(p), 2) if r.id in fits else None,
+                "fitEdge": _r(fit_rate.dollars(fits[r.id]) - self._market(p), 2) if r.id in fits else None,
                 "starts": _r(starts[r.id], 3) if r.id in starts else None,
                 "teamGames": len(self.team_days.get(p.pro_team, [])) or None,
                 "status": pick["status"] if pick else None,

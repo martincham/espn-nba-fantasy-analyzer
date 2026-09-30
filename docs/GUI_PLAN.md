@@ -151,7 +151,7 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
    - Alternative (`fit_by_fade`): `Fade(start=110, end=140)`, full weight up to 110, weight falling linearly to 0 at 140.
    - Fit = 100 + (useful total with the player − useful total with an average player) × counted ÷ categories. Punted categories (team-row checkboxes, never automatic) are left out.
    - With daily lineups, a player only adds on the days he'd start, and "counted" becomes the team's total starts in seasons (starts ÷ 82). The share of each player's games he'd start on my team is shown as **Starts**.
-   - **Fit $** converts Fit at the league's $/point (`valuation.pricing`). **Fit edge** = Fit $ − Avg paid, a board column. **Fit rank** ranks Fit among players not taken.
+   - **Fit $** prices Fit the way Ours prices Value: `valuation.pricing` run on every player's Fit, so the same league money is split by Fit above the replacement Fit. (At Ours' rate, an empty roster's top 84 came to ~$3,400 of $2,400, since Fit runs higher than Value.) **Fit $** and **Fit edge** = Fit $ − Avg paid are board columns. **Fit rank** ranks Fit among players not taken.
 11. **During the draft** other teams' picks are marked taken with no price: only that a player is gone matters. There's no inflation tracking. Your own picks keep a price (default Avg paid) for your budget.
 
 ## Screens
@@ -165,12 +165,12 @@ The league is an **auction** draft: 12 teams, $200 each, 12-man rosters (read fr
   - *2025-26:* GP · Per game · Value
   - *2026-27 outlook:* **GP Δ** · Exp GP · **Exp MIN** · **Δ** (the bold ones are editable by typing or click-and-drag scrubbing) · Proj per game · Value
   - *2026-27 outlook* also ends with **Fit**: value to my current team.
-  - *Auction $:* Avg paid · **Ours** · **Edge** · **Fit edge**. ESPN's own price is in the player panel.
+  - *Auction $:* Avg paid · **Ours** · **Fit $** · **Edge** · **Fit edge**. ESPN's own price is in the player panel.
   - Edge uses green/red. Edited cells are highlighted amber.
 - **Player detail** (on row select):
   - A ratings table: per game, games and value, for 2025-26 and 2026-27.
   - Before/after category bars that show how Δ spreads.
-  - Δ, Exp MIN and GP Δ sliders.
+  - Δ, Exp MIN, GP Δ and Cost sliders.
   - ESPN's implied Δ and GP, with a *Use ESPN's* button.
   - Note field, and Mark mine/taken with a price.
 - Δ, GP Δ, Exp MIN and notes save on edit to `draftState.json` (`adjustments: {playerId: {delta, gpDelta, expMin, note}}`), so they survive restarts.

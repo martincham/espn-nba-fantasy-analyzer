@@ -154,7 +154,7 @@ The **Fit** column rates each player by how much he'd help *your current team*. 
   - So a player whose games fall on nights your roster is already full adds less, and one who plays on nights your core is idle adds more. With a typical roster this moves Fit by about ±1.5, and by up to about 5 for teams with very crowded or very light schedules. The player panel shows **Starts**: the share of his games that would make your lineup.
   - Positions are ignored: any player can fill any starting slot.
 
-**Ours and Edge don't change with your team.** They price players against the market, and the room doesn't care what you've drafted. Fit is for choosing between players during the draft. **Fit $** converts Fit to dollars at the league's rate: roughly what that player is worth *to you*. **Fit edge = Fit $ − Avg paid**, the bargain for your team, where Edge is the bargain for anyone. Fit edge usually runs below Edge, because fading only ever takes value away.
+**Ours and Edge don't change with your team.** They price players against the market, and the room doesn't care what you've drafted. Fit is for choosing between players during the draft. **Fit $** is what that player is worth *to you*: the league's money split by Fit, the way Ours splits it by Value. **Fit edge = Fit $ − Avg paid**, the bargain for your team, where Edge is the bargain for anyone. Fit edge usually runs below Edge, because fading only ever takes value away.
 
 ### Punting is always your choice
 

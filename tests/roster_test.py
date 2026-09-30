@@ -67,6 +67,27 @@ class RosterTest(unittest.TestCase):
     def test_remove(self):
         self.assertEqual(roster.remove([1, None, 2], 2), [1, None, None])
 
+    def test_day_lineup_moves_players_to_start_more(self):
+        elig = {**ELIG, 9: ["UT", "BE"]}
+        # The guard starts in UT (the day before's slot) until the UT-only player needs it: he moves to PG.
+        filled, sits = roster.day_lineup(SLOTS, [3, 9], elig, prefer={3: 6})
+        self.assertEqual((filled[0], filled[6], sits), (3, 9, []))
+        self.assertEqual(filled[7:], [None, None])  # bench slots stay empty
+
+    def test_day_lineup_benches_the_worst(self):
+        elig = {**ELIG, 9: ["UT", "BE"]}
+        # Two C/UT spots for three centers: the last one sits, even though he'd fit if the first sat.
+        filled, sits = roster.day_lineup(SLOTS, [9, 1, 4], elig)
+        self.assertEqual((filled[1], filled[6], sits), (1, 9, [4]))
+
+    def test_day_lineup_leaves_ut_open(self):
+        filled, _ = roster.day_lineup(SLOTS, [3], ELIG, prefer={3: 6})
+        self.assertEqual((filled[0], filled[6]), (3, None))
+
+    def test_day_lineup_keeps_preferred_slots(self):
+        filled, _ = roster.day_lineup(SLOTS, [2, 3], ELIG, prefer={2: 3, 3: 5})
+        self.assertEqual((filled[3], filled[5]), (2, 3))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -249,6 +249,14 @@ class BoardPlanTest(unittest.TestCase):
         self.assertNotIn(ranked[0].id, ids)  # taken
         self.assertTrue(all(p["pfit"] is not None for p in po["players"]))
         self.assertEqual(b.snapshot()["meta"]["playoffWeeks"], [21, 22, 23, 24])
+        # Daily lineups: he starts on each of his team's game days and is off the rest.
+        self.assertEqual(len(po["startSlots"]), b.shape.starters)
+        days = [day for w in po["weeks"] for day in w["lineups"]]
+        self.assertEqual(len(days), 28)
+        started = sum(1 for day in days if mine.id in day["start"])
+        self.assertEqual(started, me[0]["games"])
+        self.assertEqual(sum(1 for day in days if day["off"] == [mine.id]), 28 - started)
+        self.assertTrue(all(day["sits"] == [] for day in days))
 
     def test_plan_for_the_playoffs(self):
         b = self.board

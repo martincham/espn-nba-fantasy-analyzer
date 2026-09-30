@@ -93,3 +93,46 @@ def move(
 
 def remove(filled: Slots, player_id: int) -> Slots:
     return [None if x == player_id else x for x in filled]
+
+
+def day_lineup(
+    slots: Sequence[str],
+    players: Sequence[int],
+    eligibility: Dict[int, Sequence[str]],
+    prefer: Optional[Dict[int, int]] = None,
+) -> Tuple[Slots, List[int]]:
+    """One day's starting lineup from the players with a game, best first.
+
+    Each player starts if the players ahead of him can be moved around to make
+    a slot for him, so the most players start and the better ones never sit
+    for worse ones. `prefer` is a slot to try first for each player (where he
+    started the day before), so players stay put from day to day, except that
+    UT is left open when someone in it fits an open slot. Returns
+    (a player or None for each slot in `slots`, bench slots left empty; the
+    players who sit).
+    """
+    prefer = prefer or {}
+    filled: Slots = [None] * len(slots)
+    starting = [i for i, slot in enumerate(slots) if slot != BENCH]
+
+    def fits(pid: int, seen: set) -> bool:
+        options = [i for i in starting if eligible(slots[i], eligibility.get(pid, []))]
+        options.sort(key=lambda i: i != prefer.get(pid))
+        for i in options:
+            if i in seen:
+                continue
+            seen.add(i)
+            if filled[i] is None or fits(filled[i], seen):
+                filled[i] = pid
+                return True
+        return False
+
+    sits = [pid for pid in players if not fits(pid, set())]
+    # Leave UT open rather than a position slot: any streamer fits UT.
+    for i in starting:
+        if slots[i] == "UT" and filled[i] is not None:
+            to = next((j for j in starting if filled[j] is None and slots[j] != "UT"
+                       and eligible(slots[j], eligibility.get(filled[i], []))), None)
+            if to is not None:
+                filled[to], filled[i] = filled[i], None
+    return filled, sits

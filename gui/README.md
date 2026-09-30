@@ -123,6 +123,7 @@ To start over, stop the app and delete `draftState.json`.
   - **Playoff Fit** is Fit counted over the playoff weeks alone, on Fit's scale: 100 is an average player with an average playoff schedule. A player whose team plays more then, on nights your lineup has room, rates above his Fit. **Best for the playoffs** lists the players you can still get by it.
   - **Plan a playoff team** runs the Plan tab's search for **Playoffs** or **Season + playoffs**.
   - **NBA schedules in the playoffs:** every team's games in each playoff week, and its games on light nights.
+  - **Daily lineups** (the second view on the tab): each playoff week as a grid of your starting slots by day, filled from your players with a game. Players start in order of per-game rating, shuffled between the slots they're eligible for so the most can play, and stay in the same slot from day to day when they can. Under the grid: who has a game but **sits** (no slot they can play), and who has **no game**. An **open** slot on a night with NBA games is room for a streamer.
   - Matchup weeks follow ESPN's: opening night to the first Sunday, then Monday to Sunday, with the All-Star week joined to the next. Before the season ESPN leaves the NBA Cup knockout games off the schedule; **Refresh from ESPN** picks them up once they're set. Late-season rest for stars isn't in the schedule.
 - **Rearrange:** on **My Team**, drag between slots or click one slot and then another.
   - **×** removes a player and **Clear roster** empties every slot.

@@ -1289,7 +1289,8 @@ $("savedPanel").addEventListener("click", (e) => {
 
 // ------------------------------------------------------------------ playoffs
 
-const PO = { affordable: false, show: 20 };
+const PO = { affordable: false, show: 20, sub: "overview" };
+try { if (localStorage.getItem("draftroom-po-sub") === "daily") PO.sub = "daily"; } catch (e) { /* storage blocked */ }
 const shortDate = (iso) => (iso ? new Date(iso + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric" }) : "?");
 const dateSpan = (a, b) => (a && b ? `${shortDate(a)} – ${shortDate(b)}` : "");
 const FOCUS_LABEL = { season: "the whole season", both: "the season and the playoffs", playoffs: "the playoffs" };
@@ -1313,7 +1314,9 @@ function renderPlayoffs() {
 
   let h = `<div class="plan-head"><div><h3>Fantasy playoffs</h3>
       <p class="sub">The top ${P.playoffTeams} of ${P.teams} teams after ${P.regularWeeks} regular-season weeks play ${P.rounds.length === 1 ? "one round" : `${P.rounds.length} rounds`}: ${rounds.join(", then ")}. That's ${weeks.length} weeks, so each player's playoff schedule is a small sample: a team with ${Math.max(...P.nba.map((t) => t.games))} games instead of ${Math.min(...P.nba.map((t) => t.games))}, or games on nights your lineup has room, is worth a lot more here than over a season.</p>
-      ${P.known ? "" : `<p class="plan-stale">ESPN didn't give this league's playoff settings, so this assumes the last ${weeks.length} weeks.</p>`}</div></div>`;
+      ${P.known ? "" : `<p class="plan-stale">ESPN didn't give this league's playoff settings, so this assumes the last ${weeks.length} weeks.</p>`}
+      <div class="seg" role="group" aria-label="Playoffs view"><button type="button" data-po-sub="overview" aria-pressed="${PO.sub !== "daily"}">Overview</button><button type="button" data-po-sub="daily" aria-pressed="${PO.sub === "daily"}">Daily lineups</button></div></div></div>`;
+  if (PO.sub === "daily") { el.innerHTML = h + poDaily(P, mineIds, who); return; }
 
   // The four weeks, day by day: NBA teams playing, and how many of yours.
   h += `<div class="po-weeks" role="list" aria-label="Playoff weeks">${weeks.map((w) => {
@@ -1383,7 +1386,42 @@ function renderPlayoffs() {
     <p class="callout">An average team plays ${P.avgGames} games in these weeks. Games come from ESPN's NBA schedule; late-season rest for stars on tanking or clinched teams isn't in it.</p>`;
   el.innerHTML = h;
 }
+// Each playoff week, day by day: who starts in each slot, who sits with a game, and who's off.
+function poDaily(P, mineIds, who) {
+  if (!mineIds.length) return `<p class="plan-empty">Add players to your team to see their daily lineups.</p>`;
+  const roundOf = (wk) => P.rounds.findIndex((r) => r.weeks.includes(wk)) + 1;
+  const name = (id) => { const r = byId.get(id); return r ? `<button class="linkbtn" type="button" data-goto="${id}" title="${esc(r.name)} · ${esc(r.team)} · ${esc(r.pos)}">${esc(initialLast(r.name))}</button>` : "?"; };
+  const weeks = P.weeks.map((w) => {
+    const L = w.lineups, games = w.days;
+    let starts = 0, open = 0, sits = 0;
+    L.forEach((d, i) => { d.start.forEach((x) => (x == null ? (games[i] ? open++ : 0) : starts++)); sits += d.sits.length; });
+    const head = L.map((d, i) => {
+      const day = new Date(d.date + "T12:00:00"), light = games[i] > 0 && games[i] < P.lightShare * 30;
+      return `<th scope="col" class="${light ? "light" : ""}" title="${games[i] / 2} NBA games${light ? ": a light night" : ""}">${day.toLocaleDateString([], { weekday: "short" })} <span class="d">${day.toLocaleDateString([], { month: "numeric", day: "numeric" })}</span><small>${games[i] / 2} gm</small></th>`;
+    }).join("");
+    const rows = P.startSlots.map((slot, k) => `<tr><th scope="row" class="l">${esc(slot)}</th>${L.map((d, i) => {
+      const id = d.start[k];
+      return id != null ? `<td>${name(id)}</td>` : `<td class="open">${games[i] ? "open" : ""}</td>`;
+    }).join("")}</tr>`).join("");
+    const list = (ids) => ids.map(name).join("");
+    return `<div class="po-lu"><div class="po-wt"><b>Week ${w.week}</b><span>Round ${roundOf(w.week)} · ${dateSpan(w.first, w.last)}</span>
+        <span class="num">${starts} starts · ${open} open${sits ? ` · <span class="neg">${sits} sit</span>` : ""}</span></div>
+      <div class="plantab-wrap"><table class="plantab po-lineup" aria-label="Week ${w.week} daily lineups">
+        <thead><tr><th class="l" scope="col">Slot</th>${head}</tr></thead>
+        <tbody>${rows}
+          <tr class="sits"><th scope="row" class="l" title="Players with a game but no open slot they can play">Sits</th>${L.map((d) => `<td>${list(d.sits)}</td>`).join("")}</tr>
+          <tr class="off"><th scope="row" class="l" title="Players whose team doesn't play">No game</th>${L.map((d) => `<td>${d.off.map((id) => { const r = byId.get(id); return r ? `<button class="linkbtn" type="button" data-goto="${id}" title="${esc(r.name)} · ${esc(r.team)}">${esc(lastName(r.name))}</button>` : ""; }).join(" · ")}</td>`).join("")}</tr>
+        </tbody></table></div></div>`;
+  }).join("");
+  return `${weeks}<p class="callout">Each day, your players with a game start in order of per-game rating, moved between the slots they're eligible for so the most can play and the best never sit for someone worse. They stay in the same slot from day to day when they can. <b>Open</b> is an empty starting slot on a night with NBA games: room for a streamer. Starts here respect positions, so they can come out a little below the Overview's, which only counts slots.</p>`;
+}
 $("playoffsPanel").addEventListener("click", (e) => {
+  const sub = e.target.closest("[data-po-sub]");
+  if (sub) {
+    PO.sub = sub.dataset.poSub;
+    try { localStorage.setItem("draftroom-po-sub", PO.sub); } catch (err) { /* storage blocked */ }
+    return renderPlayoffs();
+  }
   const g = e.target.closest("[data-goto]");
   if (g) { UI.sel = +g.dataset.goto; setView("board"); return render(); }
   if (e.target.closest("#poMore")) { PO.show += 20; return renderPlayoffs(); }

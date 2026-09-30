@@ -1202,11 +1202,25 @@ class DraftBoard:
         date_of = lambda d: cal.date(d).isoformat() if cal.date(d) else None  # noqa: E731
         plays = {t: set(ds) for t, ds in self.team_days.items()}
         my_teams = [by_id[i].team for i in mine if i in by_id]
+        # Each day's lineup: my players with a game, best per-game rating first, in the starting slots.
+        # Each starts where he did the day before (at first, his slot on My Team) when he can.
+        best_first = sorted((by_id[i] for i in mine if i in by_id), key=lambda r: -r.proj_pg)
+        starting = [i for i, slot in enumerate(self.slots) if slot != roster.BENCH]
+        elig = self._eligibility()
+        prefer = {pid: i for i, pid in enumerate(self.state["filled"]) if pid is not None}
         weeks = []
         for w in playoffs.weekly_games(self.team_days, cal):
             days = range(w["first"], w["last"] + 1)
+            lineups = []
+            for d in days:
+                playing = [r.id for r in best_first if d in plays.get(r.team, ())]
+                filled, sits = roster.day_lineup(self.slots, playing, elig, prefer)
+                prefer.update({pid: i for i, pid in enumerate(filled) if pid is not None})
+                lineups.append({"date": date_of(d), "start": [filled[i] for i in starting], "sits": sits,
+                                "off": [r.id for r in best_first if r.id not in playing]})
             weeks.append({**w, "first": date_of(w["first"]), "last": date_of(w["last"]),
-                          "mine": [sum(1 for t in my_teams if d in plays.get(t, ())) for d in days]})  # my players with a game
+                          "mine": [sum(1 for t in my_teams if d in plays.get(t, ())) for d in days],  # my players with a game
+                          "lineups": lineups})
         result = {
             "known": cal.known,
             "playoffTeams": cal.playoff_teams,
@@ -1215,6 +1229,7 @@ class DraftBoard:
             "rounds": [{"period": r.period, "weeks": r.weeks, "first": date_of(r.first), "last": date_of(r.last)} for r in cal.rounds],
             "weeks": weeks,
             "starters": shape.starters,
+            "startSlots": [self.slots[i] for i in starting],
             "nba": [{"team": t.team, "weeks": t.weeks, "games": t.games, "light": t.light} for t in teams.values()],
             "avgGames": round(window_games, 1),
             "lightShare": playoffs.LIGHT_DAY,
